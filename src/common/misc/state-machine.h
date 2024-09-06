@@ -192,7 +192,12 @@ int PINT_state_machine_complete(void *);
  * We assume the first 6 characters of every state machine name are "pvfs2_".
  */
 #define PINT_state_machine_current_machine_name(smcb) \
-    ((smcb)->current_state ? (((smcb)->current_state->parent_machine->name) + 6) : "UNKNOWN")
+    ((smcb)->current_state ? (((smcb)->current_state->parent_machine->name) + 0) : "UNKNOWN")
+
+/*    
+ *  ((smcb)->current_state ? (((smcb)->current_state->parent_machine->name) + 6) : "UNKNOWN")
+ */   
+
 
 /* This macro returns the current state invoked */
 #define PINT_state_machine_current_state_name(smcb) \

@@ -213,6 +213,8 @@ const __keyword_mask_t s_keyword_mask_map[] =
     { "usrint", {GOSSIP_USRINT_DEBUG_INIT} },
     /* Sidcache debugging */
     { "sidcache", {GOSSIP_SIDCACHE_DEBUG_INIT} },
+    /* unexpected messages debugging */
+    { "unexp", {GOSSIP_UNEXP_DEBUG_INIT} },
     /* Configuration file debugging */
     { "getattrsecure", {GOSSIP_GETATTR_SECURITY_DEBUG_INIT} },
     /* Everything except the periodic events.  Useful for debugging */

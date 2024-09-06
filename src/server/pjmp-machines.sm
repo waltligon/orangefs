@@ -244,12 +244,12 @@ static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Executing pvfs2_pjmp_call_msgpairarray_sm:%s\n"
-                 "\t\tfor operation (%s)\n"
+                 "\t\tfor operation (%d)\n"
                  "\t\ts_op (%p)\n"
                  "\t\tframe count is %d.\n"
                  "\t\tbase frame is %d.\n"
                  "\t\top nbr is #%d.\n",
-                 __func__, PINT_map_server_op_to_string(smcb->op),
+                 __func__, smcb->op, /* PINT_map_server_op_to_string(smcb->op), */
                  s_op, smcb->frame_count, smcb->base_frame, smcb->op);
     js_p->error_code = 0;
 

@@ -2477,9 +2477,9 @@ int server_post_unexpected_recv(void)
      */
     job_status_s js={0};
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "server_post_unexpected_recv\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "starting function\n");
 
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "allocating smcb\n");
     ret = PINT_smcb_alloc(&smcb,
                           BMI_UNEXPECTED_OP,
                           sizeof(struct PINT_server_op),
@@ -2493,6 +2493,8 @@ int server_post_unexpected_recv(void)
         return ret;
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New SMCB\n");
+
     s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     memset(s_op, 0, sizeof(PINT_server_op));
     s_op->op = BMI_UNEXPECTED_OP;
@@ -2502,6 +2504,7 @@ int server_post_unexpected_recv(void)
     /* Add an unexpected s_ops to the list */
     qlist_add_tail(&s_op->next, &posted_sop_list);
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling state_machine_start\n");
     ret = PINT_state_machine_start(smcb, &js);
     if(ret == SM_ACTION_TERMINATE)
     {
@@ -2509,6 +2512,7 @@ int server_post_unexpected_recv(void)
         PINT_smcb_free(smcb);
         return js.error_code;
     }
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "exiting function\n");
     return ret;
 }
 
@@ -2668,17 +2672,16 @@ int server_state_machine_start(PINT_smcb *smcb, job_status_s *js_p)
  * returns 0 on success, -PVFS_error on failure
  */
 int server_state_machine_alloc_noreq(enum PVFS_server_op op,
-                                     struct PINT_smcb **new_op)
+                                     struct PINT_smcb **smcb)
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "server_state_machine_alloc_noreq %d\n",op);
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "op = %d\n", op);
 
-    if (new_op)
+    if (smcb)
     {
         PINT_server_op *tmp_op;
-        ret = PINT_smcb_alloc(new_op,
+        ret = PINT_smcb_alloc(smcb,
                               op, 
                               sizeof(struct PINT_server_op),
                               server_op_state_get_machine,
@@ -2691,7 +2694,7 @@ int server_state_machine_alloc_noreq(enum PVFS_server_op op,
             return ret;
         }
 
-        tmp_op = PINT_sm_frame(*new_op, PINT_FRAME_CURRENT);
+        tmp_op = PINT_sm_frame(*smcb, PINT_FRAME_CURRENT);
         tmp_op->op = op;
         tmp_op->target_handle = PVFS_HANDLE_NULL;
         tmp_op->target_fs_id = PVFS_FS_ID_NULL;
@@ -2699,6 +2702,8 @@ int server_state_machine_alloc_noreq(enum PVFS_server_op op,
         /* NOTE: We do not add these state machines to the 
          * in-progress or posted sop lists 
          */
+
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New SMCB\n");
 
         ret = 0;
     }
@@ -2722,8 +2727,7 @@ int server_state_machine_start_noreq(struct PINT_smcb *smcb)
     int ret = -PVFS_EINVAL;
     job_status_s tmp_status;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "server_state_machine_start_noreq %p\n",smcb);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "starting function\n");
 
     tmp_status.error_code = 0;
 
@@ -2741,6 +2745,7 @@ int server_state_machine_start_noreq(struct PINT_smcb *smcb)
             return ret;
         }
     }
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "exiting function\n");
     return ret;
 }
 
@@ -2841,7 +2846,7 @@ int server_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
     return SM_ACTION_TERMINATE;
 }
 
-/* server_op_get_machine()
+/* server_op_state_get_machine()
  * 
  * looks up the state machine for the op * given and returns it, or
  * NULL of the op is out of range.
@@ -2850,7 +2855,7 @@ int server_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
  */
 struct PINT_state_machine_s *server_op_state_get_machine(int op, int dflag)
 {
-    if (op == 999)
+    if (op == BMI_UNEXPECTED_OP) /* 999 */
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 "%s: %d\n", __func__, op);

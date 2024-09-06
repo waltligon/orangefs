@@ -314,14 +314,14 @@ static PINT_sm_action tree_communicate_partition_handles(
     /* Separate the handles into local and remote. */
     for (i = 0; i < num_data_files; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: New target\n", __func__);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New target\n");
         /* Since a datafile will exist on multiple sids, check each sid to
          * see if one matches the local sid.  If so, use the local sid to
          * calculate/retrieve the size of the datafile.
          */
         for (j = 0; j < num_sids; j++)
         {
-            gossip_debug(GOSSIP_SERVER_DEBUG, "%s: New SID\n", __func__);
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New SID\n");
             /* j is looping through the number of sids per object,
              * a datafile object in this case, 
              * and i is ordinal number for this datafile within the group of
@@ -333,8 +333,8 @@ static PINT_sm_action tree_communicate_partition_handles(
             if (PINT_cached_config_server_local( &sid_array[(i * num_sids) + j] ))
             {
                 /* we found a local sid, so put handle on the local list */
-                gossip_debug(GOSSIP_SERVER_DEBUG,
-                             "%s: local handle = %s\n", __func__,
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                             "local handle = %s\n",
                              PVFS_OID_str(&handle_array[i]));
 
                 s_op->u.tree_communicate.handle_array_local[
@@ -359,8 +359,8 @@ static PINT_sm_action tree_communicate_partition_handles(
              * so all sids must represent remote servers.
              * Add the datafile to the remote list.
              */
-            gossip_debug(GOSSIP_SERVER_DEBUG, 
-                         "%s: remote handle = %s\n", __func__,
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
+                         "remote handle = %s\n",
                          PVFS_OID_str(&handle_array[i]));
 
             s_op->u.tree_communicate.handle_array_remote[
@@ -383,10 +383,10 @@ static PINT_sm_action tree_communicate_partition_handles(
      */
     if (s_op->u.tree_communicate.handle_array_local_count > 0)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Local target\n", __func__);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Local target\n");
         for (i = 0; i < s_op->u.tree_communicate.handle_array_local_count; i++)
         {
-            gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Next Local\n", __func__);
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Next Local\n");
             /* Create a stack frame for the local operation. */
             s_op->u.tree_communicate.num_pjmp_frames++;
             js_p->error_code = LOCAL_OPERATION;
@@ -406,7 +406,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             case PVFS_SERV_TREE_SETATTR:
             {
                 PVFS_object_attr dummy_obj_attr;
-                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: SETATTR\n", __func__);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SETATTR\n");
                  
                 memset(&dummy_obj_attr, 0, sizeof(PVFS_object_attr));
             
@@ -445,7 +445,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             
             case PVFS_SERV_TREE_REMOVE:
             {
-                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: REMOVE\n", __func__);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "REMOVE\n");
                 PINT_SERVREQ_REMOVE_FILL(
                         *req,
                         s_op->req->capability,
@@ -469,7 +469,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
             case PVFS_SERV_TREE_GET_FILE_SIZE:
             {
-                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: FILE_SIZE\n", __func__);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "FILE_SIZE\n");
                 PINT_SERVREQ_GETATTR_FILL(
                          *req,
                          PVFS_REQ_DATAFILE,
@@ -491,7 +491,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             }
             case PVFS_SERV_TREE_GET_DIRENT_COUNT:
             {
-                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: DIRENT_CNT\n", __func__);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "DIRENT_CNT\n");
 /* I don't really remember why this was changed WBL */
 #if 1
                 PINT_SERVREQ_GETATTR_FILL(
@@ -526,7 +526,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
             case PVFS_SERV_TREE_GETATTR:
             {
-                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: GETATTR\n", __func__);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "GETATTR\n");
                 PINT_SERVREQ_GETATTR_FILL(
                     *req,
                     s_op->req->ctrl.sub,
@@ -553,7 +553,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             } /* end local switch */
         } /* end for each local handle */
     } /* end if local */
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Done with local\n", __func__);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done with local\n");
 
     /* END OF LOCAL FILES - NOW REMOTE FILES */
 
@@ -561,7 +561,7 @@ static PINT_sm_action tree_communicate_partition_handles(
     {
         int location = 0; /* return val from setting up frame - should be remote */
 
-        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Remote target\n", __func__);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Remote target\n");
         /* Decide how to divide the remote handles.
          * If there are only a few (fewer than tree_threshhold
          * from the config file) then go ahead and
@@ -587,10 +587,10 @@ static PINT_sm_action tree_communicate_partition_handles(
             num_files_per_server = 1;
         }
 
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "%s: num_data_files = %d, num_remote_handles = %d, "
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                     "num_data_files = %d, num_remote_handles = %d, "
                      "num_partitions = %d, num_files_per_server = %d\n",
-                     __func__, num_data_files,
+                     num_data_files,
                      s_op->u.tree_communicate.handle_array_remote_count,
                      num_partitions, num_files_per_server);
 
@@ -599,7 +599,7 @@ static PINT_sm_action tree_communicate_partition_handles(
         s_op->u.tree_communicate.num_pjmp_frames++;
 
         /* Prepare the stack for pjmp. */
-        PINT_CREATE_SUBORDINATE_SERVER_FRAME(
+        PINT_CREATE_SUBORDINATE_SERVER_FRAME( /* pushes a frame */
                 smcb,
                 tree_communicate_s_op,
                 PVFS_SID_NULL,  /* bc this is a remote operation, we don't 
@@ -656,6 +656,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             {
             case PVFS_SERV_TREE_SETATTR:
             {
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SETATTR\n");
                 PINT_SERVREQ_TREE_SETATTR_FILL(
                                 msg_p->req,
                                 s_op->req->ctrl.sub,
@@ -679,7 +680,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
             case PVFS_SERV_TREE_REMOVE:
             {
-                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: REMOVE\n", __func__);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "REMOVE\n");
                 PINT_SERVREQ_TREE_REMOVE_FILL(
                         msg_p->req,
                         s_op->req->capability,
@@ -700,7 +701,7 @@ static PINT_sm_action tree_communicate_partition_handles(
     
             case PVFS_SERV_TREE_GET_FILE_SIZE:
             {
-                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: FILE_SIZE\n", __func__);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "FILE_SIZE\n");
                 PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(
                         msg_p->req,
                         capability,
@@ -728,16 +729,14 @@ static PINT_sm_action tree_communicate_partition_handles(
                 if ( (this_req->u.tree_get_file_size.retry_msgpair_at_leaf) && 
                      (num_files_per_server == 1))
                 {
-                    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
-                                 "PVFS_MSGPAIR_NO_RETRY\n"
-                                 ,__func__);
+                    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"retry_flag:"
+                                 "PVFS_MSGPAIR_NO_RETRY\n");
                     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
                 }
                 else
                 {
-                    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
-                                 "PVFS_MSGPAIR_RETRY\n"
-                                  ,__func__);
+                    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"retry_flag:"
+                                 "PVFS_MSGPAIR_RETRY\n");
                     msg_p->retry_flag = PVFS_MSGPAIR_RETRY; 
                 }
             }
@@ -745,7 +744,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
             case PVFS_SERV_TREE_GET_DIRENT_COUNT:
             {
-                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: DIRENT_CNT\n", __func__);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "DIRENT_CNT\n");
                 PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
                         msg_p->req,
                         capability,
@@ -774,16 +773,14 @@ static PINT_sm_action tree_communicate_partition_handles(
                 if ((this_req->u.tree_get_dirent_count.retry_msgpair_at_leaf)&&
                      (num_files_per_server == 1))
                 {
-                    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
-                                 "PVFS_MSGPAIR_NO_RETRY\n"
-                                 ,__func__);
+                    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"retry_flag:"
+                                 "PVFS_MSGPAIR_NO_RETRY\n");
                     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
                 }
                 else
                 {
-                    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
-                                 "PVFS_MSGPAIR_RETRY\n"
-                                  ,__func__);
+                    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"retry_flag:"
+                                 "PVFS_MSGPAIR_RETRY\n");
                     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
                 }
             }
@@ -791,7 +788,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
             case PVFS_SERV_TREE_GETATTR:
             {
-                gossip_debug(GOSSIP_SERVER_DEBUG, "%s: GETATTR\n", __func__);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "GETATTR\n");
                 PINT_SERVREQ_TREE_GETATTR_FILL(
                         msg_p->req,
                         s_op->req->ctrl.sub,
@@ -823,33 +820,32 @@ static PINT_sm_action tree_communicate_partition_handles(
                 if ( (this_req->u.tree_getattr.retry_msgpair_at_leaf) &&
                      (num_files_per_server == 1))
                 {
-                    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
-                                                     "PVFS_MSGPAIR_NO_RETRY\n"
-                                                    ,__func__);
+                    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"retry_flag = "
+                                                     "PVFS_MSGPAIR_NO_RETRY\n");
                     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
                 }
                 else
                 {
-                    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:retry_flag:"
-                                                     "PVFS_MSGPAIR_RETRY\n"
-                                                    ,__func__);
+                    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"retry_flag = "
+                                                     "PVFS_MSGPAIR_RETRY\n");
                     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
                 }
-            }
+            } /* end of TREE_GETATTR case */
             break;
 
             default:
                 break;
             } /* end of remote switch */
+
             msg_p->fs_id = fs_id;
             msg_p->handle = s_op->u.tree_communicate.handle_array_remote[
                                                    i * num_files_per_server];
             msg_p->sid_array = &sid_array[i * num_sids];
 
             /* V3 need to adjust sid array index */
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "%s: msg_p->svr_addr (%p) msg_p->sid_array[0] (%p)\n",
-                         __func__, &msg_p->svr_addr, &msg_p->sid_array[0]);
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                         "msg_p->svr_addr (%p) msg_p->sid_array[0] (%p)\n",
+                         &msg_p->svr_addr, &msg_p->sid_array[0]);
 
             ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
             if (ret)
@@ -865,10 +861,10 @@ static PINT_sm_action tree_communicate_partition_handles(
         {
             PINT_null_capability(&capability);
         }
-        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Done with remote\n", __func__);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done with remote\n");
     }/* end if remote */
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Done.\n", __func__);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done.\n");
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -936,7 +932,7 @@ static int tree_setattr_comp_fn(void *v_p,
     int i;
     uint32_t status_array_index=0;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                  "tree_setattr_comp_fn[%d], caller_handle_index = %u\n",
                  index, resp_p->u.tree_setattr.caller_handle_index);
 
@@ -949,21 +945,16 @@ static int tree_setattr_comp_fn(void *v_p,
     }
 
     /* stash the status for each file handle */
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: m_resp->u.tree_setattr.handle_count"
-                                     " is %d\n"
-                                    ,__func__
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"m_resp->u.tree_setattr.handle_count is %d\n"
                                     ,m_resp->u.tree_setattr.handle_count);
     for (i = 0; i < m_tree->handle_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: caller_handle_index:%u "
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,"caller_handle_index:%u "
                                          "\tarray_local_count:%d\n"
-                                        ,__func__
                                         ,m_tree->caller_handle_index
                                         ,s_tree_comm->handle_array_local_count);
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: status for file %d is %d\n"
-                                        ,__func__
-                                        ,i
-                                        ,m_tree->status[i]);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,"status for file %d is %d\n"
+                                        ,i ,m_tree->status[i]);
         status_array_index = s_op->u.tree_communicate.remote_join_size[ i +
                               resp_p->u.tree_setattr.caller_handle_index];
 
@@ -987,9 +978,8 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *tree_msgop = NULL;
 
     assert(s_op->req->op == PVFS_SERV_TREE_SETATTR);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "%s: num_pjmp_frames = %d\n"
-                , __func__, s_op->num_pjmp_frames);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "num_pjmp_frames = %d\n"
+                , s_op->num_pjmp_frames);
 
     /* for each state machine spawned, pop a frame */
     for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
@@ -1849,10 +1839,11 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PVFS_server_req *req = s_op->req;
+    int ret = 0;
 
     assert(s_op->req->op == PVFS_SERV_TREE_GETATTR);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:req->retry_msgpair_at_leaf:%s\n"
+    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: req->retry_msgpair_at_leaf:%s\n"
                 ,__func__
                 ,(req->u.tree_getattr.retry_msgpair_at_leaf ? "YES" : "NO"));
 
@@ -1873,6 +1864,7 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
     /* allocate response arrays */
     s_op->resp.u.tree_getattr.error = (PVFS_error *)
         calloc(s_op->req->u.tree_getattr.handle_count, sizeof(PVFS_error));
+
     s_op->resp.u.tree_getattr.attr = (PVFS_object_attr *)
         calloc(s_op->req->u.tree_getattr.handle_count,
                sizeof(PVFS_object_attr));
@@ -1880,19 +1872,24 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
     if (! s_op->resp.u.tree_getattr.error ||
         ! s_op->resp.u.tree_getattr.attr)
     {
-        gossip_err("tree_getattr: failed to allocate arrays\n");
+        gossip_err("%s: failed to allocate arrays\n", __func__);
         js_p->error_code = -PVFS_ENOMEM;
-        return SM_ACTION_COMPLETE;
+        ret = SM_ACTION_COMPLETE;
+    }
+    else
+    {
+        ret = (tree_communicate_partition_handles(smcb,
+                                                  js_p,
+                                                  s_op->req->u.tree_getattr.handle_count,
+                                                  s_op->req->u.tree_getattr.sid_count,
+                                                  s_op->req->u.tree_getattr.fs_id,
+                                                  PVFS_SERV_TREE_GETATTR,
+                                                  s_op->req->u.tree_getattr.handle_array,
+                                                  s_op->req->u.tree_getattr.sid_array));
     }
 
-    return (tree_communicate_partition_handles(smcb,
-                                               js_p,
-                                               s_op->req->u.tree_getattr.handle_count,
-                                               s_op->req->u.tree_getattr.sid_count,
-                                               s_op->req->u.tree_getattr.fs_id,
-                                               PVFS_SERV_TREE_GETATTR,
-                                               s_op->req->u.tree_getattr.handle_array,
-                                               s_op->req->u.tree_getattr.sid_array));
+    gossip_debug(GOSSIP_SERVER_DEBUG, "%s; Done. returning %d\n", __func__, ret);
+    return ret;
 }
 
 static int tree_getattr_comp_fn(void *v_p,
@@ -1968,9 +1965,8 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
     struct PINT_server_tree_communicate_op *s_tree_comm = &(s_op->u.tree_communicate);
 
     assert(s_op->req->op == PVFS_SERV_TREE_GETATTR);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "%s: num_pjmp_frames = %d\n"
-                ,__func__
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                 "num_pjmp_frames = %d\n"
                 ,s_op->u.tree_communicate.num_pjmp_frames);
 
     /* for each state machine spawned, pop a frame */
@@ -1986,15 +1982,13 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
            tree_msgop = &(old_frame->msgarray_op);
         }
 
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: Value of task_id is %d\n"
-                                        ,__func__,task_id);
-        gossip_debug(GOSSIP_SERVER_DEBUG
-                    ,"%s: Value of handle_count is %d\n"
-                    ,__func__
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,"Value of task_id is %d\n"
+                                        ,task_id);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG
+                    ,"Value of handle_count is %d\n"
                     ,old_frame->resp.u.tree_getattr.handle_count);
-        gossip_debug(GOSSIP_SERVER_DEBUG
-                     ,"%s: Value of error_code is %d\n"
-                     ,__func__
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG
+                     ,"Value of error_code is %d\n"
                      ,error_code);
 
         if (task_id == REMOTE_OPERATION)
@@ -2003,9 +1997,8 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
             { /*sub-tree request failed; all handles identified in each msgpair
                *must be retried.  response structure is invalid; use request.
               */
-              gossip_debug(GOSSIP_SERVER_DEBUG
-                          ,"%s: REMOTE OPERATION encountered error:%d\n"
-                          ,__func__
+              gossip_lsdebug(GOSSIP_SERVER_DEBUG
+                          ,"REMOTE OPERATION encountered error:%d\n"
                           ,error_code);
               for (j=0; j < tree_msgop->count; j++)
               {
@@ -2031,8 +2024,7 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
             PINT_msgpairarray_destroy(&old_frame->msgarray_op);
         }
         else { /* LOCAL OPERATION */
-            gossip_debug(GOSSIP_SERVER_DEBUG,"%s:handle_index:%d\n"
-                                            ,__func__
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG,"handle_index:%d\n"
                                             ,old_frame->local_index);
             attr_array_index = s_op->u.tree_communicate.local_join_size[
                                      old_frame->local_index];
@@ -2048,22 +2040,18 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
 
     for (i=0; i<s_tree->handle_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: resp->error[%d]:%d\n"
-                                        ,__func__
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,"resp->error[%d]:%d\n"
                                         ,i
                                         ,s_tree->error[i]);
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: Resp op:%d \tResp status:%d\n"
-                                    ,__func__
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"Resp op:%d \tResp status:%d\n"
                                     ,s_op->resp.op
                                     ,s_op->resp.status);
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: s_op->addr:%d\n"
-                                    ,__func__
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"s_op->addr:%d\n"
                                     ,(int)s_op->addr);
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: resp->caller_handle_index:%d "
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"resp->caller_handle_index:%d "
                                      "\tresp->handle_count:%d\n"
-                                    ,__func__
                                     ,s_tree->caller_handle_index
                                     ,s_tree->handle_count);
 

@@ -92,13 +92,19 @@ do {                                                      \
 /* do file and line number printouts w/ the GNU preprocessor */
 #define gossip_ldebug(mask, format, f...)                  \
 do {                                                       \
-    gossip_debug(mask, "%s: " format, __func__ , ##f); \
+    gossip_debug(mask, "%s: " format, __func__ , ##f);     \
+} while(0)
+
+/* do file printouts w/ the GNU preprocessor - assumes a var smbc */
+#define gossip_lsdebug(mask, format, f...)                        \
+do {                                                              \
+    gossip_debug(mask, "%s (%p): " format, __func__ , smbc, ##f); \
 } while(0)
 
 #define gossip_err printk
 #define gossip_log printk
-#define gossip_lerr(format, f...)                  \
-do {                                               \
+#define gossip_lerr(format, f...)                                 \
+do {                                                              \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
 } while(0)
 
@@ -233,10 +239,16 @@ do {                                                       \
     gossip_debug(mask, "%s: " format, __func__ , ##f);     \
 } while(0)
 
-#define gossip_lerr(format, f...)                          \
-do {                                                       \
+/* do file and line number printouts w/ the GNU preprocessor */
+#define gossip_lsdebug(mask, format, f...)                            \
+do {                                                                  \
+    gossip_debug(mask, "%s (%p): " format, __func__ , smcb, ##f);     \
+} while(0)
+
+#define gossip_lerr(format, f...)                                 \
+do {                                                              \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
-    gossip_backtrace();                                    \
+    gossip_backtrace();                                           \
 } while(0)
 #else /* ! __GNUC__ */
 
@@ -267,9 +279,11 @@ int gossip_err(const char *format, ...);
 #ifdef WIN32
 #define gossip_debug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
 #define gossip_ldebug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
+#define gossip_lsdebug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
 #else /* WIN32 */
 #define gossip_debug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
+#define gossip_lsdebug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
 #endif /* WIN32 */
 #define gossip_isset(__m1, __m2) 0
 #define gossip_debug_enabled(__m) 0
@@ -277,9 +291,11 @@ int gossip_err(const char *format, ...);
 #ifdef WIN32
 #define gossip_debug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
 #define gossip_ldebug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
+#define gossip_lsdebug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
 #else /* WIN32 */
 #define gossip_debug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
+#define gossip_lsdebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #endif /* WIN32 */
 #define gossip_isset(__m1, __m2) ((__m1.mask1 & (__m2).mask1) || \
                                   (__m1.mask2 & (__m2).mask2))

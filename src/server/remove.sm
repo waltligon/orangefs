@@ -495,11 +495,13 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
 
     attr_p = &s_op->attr;
 
+    /* Need a comment here saying what this is
+     * I don't know or I'd put one
+     */
     if(js_p->error_code == -TROVE_ENOENT)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "remove: no DIST_DIR_ATTR key present in "
-                     "directory meta handle!!\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                     "Error Code ENOENT\n");
         attr_p->u.dir.dist_dir_bitmap = NULL;
         attr_p->u.dir.dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;
@@ -507,17 +509,19 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
 
     assert(attr_p->u.dir.dist_dir_attr.dirdata_count > 0);
     
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "remove: get dist-dir-attr for dir meta handle %s "
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
+                 "for dir meta handle %s "
                  "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
                  "split_size=%d, server_no=%d and branch_level=%d\n",
-                 PVFS_OID_str(&s_op->u.remove.handle),
+                 PVFS_OID_str(&s_op->req->u.remove.handle),
                  attr_p->u.dir.dist_dir_attr.tree_height,
                  attr_p->u.dir.dist_dir_attr.dirdata_count,
                  attr_p->u.dir.dist_dir_attr.bitmap_size,
                  attr_p->u.dir.dist_dir_attr.split_size,
                  attr_p->u.dir.dist_dir_attr.server_no,
                  attr_p->u.dir.dist_dir_attr.branch_level);
+
+              /* PVFS_OID_str(&s_op->u.remove.handle), */
 
     /* allocate space for dirdata handles */
     attr_p->u.dir.dist_dir_bitmap = 
@@ -533,6 +537,8 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
 
     if(!attr_p->u.dir.dirdata_handles || !attr_p->u.dir.dist_dir_bitmap)
     {
+        free(attr_p->u.dir.dirdata_handles);
+        free(attr_p->u.dir.dist_dir_bitmap);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -573,8 +579,8 @@ static PINT_sm_action remove_get_dirdata_bitmap_and_handles(
     s_op->val_a[1].buffer = attr_p->u.dir.dist_dir_bitmap;
 
     js_p->error_code = 0;
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "remove: trying to read dirdata handles (coll_id = %d, "
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                 "trying to read dirdata handles (coll_id = %d, "
                  "handle = %s, key = %s (%d), val_buf = %p (%d)) and "
                  "dirdata bitmap (key = %s (%d), val_buf = %p (%d))\n",
                  s_op->req->u.remove.fs_id,
@@ -613,13 +619,13 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     PVFS_capability capability;
     int location = REMOTE_OPERATION;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "%s: Starting State Action s_op = (%p) attr_p = (%p)\n",
-                 __func__, s_op, &s_op->attr);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "Starting State Action s_op = (%p) attr_p = (%p)\n",
+                   s_op, &s_op->attr);
     attr_p = &s_op->attr;
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb
                                         ,getattr_op
-                                        ,attr_p->u.dir.dirdata_sids[0]FIXME
+                                        ,attr_p->u.dir.dirdata_sids[0] /*FIXME*/
                                         ,s_op->req->u.remove.fs_id
                                         ,location
                                         ,req

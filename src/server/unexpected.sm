@@ -139,7 +139,7 @@ static int unexpected_replicate_comp_fn(void *v_p,
      * other - we can ignore other results.  Not exactly sure how that
      * will fit in.  - WBL
      */
-    PFI();
+    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "completion function\n");
     return 0;
 }
 
@@ -153,7 +153,7 @@ static int unexpected_tree_comp_fn(void *v_p,
      * other - we can ignore other results.  Not exactly sure how that
      * will fit in.  - WBL
      */
-    PFI();
+    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "completion function\n");
     return 0;
 }
 
@@ -168,7 +168,7 @@ static PINT_sm_action unexpected_post(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    PFI();
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Running state action\n");
 
     /*
      * TODO: Consider the optimization of enabling immediate
@@ -191,7 +191,7 @@ static PINT_sm_action unexpected_post(struct PINT_smcb *smcb,
         PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
         return SM_ACTION_TERMINATE;
     }
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "DEFERRING!\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "DEFERRING!\n");
     return SM_ACTION_DEFERRED;
 }
 
@@ -204,7 +204,7 @@ static PINT_sm_action unexpected_replace(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    PFI();
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Running state action\n");
 
     /* If op was cancelled, print WARNING */
     if (s_op->op_cancelled)
@@ -219,6 +219,8 @@ static PINT_sm_action unexpected_replace(struct PINT_smcb *smcb,
     qlist_del(&s_op->next);
 
     /* start replacement unexpected recv */
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
+                  "Running server_post_unexpected_recv\n");
     ret = server_post_unexpected_recv();
     if (ret < 0)
     {
@@ -231,6 +233,7 @@ static PINT_sm_action unexpected_replace(struct PINT_smcb *smcb,
                            "server_post_unexpected_recv() returned an error: ",
                            ret);
     }
+    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "(%p) completed\n", smcb);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -247,10 +250,10 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     int remote_op_cnt = 0;
     int remote_op = 0;
 
-    PFI();
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
 
     server_config_p = PINT_server_config_mgr_get_config();
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG,
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
                   "server_config_p->host_index = %d\n",
                   server_config_p->host_index);
 
@@ -260,7 +263,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         return SM_ACTION_TERMINATE;
     }
 
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "unexpected_pjmp_setup: decoding request\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "decoding request\n");
     /* Decode request */
     ret = PINT_decode(s_op->unexp_bmi_buff.buffer,
                       PINT_DECODE_REQ,
@@ -268,7 +271,8 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                       s_op->unexp_bmi_buff.addr,
                       s_op->unexp_bmi_buff.size);
 
-    gossip_log("%s: after req decode enc_type is %d\n", __func__, s_op->decoded.enc_type);
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, 
+                   "After req decode enc_type is %d\n", s_op->decoded.enc_type);
 
     if (ret == -PVFS_EPROTONOSUPPORT)
     {
@@ -291,14 +295,13 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     }
      
 
-    gossip_debug(GOSSIP_UNEXP_DEBUG, "unexpected_pjmp_setup: Set up req and op\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Set up req and op\n");
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     smcb->op = s_op->req->op;
     s_op->op = s_op->req->op;
 
-    gossip_debug(GOSSIP_UNEXP_DEBUG,
-                 "unexpected_pjmp_setup: Received a request with op=%d\n",
-                 s_op->op);
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
+                   "Received a request with op = %d\n", s_op->op);
 
     if (s_op->op < 2 || s_op->op > PVFS_SERV_NUM_OPS)
     {
@@ -329,14 +332,14 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
      * original and push it onto the framestack
      */
     memcpy(local_op_frame, s_op, sizeof(struct PINT_server_op));
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG,
-                  "unexpected_pjmp_setup: Pushing local op frame\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Pushing local op frame\n");
     s_op->num_pjmp_frames = 1;
+
     ret = PINT_sm_push_frame(smcb, LOCAL_OPERATION, local_op_frame);
+
     if(ret < 0)
     {
-        gossip_lerr("unexpected_pjmp_setup: failed to push frame for "
-                    "local_op!\n");
+        gossip_lerr("failed to push frame for local_op!\n");
     }
 
     /* Replicate and Tree are very similar so we share a lot of code */
@@ -355,10 +358,11 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
 
         memset(&req_ctrl, 0, sizeof(struct PINT_server_req_ctrl));
         PINT_server_req_get_ctrl(s_op->req, &req_ctrl);
-        gossip_ldebug(GOSSIP_UNEXP_DEBUG,
-                      "Ctrl sid_count = %d\n",req_ctrl.sid_count);
-        gossip_ldebug(GOSSIP_UNEXP_DEBUG,
-                      "Ctrl count = %d\n",req_ctrl.count);
+
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
+                       "Ctrl sid_count = %d\n", req_ctrl.sid_count);
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
+                       "Ctrl count = %d\n", req_ctrl.count);
         
         switch (s_op->req->ctrl.mode)
         {
@@ -454,7 +458,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         }
         /* now push remote ops frame */
         ret = PINT_sm_push_frame(smcb, REMOTE_OPERATION, remote_op_frame);
-        gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Pushing remote op frame\n");
+        gossip_ldebug(GOSSIP_UNEXP_DEBUG, "(%p) Pushing remote op frame\n", smcb);
         s_op->num_pjmp_frames += 1;
         if(ret < 0)
         {
@@ -478,7 +482,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
 noremote:
     /* Do nothing but just run the request as normal */
 
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "unexpected_pjmp_setup: ready for pjmp\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Ready for pjmp\n");
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -492,21 +496,21 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
     int task_id;
     PVFS_error tmp_err = 0;
     int remaining = 0;
-    PFI();
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
 
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "s_op->num_pjmp_frames = %d\n",
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "s_op->num_pjmp_frames = %d\n",
                   s_op->num_pjmp_frames);
 
     assert(s_op->num_pjmp_frames > 0);
 
     for (; s_op->num_pjmp_frames > 1; s_op->num_pjmp_frames--)
     {
-        gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Poping a remote frame\n");
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Poping a remote frame\n");
 
         remote_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining);
         if (!remote_op)
         {
-            gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Failed to pop a frame\n");
+            gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Failed to pop a frame\n");
             js_p->error_code = -1;
             return SM_ACTION_COMPLETE;
         }
@@ -514,7 +518,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
         /* comm failures need to be recorded at least */
         if (tmp_err < 0)
         {
-            gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Error code returned\n");
+            gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Error code returned\n");
         }
         /* free up remote op */
         free(remote_op);
@@ -522,7 +526,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
     
     assert(s_op->num_pjmp_frames == 1);
 
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Poping a local frame\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Poping a local frame\n");
     local_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining);
     if (!local_op)
     {
@@ -530,7 +534,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
         js_p->error_code = -1;
         return SM_ACTION_COMPLETE;
     }
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG,
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
                   "popping frame\n"
                   "\ttask_id = %d\n"
                   "\ttmp_err = %d\n"
@@ -561,7 +565,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
     }
     /* free up local op */
     free(local_op);
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "Finished with unexpected PJMP\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Finished with unexpected PJMP\n");
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -569,7 +573,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
 static PINT_sm_action unexpected_terminate(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
-    PFI();
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
     return SM_ACTION_TERMINATE;
 }
 
@@ -580,7 +584,7 @@ static PINT_sm_action unexp_remote_pre(struct PINT_smcb *smcb,
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
-    PFI();
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
 
     /* set up to call MPA */
     ret = PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
@@ -592,7 +596,7 @@ static PINT_sm_action unexp_remote_pre(struct PINT_smcb *smcb,
 static PINT_sm_action unexp_remote_post(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
-    PFI();
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
     js_p->error_code = 0;
     return SM_ACTION_TERMINATE;
 }
@@ -602,7 +606,7 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
-    PFI();
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
 
     /* Should we run prelude here - simplify SM code */
 
@@ -648,7 +652,7 @@ static PINT_sm_action unexp_local_post(struct PINT_smcb *smcb,
                                        job_status_s *js_p)
 {
     PINT_server_op *frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PFI();
+    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
     /* check frame->join schedule hold if not ready */
     if (frame->join)
     {
