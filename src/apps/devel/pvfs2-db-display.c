@@ -160,11 +160,11 @@ void iterate_database(dbpf_db *db_p, void (*print)(struct dbpf_data key,
     {
         print( key, val );
         key.len = 1024; 
-        val.len = 1024; 
+        val.len = 1024;
     }
-
+    
     /* making this neg seems right but ... */
-    if( ret != -TROVE_ENOENT )
+    if( ret != TROVE_ENOENT )
     {
         printf("**** an error occurred (%s) ****\n", strerror(ret));
     }
