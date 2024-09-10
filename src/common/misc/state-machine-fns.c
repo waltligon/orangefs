@@ -178,7 +178,7 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
 
     if (retval == SM_ACTION_COMPLETE && smcb->current_state->flag == SM_PJMP)
     {
-        gossip_lsdebug("Executing PJMP\n");
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Executing PJMP\n");
         /* start child SMs */
         PINT_sm_start_child_frames(smcb, &children_started);
         /* if any children were started, then we return DEFERRED (even
@@ -633,7 +633,8 @@ int PINT_smcb_alloc(struct PINT_smcb **smcb,
     }
     /* zero out all members */
     memset(*smcb, 0, sizeof(struct PINT_smcb));
-    gossip_ldebug("New SMCB = (%p)\n", *smcb);
+    gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, 
+                  "New SMCB = (%p)\n", *smcb);
 
     INIT_QLIST_HEAD(&(*smcb)->frames);
     (*smcb)->base_frame = -1; /* no frames yet */
@@ -649,7 +650,8 @@ int PINT_smcb_alloc(struct PINT_smcb **smcb,
             *smcb = NULL;
             return -PVFS_ENOMEM;
         }
-        gossip_ldebug("Pushing a new frame (%p)\n", new_frame);
+        gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG,
+                      "Pushing a new frame (%p)\n", new_frame);
         /* zero out all members */
         memset(new_frame, 0, frame_size);
         PINT_sm_push_frame(*smcb, 0, new_frame);
