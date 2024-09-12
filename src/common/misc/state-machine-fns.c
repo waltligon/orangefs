@@ -910,28 +910,41 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
  */
 static struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb,
                                              int task_id)
+                                   
 {
     struct PINT_pjmp_tbl_s *pjmptbl;
     int i;
 
     pjmptbl = smcb->current_state->pjtbl;
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                   "pjmptbl = (%p)\n", pjmptbl);
+                   "task_id = %d, pjmptbl = (%p)\n", 
+                   task_id, pjmptbl);
 
+    /* loop over number of items in the PJMPTBL
+     * This function shuld be called for each new frame
+     * (child) in the SM.
+     */
     for (i = 0; ; i++)
     {
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "&pjmptbl[%d] = (%p)\n", i, &pjmptbl[i]);
+                       "pjmptbl[%d] = %d, (%p)\n", i, 
+                       pjmptbl[i].return_value, pjmptbl[i].state_machine);
 
         if (pjmptbl[i].return_value == task_id ||
             pjmptbl[i].return_value == -1)
         {
             gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                           "pjmptbl[%d].state_machine = (%p)\n",
-                           i, pjmptbl[i].state_machine);
-
-            return pjmptbl[i].state_machine->first_state;
+                           "selected pjmptbl[%d]\n", i);
+            break;
         }
+    }
+    if (pjmptbl[i].state_machine)
+    {
+        return pjmptbl[i].state_machine->first_state;
+    }
+    else
+    {
+        return NULL;
     }
 }
 
@@ -964,7 +977,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 
     assert(smcb);
 
-    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "starting function\n");
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Starting function\n");
 
     memset(&r, 0, sizeof(job_status_s));
 
@@ -990,15 +1003,15 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         /* increment parent's counter */
         smcb->children_running++;
     }
+    *children_started = smcb->children_running;
+
+    /* pass back number of children started and 
+     * keep this to pass to other funcs
+     */
 
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                    "Children Starting = %d\n", smcb->children_running);
 
-    /* let the caller know how many children are being started; it won't be
-     * able to tell from the running_count because they may all immediately
-     * complete before we leave this function.
-     */
-    *children_started = smcb->children_running;
 #ifdef WIN32
     qlist_for_each_entry(f, &smcb->frames, link, struct PINT_frame_s)
 #else
@@ -1015,7 +1028,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         PINT_smcb_alloc(&new_sm,
                         smcb->op,
                         0,
-                        smcb->op_get_state_machine,
+                        smcb->op_get_state_machine, /* do we need or even have this */
                         child_sm_frame_terminate,
                         smcb->context);
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "New SMCB = (%p)\n", new_sm);
@@ -1033,6 +1046,10 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                        "Task id: %d.\n", f->task_id);
 
+        /* PINT_sm_task_map is static and only called in one place when
+         * a PJMP occurs.  When processing a PJMP the state must be
+         * set by the PJMPTBL, not op number in the SMCB.
+         */
         /* locate SM to run */
         new_sm->current_state = PINT_sm_task_map(smcb, f->task_id);
 

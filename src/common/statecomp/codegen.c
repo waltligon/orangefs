@@ -68,7 +68,8 @@ void gen_machine(char *machine_name)
     fprintf(out_file, "};\n\n");
 
     /* generate all output */
-    for (s = states; s; s = s->next) {
+    for (s = states; s; s = s->next) 
+    {
         gen_state_start(s->name, machine_name);
         gen_state_action(s->action, s->function_or_machine, s->name);
         if(s->action == ACTION_PJMP)
@@ -83,6 +84,8 @@ void gen_machine(char *machine_name)
                 gen_return_code(task->return_code);
                 gen_next_state(TRANS_PJMP, task->task_name);
             }
+            gen_return_code("-1");
+            gen_next_state(TRANS_PJMP, NULL);
         }
 
         gen_trtbl(s->name);
@@ -331,9 +334,23 @@ static void gen_next_state(enum transition_type type, char *new_state)
         case TRANS_PJMP:
 #ifdef WIN32
             fprintf(out_file, "\t SM_NONE ,\n");  /* flag */
-            fprintf(out_file, "\n\t &%s }", new_state);
+            if (new_state != NULL)
+            {
+                fprintf(out_file, "\n\t &%s }", new_state);
+            }
+            else
+            {
+                fprintf(out_file, "\n\t NULL }");
+            }
 #else
-            fprintf(out_file, "\n\t .state_machine = &%s }", new_state);
+            if (new_state != NULL)
+            {
+                fprintf(out_file, "\n\t .state_machine = &%s }", new_state);
+            }
+            else
+            {
+                fprintf(out_file, "\n\t .state_machine = NULL }");
+            }
 #endif
             break;
         case TRANS_NEXT_STATE:
