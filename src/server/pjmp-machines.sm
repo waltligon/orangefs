@@ -197,6 +197,7 @@ static PINT_sm_action pjmp_initialize(struct PINT_smcb *smcb,
                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Running initialize\n");
     /* keep code from looping through get_item */
     if ((s_op->req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT) ||
         (s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE))
@@ -210,23 +211,25 @@ static PINT_sm_action pjmp_initialize(struct PINT_smcb *smcb,
 
 static PINT_sm_action pjmp_release_job(struct PINT_smcb *smcb, job_status_s *js_p)
 {
-   int ret = -1;
-   job_id_t tmp_id;
-   struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    job_id_t tmp_id;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Running release job\n");
 
-   ret = job_req_sched_release( s_op->scheduled_id
-                               ,smcb
-                               ,0
-                               ,js_p
-                               ,&tmp_id
-                               ,server_job_context);
+    ret = job_req_sched_release( s_op->scheduled_id
+                                ,smcb
+                                ,0
+                                ,js_p
+                                ,&tmp_id
+                                ,server_job_context);
 
-   return ret;
+    return ret;
 }/*end pjmp_release_job*/
 
 static PINT_sm_action pjmp_execute_terminate( struct PINT_smcb *smcb
                                             , job_status_s *js_p)
 {
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Running terminate\n");
     return SM_ACTION_TERMINATE;
 }
 
@@ -242,26 +245,23 @@ static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
 {   
     struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                  "Executing pvfs2_pjmp_call_msgpairarray_sm:%s\n"
-                 "\t\tfor operation (%d)\n"
-                 "\t\ts_op (%p)\n"
-                 "\t\tframe count is %d.\n"
-                 "\t\tbase frame is %d.\n"
-                 "\t\top nbr is #%d.\n",
-                 __func__, smcb->op, /* PINT_map_server_op_to_string(smcb->op), */
-                 s_op, smcb->frame_count, smcb->base_frame, smcb->op);
+                 "                        "
+                 "op num: (%d) s_op: (%p)\n frame count: %d base frame; %d\n",
+                 PINT_map_server_op_to_string(smcb->op), smcb->op,
+                 s_op, smcb->frame_count, smcb->base_frame);
+
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op->msgarray_op.msgpair.req.op:%d\n"
-
-                                    ,s_op->msgarray_op.msgpair.req.op);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "s_op->msgarray_op.msgpair.req.op:%d\n"
+                                      ,s_op->msgarray_op.msgpair.req.op);
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op.msgpair.req.op);
    
-    gossip_debug(GOSSIP_SERVER_DEBUG,"\tAFTER PUSH:smcb->base_frame:%d"
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "AFTER PUSH:smcb->base_frame:%d"
                                      "\tframe_count:%d\n"
-                                    ,smcb->base_frame,smcb->frame_count);
+                                    ,smcb->base_frame, smcb->frame_count);
 
     return SM_ACTION_COMPLETE;
 } /* end action call_msgpairarray */

@@ -815,7 +815,10 @@ typedef struct PINT_server_op
 
 /* This creates  new frame in __s_op and pushes it for a subsequent PJMP
  *
- * V3 call to server_local needs a propoer argument
+ * In the big if :
+ * a __location value of LOCAL will result in LOCAL
+ * and a __location value of REMOTE will result in REMOTE
+ * any other avlue will check the __sid against the local server
  */
 #define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                                \
                                              __s_op,                                \

@@ -138,7 +138,7 @@ static PINT_sm_action listattr_setup_getattr(
     PVFS_credential dummy_credential={0}; /* used for call to getattr */
 
     s_op->u.listattr.parallel_sms = 0;
-    js_p->error_code = 0;
+    js_p->error_code = 0; /* should this be inside the loop? */
 
     /* Make sure that the attrmask that came from userland does
      * not specify PVFS_ATTR_CAPABILITY, because we don't have
@@ -161,7 +161,7 @@ static PINT_sm_action listattr_setup_getattr(
         PINT_CREATE_SUBORDINATE_SERVER_FRAME(
             smcb,
             getattr_op,
-            s_op->req->u.listattr.sid_array[i*s_op->req->u.listattr.sid_count],
+            s_op->req->u.listattr.sid_array[i * s_op->req->u.listattr.sid_count],
             s_op->req->u.listattr.fs_id,
             js_p->error_code,
             req,

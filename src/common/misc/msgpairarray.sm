@@ -170,17 +170,14 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
-                 smcb, __func__);
 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing msgpairarray_init...\n");
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"\tbase frame:%d\tframe count:%d\n"
-                                    ,smcb->base_frame,smcb->frame_count);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray"
+                                  "(%d msgpair(s))\n", mop->count);
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: init "
-                 "(%d msgpair(s))\n", smcb, mop->count);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"base frame:%d frame count:%d\n"
+                                    ,smcb->base_frame, smcb->frame_count);
 
-    PVFS_perror_gossip_verbose();
+    /* PVFS_perror_gossip_verbose(); */
 
     assert(mop->count > 0);
 
@@ -210,6 +207,7 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
         msg_p->op_action = PVFS_MPA_OK;
 
     }
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray init done.");
     return SM_ACTION_COMPLETE;
 }
 

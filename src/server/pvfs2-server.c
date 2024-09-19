@@ -616,7 +616,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     /* int old_flag = 0; */
     /* PVFS_debug_mask old_debug_mask = {0, 0}; */
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Initializing server\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Initializing server\n");
 
     /* Grab a copy of the config mask set mask to server for
      * initialization routines.  Then we will reset down below
@@ -625,7 +625,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     assert(server_config.logfile != NULL);
 
     /* Set up log file if there is one */
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Open log file\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Open log file\n");
     if(!strcmp(server_config.logtype, "file"))
     {
         dummy = fopen(server_config.logfile, "a");
@@ -640,7 +640,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     }
 
     /* Enable gossip on requested service */
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Redirecting gossip output\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Redirecting gossip output\n");
 
     /* redirect gossip to specified target if backgrounded */
     if (s_server_options.server_background)
@@ -678,7 +678,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
         gossip_log("PVFS2 Server version %s starting.\n", PVFS2_VERSION);
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Set up working environment\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Set up working environment\n");
 
     /* handle backgrounding, setting up working directory, and so on. */
     ret = server_setup_process_environment(
@@ -689,7 +689,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
         return ret;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Security\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Initialize Security\n");
     /* initialize the security module */
     ret = PINT_security_initialize();
     if (ret < 0)
@@ -702,7 +702,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     *server_status_flag |= SERVER_SECURITY_INIT;
 
 #ifdef ENABLE_CAPCACHE
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Capcache\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Initialize Capcache\n");
     /* initialize the capability cache */
     ret = PINT_capcache_init();
     if(ret < 0)
@@ -716,7 +716,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
 #endif /* ENABLE_CAPCACHE */
 
 #ifdef ENABLE_CREDCACHE
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Credcache\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Initialize Credcache\n");
     /* initialize the credential cache */
     ret = PINT_credcache_init();
     if(ret < 0)
@@ -730,7 +730,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
 #endif
 
 #ifdef ENABLE_CERTCACHE
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Certcache\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Initialize Certcache\n");
     /* initialize the certificate cache */
     ret = PINT_certcache_init();
     if (ret < 0)
@@ -749,7 +749,7 @@ static int server_initialize(PINT_server_status_flag *server_status_flag,
     }
 #endif
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Initialize Subsystems\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Initialize Subsystems\n");
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
     if (ret < 0)
@@ -2477,7 +2477,7 @@ int server_post_unexpected_recv(void)
      */
     job_status_s js={0};
 
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "starting function\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Starting\n");
 
     gossip_ldebug(GOSSIP_SERVER_DEBUG, "allocating smcb\n");
     ret = PINT_smcb_alloc(&smcb,
@@ -2493,7 +2493,7 @@ int server_post_unexpected_recv(void)
         return ret;
     }
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New SMCB\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "New SMCB = (%p)\n", smcb);
 
     s_op = (struct PINT_server_op *)PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     memset(s_op, 0, sizeof(PINT_server_op));
@@ -2504,7 +2504,7 @@ int server_post_unexpected_recv(void)
     /* Add an unexpected s_ops to the list */
     qlist_add_tail(&s_op->next, &posted_sop_list);
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling state_machine_start\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "calling state_machine_start\n");
     ret = PINT_state_machine_start(smcb, &js);
     if(ret == SM_ACTION_TERMINATE)
     {
@@ -2512,7 +2512,7 @@ int server_post_unexpected_recv(void)
         PINT_smcb_free(smcb);
         return js.error_code;
     }
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "exiting function\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Exiting\n");
     return ret;
 }
 
@@ -2676,7 +2676,7 @@ int server_state_machine_alloc_noreq(enum PVFS_server_op op,
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "op = %d\n", op);
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Starting op = %d\n", op);
 
     if (smcb)
     {
@@ -2703,7 +2703,7 @@ int server_state_machine_alloc_noreq(enum PVFS_server_op op,
          * in-progress or posted sop lists 
          */
 
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New SMCB\n");
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "New SMCB = (%p)\n", smcb);
 
         ret = 0;
     }
@@ -2727,7 +2727,7 @@ int server_state_machine_start_noreq(struct PINT_smcb *smcb)
     int ret = -PVFS_EINVAL;
     job_status_s tmp_status;
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "starting function\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Starting (%p)\n", smcb);
 
     tmp_status.error_code = 0;
 
@@ -2745,7 +2745,7 @@ int server_state_machine_start_noreq(struct PINT_smcb *smcb)
             return ret;
         }
     }
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "exiting function\n");
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Exiting\n");
     return ret;
 }
 
@@ -2762,7 +2762,7 @@ int server_state_machine_complete_noreq(PINT_smcb *smcb)
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
         
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: %p\n", __func__, smcb);
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Starting (%p)\n", smcb);
     id_gen_fast_register(&tmp_id, s_op);
                 
     qlist_del(&s_op->next);
@@ -2784,7 +2784,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
 
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "(%p)\n", smcb);
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Starting (%p)\n", smcb);
 
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
@@ -2841,15 +2841,15 @@ int server_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     /* free the operation structure itself */
     gossip_ldebug(GOSSIP_SERVER_DEBUG,
-            "server_state_machine_terminate (%p)\n",smcb);
+            "Terminating SM (%p)\n", smcb);
     PINT_smcb_free(smcb);
     return SM_ACTION_TERMINATE;
 }
 
 /* server_op_state_get_machine()
  * 
- * looks up the state machine for the op * given and returns it, or
- * NULL of the op is out of range.
+ * looks up the state machine for the op given and returns it, or
+ * NULL if the op is out of range.
  * pointer to this function set in the control block of server state
  * machines.
  */
@@ -2857,15 +2857,15 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op, int dflag)
 {
     if (op == BMI_UNEXPECTED_OP) /* 999 */
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                "%s: %d\n", __func__, op);
+        gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                       "op: %d\n", op);
     }
     else if (dflag)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                "===================== New Request ================\n"
-                "                        "
-                "%s: %d(%s)\n", __func__, op,
+        gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                "op: %d(%s)\n" "                        "
+                "===================== New Request ================\n",
+                op,
                 PINT_map_server_op_to_string(op));
     }
 

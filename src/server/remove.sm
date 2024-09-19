@@ -617,7 +617,7 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     struct PVFS_server_req *req = NULL;
     PVFS_object_attr *attr_p = NULL;
     PVFS_capability capability;
-    int location = REMOTE_OPERATION;
+    int location = 0;
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "Starting State Action s_op = (%p) attr_p = (%p)\n",
@@ -629,7 +629,7 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
                                         ,s_op->req->u.remove.fs_id
                                         ,location
                                         ,req
-                                        ,0);
+                                        ,LOCAL_OPERATION);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Setting NULL capability\n", __func__);
     PINT_null_capability(&capability);

@@ -559,8 +559,6 @@ static PINT_sm_action tree_communicate_partition_handles(
 
     if (s_op->u.tree_communicate.handle_array_remote_count > 0)
     {
-        int location = 0; /* return val from setting up frame - should be remote */
-
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Remote target\n");
         /* Decide how to divide the remote handles.
          * If there are only a few (fewer than tree_threshhold
@@ -605,9 +603,9 @@ static PINT_sm_action tree_communicate_partition_handles(
                 PVFS_SID_NULL,  /* bc this is a remote operation, we don't 
                                    need a real sid, just a place holder */
                 fs_id,
-                location, /* out: location */
+                js_p->error_code, /* out: location */
                 req,
-                0); /* task_id */
+                REMOTE_OPERATION); /* task_id */
 
         /* store the number of partitions */
         s_op->u.tree_communicate.num_partitions = num_partitions;
@@ -1843,8 +1841,7 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
 
     assert(s_op->req->op == PVFS_SERV_TREE_GETATTR);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: req->retry_msgpair_at_leaf:%s\n"
-                ,__func__
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"req->retry_msgpair_at_leaf:%s\n"
                 ,(req->u.tree_getattr.retry_msgpair_at_leaf ? "YES" : "NO"));
 
     s_op->resp.u.tree_getattr.caller_handle_index =
@@ -1852,10 +1849,9 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
     s_op->resp.u.tree_getattr.handle_count =
             s_op->req->u.tree_getattr.handle_count;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "%s: frame:%p \ttree.caller_handle_index:%u\n"
-                 "\t\ttree.handle_count:%d \ttree.op:%d\n"
-                 ,__func__
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                 "frame:%p tree.caller_handle_index:%u\n"
+                 "\t\ttree.handle_count:%d tree.op:%d\n"
                  ,s_op
                  ,s_op->resp.u.tree_getattr.caller_handle_index
                  ,s_op->resp.u.tree_getattr.handle_count
@@ -1888,7 +1884,7 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
                                                   s_op->req->u.tree_getattr.sid_array));
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s; Done. returning %d\n", __func__, ret);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done. returning %d\n", ret);
     return ret;
 }
 

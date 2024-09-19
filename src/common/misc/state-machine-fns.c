@@ -217,8 +217,8 @@ PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
      */
     smcb->immediate = 1;
 
-    /* under what conditions do we call SM start?  I wojuld assume
-     * alwaus after smcb_alloc, which sets the base_frame to 0 since
+    /* under what conditions do we call SM start?  I would assume
+     * always after smcb_alloc, which sets the base_frame to 0 since
      * there is only one frame - making this redundant - unless there
      * are undocumented use cases.
      */
@@ -343,6 +343,8 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
             }
             else /* state flag == SM_SWITCH */
             {
+                gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "SWITCH\n");
+                /* locates SM via op, finds first state, follows jumps */
                 if (!PINT_state_machine_locate(smcb, 0))
                 {
                     return SM_ACTION_TERMINATE;
@@ -380,8 +382,9 @@ PINT_sm_action PINT_state_machine_continue(struct PINT_smcb *smcb,
     return ret;
 }
 
-/* Function: PINT_state_machine_locate(**smcb, dflag)
+/* Function: PINT_state_machine_locate(*smcb, dflag)
  * Params:   smcb pointer with op correctly set
+ *           and op_get_state_machine set
  *           dflag controls gossip_debug output
  * Returns:  1 on successful locate, 0 on locate failure, <0 on error
  * Synopsis: This function locates the state associated with the op
@@ -395,20 +398,15 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb, int dflag)
     const char *state_name;
     const char *machine_name;
 
-    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "starting function\n"); 
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Starting\n"); 
     /* check for valid inputs */
     if (!smcb || smcb->op < 0 || !smcb->op_get_state_machine)
     {
 	gossip_err("State machine requested not valid\n");
 	return -PVFS_EINVAL;
     }
-/* this is somewhat redundant, but we do call several routines
- * that we might want to follow so it's back on for now.
- */
-#if 1
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                    "Locating op-id: %d\n", (smcb)->op);
-#endif
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                    "calling op_get_state_machine\n"); 
     /* this is a the usage dependant routine to look up the SM */
@@ -615,7 +613,7 @@ int PINT_smcb_cancelled(struct PINT_smcb *smcb)
 /* Function: PINT_smcb_alloc
  * Params: pointer to an smcb pointer, an op code (int), size of frame
  *          (int), pinter to function to locate SM
- * Returns: nothing, but fills in pointer argument
+ * Returns: nothing, but fills in smcb pointer argument
  * Synopsis: this allocates an smcb struct, including its frame stack
  *           and sets the op code so you can start the state machine
  */
@@ -657,6 +655,10 @@ int PINT_smcb_alloc(struct PINT_smcb **smcb,
         PINT_sm_push_frame(*smcb, 0, new_frame);
         (*smcb)->base_frame = 0;
     }
+    /* not sure if this should be original req, imbedded op,
+     * or something specific for pjmp.  In any case passed
+     * in so don't change here.
+     */
     (*smcb)->op = op;
     (*smcb)->op_get_state_machine = getmach;
     (*smcb)->terminate_fn = term_fn;
@@ -930,6 +932,7 @@ static struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb,
                        "pjmptbl[%d] = %d, (%p)\n", i, 
                        pjmptbl[i].return_value, pjmptbl[i].state_machine);
 
+        /* -1 is default we don't search further */
         if (pjmptbl[i].return_value == task_id ||
             pjmptbl[i].return_value == -1)
         {
@@ -977,7 +980,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 
     assert(smcb);
 
-    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Starting function\n");
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Starting\n");
 
     memset(&r, 0, sizeof(job_status_s));
 
@@ -1003,11 +1006,10 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         /* increment parent's counter */
         smcb->children_running++;
     }
-    *children_started = smcb->children_running;
-
     /* pass back number of children started and 
      * keep this to pass to other funcs
      */
+    *children_started = smcb->children_running;
 
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                    "Children Starting = %d\n", smcb->children_running);
@@ -1023,11 +1025,15 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         {
             break;
         }
+        /* smcb_alloc has been reworked to assume a new request
+         * BAD assumption - however it seems this is called
+         * in more than one place - need to figure out!
+         */
         /* allocate smcb */
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Allocating SMCB\n");
         PINT_smcb_alloc(&new_sm,
-                        smcb->op,
-                        0,
+                        smcb->op, /* what should really go here */
+                        0, /* frame size */
                         smcb->op_get_state_machine, /* do we need or even have this */
                         child_sm_frame_terminate,
                         smcb->context);
@@ -1040,15 +1046,12 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         PINT_sm_push_frame(new_sm, f->task_id, f->frame);
 
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "Calling smcb: %p.\n", smcb);
-        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "With frame: %p.\n", f->frame);
-        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "Task id: %d.\n", f->task_id);
+                       "Calling smcb: %p frame: %p task: %d\n",
+                       smcb, f->frame, f->task_id);
 
         /* PINT_sm_task_map is static and only called in one place when
          * a PJMP occurs.  When processing a PJMP the state must be
-         * set by the PJMPTBL, not op number in the SMCB.
+         * set by the PJMPTBL, not the op number in the SMCB.
          */
         /* locate SM to run */
         new_sm->current_state = PINT_sm_task_map(smcb, f->task_id);
@@ -1066,14 +1069,14 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 
         /* invoke SM */
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "Calling PINT_stat_machine_start (%p)\n", new_sm);
+                       "Calling PINT_state_machine_start (%p)\n", new_sm);
         retval = PINT_state_machine_start(new_sm, &r);
         if(retval < 0)
         {
             gossip_err("PJMP child state machine failed to start.\n");
         }
     }
-    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Exiting function\n");
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Exiting\n");
 }
 
 char * PINT_sm_action_string[3] =
