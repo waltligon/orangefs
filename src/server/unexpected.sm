@@ -29,10 +29,13 @@
     } while(0)
 
 /* TODO are these enum values okay? */
-enum {
-    LOCAL_OPERATION = 2,
-    REMOTE_OPERATION = 3,
-    OP_CANCELLED = 4
+enum
+{
+    NEXT_STATE_LOCAL  = 2, /* these are for the SM next state transition table */
+    NEXT_STATE_REMOTE = 3,
+    PJMP_LOCAL        = 4, /* these are for a PJMP table selecting a SM */
+    PJMP_REMOTE       = 5,
+    OP_CANCELLED      = 6
 };
 
 static int unexpected_replicate_comp_fn(void *v_p,
@@ -106,8 +109,8 @@ machine pvfs2_unexpected_sm
     {
         pjmp unexpected_pjmp_setup
         {
-            LOCAL_OPERATION => pvfs2_unexpected_local_sm;
-            REMOTE_OPERATION => pvfs2_unexpected_remote_sm;
+            PJMP_LOCAL => pvfs2_unexpected_local_sm;
+            PJMP_REMOTE => pvfs2_unexpected_remote_sm;
         }
         default => unexpected_pjmp_cleanup;
     }
@@ -335,7 +338,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Pushing local op frame\n");
     s_op->num_pjmp_frames = 1;
 
-    ret = PINT_sm_push_frame(smcb, LOCAL_OPERATION, local_op_frame);
+    ret = PINT_sm_push_frame(smcb, PJMP_LOCAL, local_op_frame);
 
     if(ret < 0)
     {
@@ -457,7 +460,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
             }
         }
         /* now push remote ops frame */
-        ret = PINT_sm_push_frame(smcb, REMOTE_OPERATION, remote_op_frame);
+        ret = PINT_sm_push_frame(smcb, PJMP_REMOTE, remote_op_frame);
         gossip_ldebug(GOSSIP_UNEXP_DEBUG, "(%p) Pushing remote op frame\n", smcb);
         s_op->num_pjmp_frames += 1;
         if(ret < 0)

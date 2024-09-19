@@ -25,15 +25,15 @@
 #include "pvfs2-internal.h"
 #include "pint-security.h"
 #include "pint-cached-config.h"
-
 enum
-{
-    LOCAL_OPERATION = 2,
-    REMOTE_OPERATION = 3
-};
+{                                        
+    NEXT_STATE_LOCAL  = 5, /* these are for the SM next state transition table */
+    NEXT_STATE_REMOTE = 6,
+    PJMP_LOCAL        = 7, /* these are for a PJMP table selecting a SM */
+    PJMP_REMOTE       = 8         
+};                   
 
 %%
-
 
 machine pvfs2_list_attr_sm
 {
@@ -55,7 +55,7 @@ machine pvfs2_list_attr_sm
     {
         pjmp listattr_setup_getattr
         {
-            LOCAL_OPERATION => pvfs2_pjmp_get_attr_work_sm;
+            PJMP_LOCAL => pvfs2_pjmp_get_attr_work_sm;
         }
         success => interpret_getattrs;
         default => final_response;
@@ -165,7 +165,7 @@ static PINT_sm_action listattr_setup_getattr(
             s_op->req->u.listattr.fs_id,
             js_p->error_code,
             req,
-            LOCAL_OPERATION);
+            PJMP_LOCAL);
 
         getattr_op->op = PVFS_SERV_GETATTR;
 

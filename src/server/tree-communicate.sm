@@ -36,8 +36,10 @@
 
 enum
 {
-    LOCAL_OPERATION = 2,
-    REMOTE_OPERATION = 3
+    NEXT_STATE_LOCAL  = 2,
+    NEXT_STATE_REMOTE = 3,
+    PJMP_LOCAL        = 4,
+    PJMP_REMOTE       = 5
 };
 
 /* completion function prototypes */
@@ -86,8 +88,8 @@ nested machine pvfs2_tree_setattr_work_sm
     {
         pjmp tree_setattr_setup
         {
-            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_pjmp_set_attr_work_sm;
+            PJMP_REMOTE => pvfs2_pjmp_call_msgpairarray_sm;
+            PJMP_LOCAL => pvfs2_pjmp_set_attr_work_sm;
         }
         default => tree_setattr_work_cleanup;
     }
@@ -126,8 +128,8 @@ nested machine pvfs2_tree_remove_work_sm
     {
         pjmp tree_remove_setup
         {
-            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_pjmp_remove_work_sm;
+            PJMP_REMOTE => pvfs2_pjmp_call_msgpairarray_sm;
+            PJMP_LOCAL => pvfs2_pjmp_remove_work_sm;
         }
         default => tree_remove_work_cleanup;
     }
@@ -166,8 +168,8 @@ nested machine pvfs2_tree_get_file_size_work_sm
     {
         pjmp tree_get_file_size_setup
         {
-            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_pjmp_get_attr_work_sm;
+            PJMP_REMOTE => pvfs2_pjmp_call_msgpairarray_sm;
+            PJMP_LOCAL => pvfs2_pjmp_get_attr_work_sm;
         }
         default => tree_get_file_size_work_cleanup;
     }
@@ -206,8 +208,8 @@ nested machine pvfs2_tree_get_dirent_count_work_sm
     {
         pjmp tree_get_dirent_count_setup
         {
-            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_pjmp_get_attr_work_sm;
+            PJMP_REMOTE => pvfs2_pjmp_call_msgpairarray_sm;
+            PJMP_LOCAL => pvfs2_pjmp_get_attr_work_sm;
         }
         default => tree_get_dirent_count_work_cleanup;
     }
@@ -246,8 +248,8 @@ nested machine pvfs2_tree_getattr_work_sm
     {       
         pjmp tree_getattr_setup
         {
-            REMOTE_OPERATION => pvfs2_pjmp_call_msgpairarray_sm;
-            LOCAL_OPERATION => pvfs2_pjmp_get_attr_work_sm;
+            PJMP_REMOTE => pvfs2_pjmp_call_msgpairarray_sm;
+            PJMP_LOCAL => pvfs2_pjmp_get_attr_work_sm;
         }
         default => tree_getattr_work_cleanup;
     }
@@ -389,7 +391,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Next Local\n");
             /* Create a stack frame for the local operation. */
             s_op->u.tree_communicate.num_pjmp_frames++;
-            js_p->error_code = LOCAL_OPERATION;
+            js_p->error_code = NEXT_STATE_LOCAL;
 
             /* this creates a new frame and pushes it for a subsequent PJMP */
             PINT_CREATE_SUBORDINATE_SERVER_FRAME(
@@ -399,7 +401,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                                fs_id,
                                js_p->error_code,
                                req,                  /* req in new frame */
-                               LOCAL_OPERATION);
+                               PJMP_LOCAL);
 
             switch (operation)
             {
@@ -593,7 +595,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                      num_partitions, num_files_per_server);
 
         /* We need to send tree-based messages to other servers */
-        js_p->error_code = REMOTE_OPERATION;
+        js_p->error_code = NEXT_STATE_REMOTE;
         s_op->u.tree_communicate.num_pjmp_frames++;
 
         /* Prepare the stack for pjmp. */
@@ -605,7 +607,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                 fs_id,
                 js_p->error_code, /* out: location */
                 req,
-                REMOTE_OPERATION); /* task_id */
+                PJMP_REMOTE); /* task_id */
 
         /* store the number of partitions */
         s_op->u.tree_communicate.num_partitions = num_partitions;
@@ -1001,7 +1003,7 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
                      , "%s: Value of error_code is %d\n"
                      , __func__, error_code);
 
-        if (task_id == REMOTE_OPERATION)
+        if (task_id == PJMP_REMOTE)
         {
             if (error_code != 0)
             {
@@ -1255,7 +1257,7 @@ static int tree_remove_work_cleanup(struct PINT_smcb *smcb,
                      ,__func__
                      ,error_code);
 
-        if (task_id == REMOTE_OPERATION)
+        if (task_id == PJMP_REMOTE)
         {
             if (error_code != 0)
             {   
@@ -1605,7 +1607,7 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                      ,__func__
                      ,error_code);
 
-        if (task_id == REMOTE_OPERATION) 
+        if (task_id == PJMP_REMOTE) 
         {
             if (error_code != 0)
             {
@@ -1987,7 +1989,7 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
                      ,"Value of error_code is %d\n"
                      ,error_code);
 
-        if (task_id == REMOTE_OPERATION)
+        if (task_id == PJMP_REMOTE)
         {
             if (error_code != 0)
             { /*sub-tree request failed; all handles identified in each msgpair
