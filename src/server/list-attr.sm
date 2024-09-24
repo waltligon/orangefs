@@ -163,9 +163,7 @@ static PINT_sm_action listattr_setup_getattr(
             getattr_op,
             s_op->req->u.listattr.sid_array[i * s_op->req->u.listattr.sid_count],
             s_op->req->u.listattr.fs_id,
-            js_p->error_code,
-            req,
-            PJMP_LOCAL);
+            req);
 
         getattr_op->op = PVFS_SERV_GETATTR;
 

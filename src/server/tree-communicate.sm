@@ -34,12 +34,14 @@
 #include "security-util.h"
 #include "sid.h"
 
+/* These must match src/server/remove.sm */
+
 enum
 {
-    NEXT_STATE_LOCAL  = 2,
-    NEXT_STATE_REMOTE = 3,
-    PJMP_LOCAL        = 4,
-    PJMP_REMOTE       = 5
+    NEXT_STATE_LOCAL  = 5, /* These must match src/server/remove.sm */
+    NEXT_STATE_REMOTE = 6,
+    PJMP_LOCAL        = 7,
+    PJMP_REMOTE       = 8
 };
 
 /* completion function prototypes */
@@ -399,9 +401,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                                tree_communicate_s_op, /* new frame */
                                config->host_sid,
                                fs_id,
-                               js_p->error_code,
-                               req,                  /* req in new frame */
-                               PJMP_LOCAL);
+                               req);                  /* req in new frame */
 
             switch (operation)
             {
@@ -605,9 +605,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                 PVFS_SID_NULL,  /* bc this is a remote operation, we don't 
                                    need a real sid, just a place holder */
                 fs_id,
-                js_p->error_code, /* out: location */
-                req,
-                PJMP_REMOTE); /* task_id */
+                req);
 
         /* store the number of partitions */
         s_op->u.tree_communicate.num_partitions = num_partitions;

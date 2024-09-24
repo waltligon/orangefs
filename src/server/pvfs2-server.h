@@ -813,6 +813,46 @@ typedef struct PINT_server_op
 
 } PINT_server_op;
 
+
+/* This creates  new frame in __s_op and pushes it for a subsequent PJMP
+ *
+ * In the big if :
+ * a __location value of LOCAL will result in LOCAL
+ * and a __location value of REMOTE will result in REMOTE
+ * any other avlue will check the __sid against the local server
+ */
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                                \
+                                             __s_op,                                \
+                                             __sid,                                 \
+                                             __fs_id,                               \
+                                             __req)                                 \
+do {                                                                                \
+      struct server_configuration_s *__config = PINT_server_config_mgr_get_config();\
+      __s_op = (PINT_server_op *)malloc(sizeof(struct PINT_server_op));             \
+      if(!__s_op)                                                                   \
+      {                                                                             \
+          gossip_err("%s:Error allocating subordinate server frame\n"               \
+                    ,__func__);                                                     \
+          return -PVFS_ENOMEM;                                                      \
+      }                                                                             \
+      memset(__s_op, 0, sizeof(struct PINT_server_op));                             \
+      __s_op->req = &__s_op->decoded.stub_dec.req;                                  \
+      __req = __s_op->req;                                                          \
+      if (!PVFS_SID_is_null(&(__sid)) &&                                            \
+          !PVFS_SID_cmp(&(__sid), &(__config->host_sid)))                           \
+      {                                                                             \
+          PINT_sm_push_frame(__smcb, PJMP_LOCAL, __s_op);                           \
+      }                                                                             \
+      else                                                                          \
+      {                                                                             \
+          PINT_sm_push_frame(__smcb, PJMP_REMOTE, __s_op);                          \
+          memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));             \
+          PINT_serv_init_msgarray_params(__s_op, __fs_id);                          \
+      }                                                                             \
+} while (0)
+
+#if 0
+/* OLD VERSION */
 /* This creates  new frame in __s_op and pushes it for a subsequent PJMP
  *
  * In the big if :
@@ -857,6 +897,7 @@ do {                                                                            
       }                                                                             \
       __req = __s_op->req;                                                          \
 } while (0)
+#endif
 
 #define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op)      \
     do {                                                   \

@@ -2857,8 +2857,7 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op, int dflag)
 {
     if (op == BMI_UNEXPECTED_OP) /* 999 */
     {
-        gossip_ldebug(GOSSIP_SERVER_DEBUG,
-                       "op: %d\n", op);
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "op: %d\n", op);
     }
     else if (dflag)
     {
@@ -2873,11 +2872,13 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op, int dflag)
     {
     case BMI_UNEXPECTED_OP :
         {
+            gossip_ldebug(GOSSIP_SERVER_DEBUG, "unexp op\n");
             return &pvfs2_unexpected_sm;
             break;
         }
     default :
         {
+            gossip_ldebug(GOSSIP_SERVER_DEBUG, "default\n");
             if (op >= 0 && op < PVFS_SERV_NUM_OPS)
                 return PINT_server_req_table[op].params->state_machine;
             else

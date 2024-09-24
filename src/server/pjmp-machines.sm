@@ -248,7 +248,7 @@ static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                  "Executing pvfs2_pjmp_call_msgpairarray_sm:%s\n"
                  "                        "
-                 "op num: (%d) s_op: (%p)\n frame count: %d base frame; %d\n",
+                 "op num: (%d) s_op: (%p) frame count: %d base frame; %d\n",
                  PINT_map_server_op_to_string(smcb->op), smcb->op,
                  s_op, smcb->frame_count, smcb->base_frame);
 

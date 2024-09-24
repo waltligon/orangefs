@@ -31,11 +31,11 @@
 /* TODO are these enum values okay? */
 enum
 {
-    NEXT_STATE_LOCAL  = 2, /* these are for the SM next state transition table */
-    NEXT_STATE_REMOTE = 3,
-    PJMP_LOCAL        = 4, /* these are for a PJMP table selecting a SM */
-    PJMP_REMOTE       = 5,
-    OP_CANCELLED      = 6
+    NEXT_STATE_LOCAL  = 5, /* these are for the SM next state transition table */
+    NEXT_STATE_REMOTE = 6,
+    PJMP_LOCAL        = 7, /* these are for a PJMP table selecting a SM */
+    PJMP_REMOTE       = 8,
+    OP_CANCELLED      = 9
 };
 
 static int unexpected_replicate_comp_fn(void *v_p,
