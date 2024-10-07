@@ -32,6 +32,10 @@ static struct PINT_state_s *PINT_sm_task_map(struct PINT_smcb *smcb,
 static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
                                        int* children_started);
 
+#if defined(__PVFS2_SERVER__)
+const char *PINT_map_server_op_to_string(enum PVFS_server_op op);
+#endif
+
 /* Function: PINT_state_machine_halt(void)
  * Params: None
  * Returns: True
@@ -329,9 +333,10 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 	    }
         } while (transtbl[i].flag == SM_RETURN);
         smcb->current_state = transtbl[i].next_state;
+        
         /* To do nested states, we check to see if the next state is
-        * a nested state machine, and if so we push the return state
-        * onto a stack */
+         * a nested state machine, and if so we push the return state
+         * onto a stack */
         while (smcb->current_state->flag == SM_JUMP ||
                smcb->current_state->flag == SM_SWITCH)
         {
@@ -344,6 +349,14 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
             else /* state flag == SM_SWITCH */
             {
                 gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "SWITCH\n");
+                gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                             "======================= NEW REQUEST ======================\n");
+                /* All requests should arrive at the server as an
+                 * unexpected message which does a PJMP and then
+                 * a switch that selects the proper state machine
+                 * via PINT_state_machine_locate.  We don't know which
+                 * request yet, but SML should provide that.
+                 */
                 /* locates SM via op, finds first state, follows jumps */
                 if (!PINT_state_machine_locate(smcb, 0))
                 {
@@ -405,18 +418,35 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb, int dflag)
 	gossip_err("State machine requested not valid\n");
 	return -PVFS_EINVAL;
     }
+#if 0
+#if defined(__PVFS2_SERVER__)
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                   "Locating op-id: %d\n", (smcb)->op);
+                   "Locating op-id: %d (%s)\n", smcb->op,
+                   PINT_map_server_op_to_string(smcb->op));
+#endif
+#if defined(__PVFS2_CLIENT__)
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                   "Locating op-id: %d (%s)\n", smcb->op,
+                   PINT_client_get_name_str(smcb->op));
+#endif
+#endif 
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                    "calling op_get_state_machine\n"); 
     /* this is a usage dependant routine to look up the SM */
     op_sm = (*smcb->op_get_state_machine)(smcb->op, dflag);
+
     if (op_sm != NULL)
     {
-	current_tmp = op_sm->first_state;
+        /* print result of SM get */
+        smcb->current_state = op_sm->first_state;
+        machine_name = PINT_state_machine_current_machine_name(smcb);
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                       "State Machine: %s\n", machine_name);
+
 	/* handle the case in which the first state points to a nested
 	 * machine, rather than a simple function
 	 */
+	current_tmp = op_sm->first_state;
 	while(current_tmp->flag == SM_JUMP)
 	{
 	    PINT_push_state(smcb, current_tmp);
@@ -425,11 +455,12 @@ int PINT_state_machine_locate(struct PINT_smcb *smcb, int dflag)
 	}
         smcb->current_state = current_tmp;
 
+        /* print resulting state */
         state_name = PINT_state_machine_current_state_name(smcb);
         machine_name = PINT_state_machine_current_machine_name(smcb);
 
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                      "Located: %s:%s\n", machine_name, state_name);
+                      "Ready to run: %s:%s\n", machine_name, state_name);
 
 	return 1; /* indicates successful locate */
     }
@@ -664,10 +695,12 @@ int PINT_smcb_alloc(struct PINT_smcb **smcb,
     (*smcb)->terminate_fn = term_fn;
     (*smcb)->context = context_id;
     /* if a getmach given, lookup state machine */
+#if 0
     if (getmach)
     {
         return PINT_state_machine_locate(*smcb, 1);
     }
+#endif
     return 0; /* success */
 }
 
@@ -1033,11 +1066,20 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         /* allocate smcb */
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Allocating SMCB\n");
         PINT_smcb_alloc(&new_sm,
-                        smcb->op, /* what should really go here */
-                        0, /* frame size */
-                        smcb->op_get_state_machine, /* do we need or even have this */
+                        smcb->op, /* set to parent value */
+                        0, /* frame size - frames already exist*/
+                        smcb->op_get_state_machine, /* set to parent value */
                         child_sm_frame_terminate,
                         smcb->context);
+
+        if (new_sm == NULL)
+        {
+            /* rewrite this func to return an error code! */
+            /* return -PVFS_ENOMEM; */
+        }
+
+        /* we select the SM by calling PINT_sm_task_map below */
+
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "New SMCB = (%p)\n", new_sm);
 
         /* set parent smcb pointer */

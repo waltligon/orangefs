@@ -609,7 +609,7 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running unexp local pre state action\n");
 
     /* Should we run prelude here - simplify SM code */
 
@@ -624,7 +624,7 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
 
     if(s_op->req)
     {
-        gossip_debug(GOSSIP_UNEXP_DEBUG, "client:%d, reqid:%d, rank:%d\n",
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "client:%d, reqid:%d, rank:%d\n",
                      PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                      PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
                      PINT_HINT_GET_RANK(s_op->req->hints));
@@ -655,7 +655,7 @@ static PINT_sm_action unexp_local_post(struct PINT_smcb *smcb,
                                        job_status_s *js_p)
 {
     PINT_server_op *frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running unexp local post state action\n");
     /* check frame->join schedule hold if not ready */
     if (frame->join)
     {

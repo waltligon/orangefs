@@ -64,6 +64,9 @@ int PINT_client_get_config(struct server_configuration_s *config,
     {
         return -PVFS_ENOMEM;
     }
+
+    PINT_state_machine_locate(smcb, 1);
+
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* NOTE: we set these fields manually here rather than use

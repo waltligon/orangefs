@@ -2486,6 +2486,7 @@ int server_post_unexpected_recv(void)
                           server_op_state_get_machine,
                           server_state_machine_terminate,
                           server_job_context);
+    PINT_state_machine_locate(smcb, 1);
     if (ret < 0)
     {
         gossip_lerr("Error: failed to allocate SMCB "
@@ -2687,6 +2688,8 @@ int server_state_machine_alloc_noreq(enum PVFS_server_op op,
                               server_op_state_get_machine,
                               server_state_machine_terminate,
                               server_job_context);
+        PINT_state_machine_locate(*smcb, 1);
+
         if (ret < 0)
         {
             gossip_lerr("Error: failed to allocate SMCB "

@@ -334,11 +334,14 @@ int PVFS_sys_initialize(PVFS_debug_mask default_debug_mask)
                     client_op_state_get_machine,
                     NULL,
                     pint_client_sm_context);
+
     if(!smcb)
     {
 	ret = (-PVFS_ENOMEM);
         goto local_exit;
     }
+
+    PINT_state_machine_locate(smcb, 1);
 
     ret = PINT_client_state_machine_post(smcb, NULL, NULL);
     if (ret < 0)

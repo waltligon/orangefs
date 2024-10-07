@@ -412,10 +412,13 @@ int client_perf_start_rollover(struct PINT_perf_counter *pc,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
+
     if (!pc->smcb)
     {
         return(-PVFS_ENOMEM);
     }
+
+    PINT_state_machine_locate(pc->smcb, 1);
 
     sm_p = PINT_sm_frame(pc->smcb, PINT_FRAME_CURRENT);
     sm_p->u.perf_count_timer.pc = pc;

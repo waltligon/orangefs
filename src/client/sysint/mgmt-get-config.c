@@ -56,10 +56,13 @@ int PVFS_mgmt_get_config(const PVFS_fs_id *fsid,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
+
     if(smcb == NULL)
     {
         return -PVFS_ENOMEM;
     }
+
+    PINT_state_machine_locate(smcb, 1);
 
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
