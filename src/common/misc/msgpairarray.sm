@@ -171,8 +171,8 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray"
-                                  "(%d msgpair(s))\n", mop->count);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "(%d msgpair(s))\n", mop->count);
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"base frame:%d frame count:%d\n"
                                     ,smcb->base_frame, smcb->frame_count);
@@ -1589,6 +1589,9 @@ int PINT_msgpairarray_init(PINT_sm_msgarray_op *op, int count)
     memset(op->msgarray, 0, (count * sizeof(PINT_sm_msgpair_state)));
     op->count = count;
 
+    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG, 
+                  "Created %d msgpairs for op (%p)\n", count, op);
+
     return 0;
 }
 
@@ -1677,8 +1680,8 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
             return(-EPROTONOSUPPORT);
         }
     }
-gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-             "%s: returning %d\n",__func__,ret);
+    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG,
+                  "returning %d\n", ret);
     return ret;
 }
 

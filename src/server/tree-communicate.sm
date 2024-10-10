@@ -332,7 +332,7 @@ static PINT_sm_action tree_communicate_partition_handles(
              * datafiles.  NOTE:  the datafiles are stored ordinally in the
              * handle_array. sid groups are stored ordinally; one group represents
              * the sids for one datafile; the first group contains sids for the
-             * first datafile, and so on.
+             * first datafile, and so on. The first sid in a group is the primary.
              */
             if (PINT_cached_config_server_local( &sid_array[(i * num_sids) + j] ))
             {
@@ -614,8 +614,8 @@ static PINT_sm_action tree_communicate_partition_handles(
         tree_communicate_s_op->resp = s_op->resp;
         tree_communicate_s_op->u.tree_communicate = s_op->u.tree_communicate;
        
-        ret = PINT_msgpairarray_init(&tree_communicate_s_op->msgarray_op
-                                    ,num_partitions);
+        ret = PINT_msgpairarray_init(&tree_communicate_s_op->msgarray_op,
+                                     num_partitions);
         if (ret)
         {
             gossip_lerr("tree_communicate: failed to allocate msgarray\n");

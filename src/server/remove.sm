@@ -630,10 +630,10 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
                                         ,s_op->req->u.remove.fs_id
                                         ,req);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Setting NULL capability\n", __func__);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Setting NULL capability\n");
     PINT_null_capability(&capability);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Filling getattr req (%p)\n", __func__, req);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Filling getattr req (%p)\n", req);
     PINT_SERVREQ_TREE_GETATTR_FILL(
                         *req,
                         PVFS_REQ_DIRDATA,

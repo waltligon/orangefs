@@ -171,7 +171,7 @@ static PINT_sm_action unexpected_post(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Running state action\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Running Post\n");
 
     /*
      * TODO: Consider the optimization of enabling immediate
@@ -194,7 +194,7 @@ static PINT_sm_action unexpected_post(struct PINT_smcb *smcb,
         PVFS_perror_gossip("Error: job_bmi_unexp failure", ret);
         return SM_ACTION_TERMINATE;
     }
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "DEFERRING!\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "DEFERRING Unexpected Recv\n");
     return SM_ACTION_DEFERRED;
 }
 
@@ -207,12 +207,12 @@ static PINT_sm_action unexpected_replace(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Running state action\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Running replace\n");
 
     /* If op was cancelled, print WARNING */
     if (s_op->op_cancelled)
     {
-        gossip_ldebug(GOSSIP_UNEXP_DEBUG,
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
                       "INFO: op_cancelled, terminating sm!\n");
         js_p->error_code = OP_CANCELLED;
         return SM_ACTION_COMPLETE;
@@ -236,7 +236,7 @@ static PINT_sm_action unexpected_replace(struct PINT_smcb *smcb,
                            "server_post_unexpected_recv() returned an error: ",
                            ret);
     }
-    gossip_ldebug(GOSSIP_UNEXP_DEBUG, "(%p) completed\n", smcb);
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "(%p) completed\n", smcb);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -253,7 +253,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     int remote_op_cnt = 0;
     int remote_op = 0;
 
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Running Setup\n");
 
     server_config_p = PINT_server_config_mgr_get_config();
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
@@ -263,6 +263,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     /* If op was cancelled, kill the SM */
     if (s_op->op_cancelled)
     {
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Op Was Cancelled\n");
         return SM_ACTION_TERMINATE;
     }
 
@@ -297,14 +298,19 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
      
-
+    /* Unfortunately this is nolonger the SMCB we care about
+     * This is the SMCB of the unexpected routine, and a ways
+     * down we will want the SMCB of the new process so that
+     * we can switch properly.
+     */
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Set up req and op\n");
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     smcb->op = s_op->req->op;
     s_op->op = s_op->req->op;
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
-                   "Received a request with op = %d\n", s_op->op);
+                   "Received a request with op = %d (%s)\n", s_op->op,
+                   PINT_state_machine_current_machine_name(smcb));
 
     if (s_op->op < 2 || s_op->op > PVFS_SERV_NUM_OPS)
     {
@@ -461,7 +467,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         }
         /* now push remote ops frame */
         ret = PINT_sm_push_frame(smcb, PJMP_REMOTE, remote_op_frame);
-        gossip_ldebug(GOSSIP_UNEXP_DEBUG, "(%p) Pushing remote op frame\n", smcb);
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Pushing remote op frame\n");
         s_op->num_pjmp_frames += 1;
         if(ret < 0)
         {
@@ -624,7 +630,8 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
 
     if(s_op->req)
     {
-        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "client:%d, reqid:%d, rank:%d\n",
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "op:%d client:%d, reqid:%d, rank:%d\n",
+                     s_op->req->op,
                      PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                      PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
                      PINT_HINT_GET_RANK(s_op->req->hints));
@@ -637,6 +644,13 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
                          PINT_HINT_GET_RANK(s_op->req->hints),
                          PINT_HINT_GET_HANDLE(s_op->req->hints),
                          s_op->req->op);
+        if (s_op->op != s_op->req->op ||
+            smcb->op != s_op->req->op)
+        {
+            gossip_lsdebug(GOSSIP_UNEXP_DEBUG,"OP is NOT properly set!!!\n");
+            smcb->op = s_op->req->op;
+            s_op->op = s_op->req->op;
+        }
         s_op->resp.op = s_op->req->op;
     }
 
@@ -644,7 +658,7 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
     s_op->tag  = s_op->unexp_bmi_buff.tag;
 
     /* the smcb->op and s_op->op are already set to the request 
-     * next state is the switch that calls the proper state machine
+     * next state it is the switch that sets the proper state machine
      */
 
     js_p->error_code = 0;
