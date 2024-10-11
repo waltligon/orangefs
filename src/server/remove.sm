@@ -633,7 +633,7 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Setting NULL capability\n");
     PINT_null_capability(&capability);
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Filling getattr req (%p)\n", req);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Filling tree getattr req (%p)\n", req);
     PINT_SERVREQ_TREE_GETATTR_FILL(
                         *req,
                         PVFS_REQ_DIRDATA,
@@ -650,10 +650,10 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
                         0,
                         s_op->req->hints);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: Cleanup capability\n", __func__);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Cleanup capability\n");
     PINT_cleanup_capability(&capability);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "%s: State Action Complete\n", __func__);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "State Action Complete\n");
     return SM_ACTION_COMPLETE;
 }
 

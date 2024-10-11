@@ -278,8 +278,8 @@ static PINT_sm_action tree_communicate_partition_handles(
                                                  ,PVFS_SID *sid_array)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *tree_communicate_s_op =
-                        PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *tree_communicate_s_op = s_op;
+/*                      PINT_sm_frame(smcb, PINT_FRAME_CURRENT);*/
     struct PVFS_server_req *this_req = s_op->req;
     int num_partitions = 0, num_files_per_server = 0;
     int i,j;
@@ -288,6 +288,9 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PVFS_server_req *req = NULL;
     PVFS_capability capability;
 
+    /* These arrays are used during partitioning to hold lists of remote
+     * and local targets
+     */
     s_op->u.tree_communicate.handle_array_local = calloc(
                         num_data_files,
                         sizeof(*s_op->u.tree_communicate.handle_array_local));
@@ -598,22 +601,26 @@ static PINT_sm_action tree_communicate_partition_handles(
         js_p->error_code = NEXT_STATE_REMOTE;
         s_op->u.tree_communicate.num_pjmp_frames++;
 
-        /* Prepare the stack for pjmp. */
+        /* Prepare the stack for pjmp. This frame will be used in MPA */
         PINT_CREATE_SUBORDINATE_SERVER_FRAME( /* pushes a frame */
                 smcb,
-                tree_communicate_s_op,
+                tree_communicate_s_op, /* overwriting this frame pointer */
                 PVFS_SID_NULL,  /* bc this is a remote operation, we don't 
                                    need a real sid, just a place holder */
                 fs_id,
                 req);
 
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New Frame for PJMP: (%p)\n",
+                       tree_communicate_s_op);
+
         /* store the number of partitions */
         s_op->u.tree_communicate.num_partitions = num_partitions;
 
-        /*keep info in new frame for later use*/
+        /* keep info in the new frame for later use*/
         tree_communicate_s_op->resp = s_op->resp;
         tree_communicate_s_op->u.tree_communicate = s_op->u.tree_communicate;
        
+        /* set up message pairs for MPA code - jumping there soon */
         ret = PINT_msgpairarray_init(&tree_communicate_s_op->msgarray_op,
                                      num_partitions);
         if (ret)
@@ -621,6 +628,8 @@ static PINT_sm_action tree_communicate_partition_handles(
             gossip_lerr("tree_communicate: failed to allocate msgarray\n");
             return -PVFS_ENOMEM;
         }
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Initialized %d messages on frame(%p)\n",
+                                            num_partitions, tree_communicate_s_op);
 
         /* Use a null capability with tree_get_file_size and tree_getattr op */
         if (operation == PVFS_SERV_TREE_GET_FILE_SIZE ||
