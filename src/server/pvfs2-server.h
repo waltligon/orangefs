@@ -657,15 +657,15 @@ struct PINT_server_tree_communicate_op
 {
     int num_pjmp_frames;
     int num_partitions;
-    PVFS_handle* handle_array_local; 
-    PVFS_handle* handle_array_remote; 
+    PVFS_OID* handle_array_local; 
+    PVFS_OID* handle_array_remote; 
+    PVFS_SID* sid_array_local; 
+    PVFS_SID* sid_array_remote; 
     uint32_t *local_join_size;
     uint32_t *remote_join_size;
-    int handle_array_local_count;
+    int handle_array_local_count; /* use these to index into sid array */
     int handle_array_remote_count;
     int handle_index;
-    int32_t sid_count; /* V3 FIXME */
-    PVFS_SID *sid_array; /* V3 FIXME */
 };
 
 struct PINT_server_mgmt_get_dirent_op

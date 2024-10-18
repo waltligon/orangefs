@@ -246,20 +246,21 @@ static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
     struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
-                 "op num: %d op: %s frame: (%p) frame count: %d base frame; %d\n",
-                 smcb->op, PINT_map_server_op_to_string(smcb->op),
-                 s_op, smcb->frame_count, smcb->base_frame);
+                   "op num: %d op: %s frame: (%p) frame count: %d base frame; %d\n",
+                   smcb->op, PINT_map_server_op_to_string(smcb->op),
+                   s_op, smcb->frame_count, smcb->base_frame);
 
     js_p->error_code = 0;
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "s_op->msgarray_op.msgpair.req.op:%d\n"
-                                      ,s_op->msgarray_op.msgpair.req.op);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "s_op->msgarray_op.msgpair.req.op:%d\n",
+                   s_op->msgarray_op.msgpair.req.op);
 
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op.msgpair.req.op);
+    /* PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op.msgpair.req.op); */
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
    
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "AFTER PUSH:smcb->base_frame:%d"
-                                     "\tframe_count:%d\n"
-                                    ,smcb->base_frame, smcb->frame_count);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "AFTER PUSH:smcb->base_frame:%d\tframe_count:%d\n",
+                   smcb->base_frame, smcb->frame_count);
 
     return SM_ACTION_COMPLETE;
 } /* end action call_msgpairarray */

@@ -328,9 +328,12 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     int must_loop_encodings = 0;
     int local_enc_and_alloc = 0;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p "
-                 "%d total message(s) with %d incomplete\n", __func__, smcb,
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, 
+                 "%d total message(s) with %d incomplete\n",
                  mop->count * 2, MPA_SUM_CT);
+
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "req op %d\n",
+                   msg_p->req.op);
 
     js_p->error_code = 0;
 
@@ -359,7 +362,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     if (msg_p->encoded_resp_p == NULL)
     {
         /* message used to say "resp_p != NULL", above if says otherwise */
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "msg_p->encoded_resp_p == NULL\n");
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msg_p->encoded_resp_p == NULL\n");
         if (msg_p->fs_id != PVFS_FS_ID_NULL)
         {
             server_config = PINT_server_config_mgr_get_config(msg_p->fs_id);
@@ -395,7 +398,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         {
             if (must_loop_encodings)
             {
-                gossip_debug(GOSSIP_MSGPAIR_DEBUG, "Looping through "
+                gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Looping through "
                              "encodings [%d/%d]\n", msg_p->enc_type,
                              ENCODING_INVALID_MAX);
 
@@ -433,8 +436,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     /*function can pass it to the caller of msgpairarray.               */
     msg_p->session_tag = session_tag;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair index %d: "
-                 "posting recv\n", __func__, smcb, i);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair index %d: posting recv\n", i);
 
     /* post receive of response; job_id stored in recv_id */
     ret = job_bmi_recv(msg_p->svr_addr,
@@ -456,6 +458,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
          * confusion of sending a request for which we can't recv a
          * response
          */
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Testing recv post\n");
         ret = job_test(msg_p->recv_id,
                        &tmp,
                        NULL,
@@ -469,6 +472,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
      */
     if ((ret < 0) || (ret == 1))
     {
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Recv error of some kind\n");
         /* it is impossible for this recv to complete at this point
          * without errors; we haven't sent the request yet!
          */
@@ -508,8 +512,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     assert(ret == 0);
     mop->params.recv_ct++;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p msgpair index %d: "
-                 "posting send\n", __func__, smcb, i);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair index %d: posting send\n",i);
 
     /* post send of request; job_id stored in send_id */
     ret = job_bmi_send_list(msg_p->encoded_req.dest,
@@ -530,6 +533,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
 
     if ((ret < 0) || ((ret == 1) && (msg_p->send_status.error_code != 0)))
     {
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Send error of some kind\n");
         if (ret < 0)
         {
             PVFS_perror_gossip("Post of send failed", ret);
@@ -550,15 +554,18 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     }
     else if (ret == 1)
     {
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Successful post, immediate successful completion\n");
         /* immediate successful completion */
         msg_p->send_id = 0;
     }
     else
     {
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Successful post, no immediate completions\n");
         /* successful post, no immediate completion */
         mop->params.send_ct++;
     }
  
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Exiting correctly, still waiting on completions\n");
     /* we are still waiting on operations to complete, next state
      * transition will handle them
      */
@@ -577,8 +584,7 @@ static PINT_sm_action msgpairarray_retry_recv_send(struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p, wait %d ms\n",
-                 __func__, smcb, mop->params.retry_delay);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "wait %d ms\n", mop->params.retry_delay);
 
     js_p->error_code = 0;  /* do not leak MSGPAIRS_RETRY through to wait */
     return job_req_sched_post_timer(mop->params.retry_delay,
@@ -600,9 +606,9 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "%s: sm %p status_user_tag %d msgarray_count %d\n",
-                 __func__, smcb, (int) js_p->status_user_tag, mop->count);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "frame (%p) status_user_tag %d msgarray_count %d\n",
+                    mop, (int)js_p->status_user_tag, mop->count);
 
 #if 0
     /* match operation with something in the msgpair array */
@@ -610,9 +616,13 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
     assert(js_p->status_user_tag < mop->count * 2);
 #endif
 
+
     switch (js_p->status_user_tag)
     {
     case PVFS_MPA_RECV :
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "recv_ct %d recv_id %d status %d\n",
+                       mop->params.recv_ct, (int)msg_p->recv_id, js_p->error_code);
         /* The RECV completed */
         mop->params.recv_ct--;
         msg_p->recv_id = 0; /* indicates recv is completed */
@@ -635,6 +645,9 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
         }
         break;
     case PVFS_MPA_SEND :
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "send_ct %d send_id %d status %d\n",
+                       mop->params.send_ct, (int)msg_p->send_id, js_p->error_code);
         /* The SEND completed */
         mop->params.send_ct--;
         msg_p->send_id = 0; /* indicates send is completed */
@@ -666,28 +679,28 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
     if (msg_p->send_id || msg_p->recv_id)
     {
         /* still more jobs need to complete */
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                     "     msgpairarray send/recv: %d operations remain\n",
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                     "msgpairarray send/recv: %d operations remain\n",
                      MPA_SUM_CT);
         js_p->error_code = 0;
         return SM_ACTION_DEFERRED;
     }
 
     /* all jobs completed */
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "     msgpairarray send/recv: all operations complete\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                 "msgpairarray send/recv: all operations complete\n");
 
     if (msg_p->msgclass == PVFS_IO_IO)
     {
         js_p->error_code = REQ_COMPLETE;
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "     msgclass is PVFS_IO_IO: request is complete\n");
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                 "msgclass is PVFS_IO_IO: request is complete\n");
     }
     else
     {
         js_p->error_code = MSGPAIRS_COMPLETE;
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "     msgclass is NOT PVFS_IO_IO: msgpairs complete\n");
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                 "msgclass is NOT PVFS_IO_IO: msgpairs complete\n");
     }
     return SM_ACTION_COMPLETE;
 }
@@ -991,10 +1004,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
      */
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
-                 smcb, __func__);
-    gossip_debug(GOSSIP_MIRROR_DEBUG,
-                 "Executing msgpairarray_complete_msg.\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Starting Completion\n");
 
     assert(msg_p);
 
@@ -1026,35 +1036,32 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     /* this decodes what should be a successful response */
     /* this could either be the recv ack or the write ack */
     /* this is an IO read, do we do this here? was it not done before? */
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG,"\tDecoding message\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"Decoding message\n");
     ret = PINT_serv_decode_resp(msg_p->fs_id,
                                 msg_p->encoded_resp_p,
                                 &decoded_msg,
                                 &msg_p->svr_addr,
                                 msg_p->recv_status.actual_size,
                                 &resp_p);
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "\tPINT_serv_decode_resp: return code: (%d)\n", ret);
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "\tPINT_serv_decode_resp: msg_p op_status: (%d)\n", msg_p->op_status);
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "\tPINT_serv_decode_resp: resp_p->status: (%d)\n", resp_p->status);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                 "PINT_serv_decode_resp: return code: (%d)\n", ret);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                 "PINT_serv_decode_resp: msg_p op_status: (%d)\n", msg_p->op_status);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                 "PINT_serv_decode_resp: resp_p->status: (%d)\n", resp_p->status);
     if (ret != 0)
     {
         /* Didn't decode right, keep decode error */
         msg_p->op_status = js_p->error_code = ret;
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                     "\t%s:error code %d from PINT_serv_decode_resp, "
-                                          "from msgpair %d\n"
-                                         ,__func__
-                                         ,msg_p->op_status
-                                         ,mop->index);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "error code %d from PINT_serv_decode_resp, "
+                       "from msgpair %d\n", msg_p->op_status, mop->index);
         goto cleanup;
     }
     else
     {
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                     "\tmsgpairarray decode complete (%d)\n", ret);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "msgpairarray decode complete (%d)\n", ret);
         /* if we've made it this far, the server response status is
          * meaningful, so we save it.  This should be a valid response
          * so we should not overwrite any error codes here.
@@ -1098,7 +1105,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
 
     if (msg_p->comp_fn != NULL && resp_p != NULL)
     {
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,"\texecuting msg_p->comp_fn..\n");
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"executing msg_p->comp_fn.\n");
 
         /* even though error_code and op_status were already set to resp_p->status,
          * override their values with the result of the completion function.
@@ -1106,7 +1113,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
          * or some other status meaningful to the request.
          */
         js_p->error_code = msg_p->op_status = msg_p->comp_fn(smcb, resp_p, mop->index);
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "\tCompletion function returns %d\n",
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Completion function returns %d\n",
                      js_p->error_code);
     }
    
@@ -1114,8 +1121,8 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
 
 
 cleanup:
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "\tFreeing capability and msgpair resources\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "Freeing capability and msgpair resources\n");
     /* cleanup capability */
     PINT_cleanup_capability(&msg_p->req.capability);
 
@@ -1142,10 +1149,10 @@ cleanup:
     msg_p->complete = 1;
 
 retry_message:
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "\tEntering retry processing\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Entering retry processing\n");
     if (msg_p->op_action == PVFS_MPA_RETRY)
     {
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "\tMessage requests PVFS_MPA_RETRY\n");
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Message requests PVFS_MPA_RETRY\n");
         /* free up and zero out msg fields; if we retry we will reallocate */
         memset(&msg_p->encoded_req, 0, sizeof(msg_p->encoded_req));
         msg_p->encoded_resp_p = NULL;
@@ -1161,22 +1168,22 @@ retry_message:
             msg_p->retry_count < mop->params.retry_limit)
         {
             msg_p->retry_count++;
-            gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                         "*** %s: msgpair %d failed, retry %d\n",
-                         __func__, mop->index, msg_p->retry_count);
+            gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                           "msgpair %d failed, retry %d\n",
+                           mop->index, msg_p->retry_count);
             if(msg_p->op_status == -BMI_ECANCEL)
             {
                 /* if the error code indicates cancel, then skip the
                  * delay.  We have probably already been waiting a while
                  */
-                gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                       "*** %s: msgpair skipping retry delay.\n", __func__);
+                gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "msgpair skipping retry delay.\n");
                 js_p->error_code = MSGPAIRS_RETRY_NODELAY;
             }
             else
             {
                 gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                       "*** %s: msgpair retrying after delay.\n", __func__);
+                       "msgpair retrying after delay.\n");
                 js_p->error_code = MSGPAIRS_RETRY_REQ;
             }
         }
@@ -1230,8 +1237,8 @@ retry_message:
         gen_mutex_unlock(mop->join.mutex);
 #endif
     }
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "\tFinished complete_message error_code: %d\n", js_p->error_code);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "Finished complete_message error_code: %d\n", js_p->error_code);
 
     return SM_ACTION_TERMINATE; /* Done with this message / child SM */
 } /* end of msgpairarray_complete_msg */

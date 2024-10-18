@@ -854,9 +854,9 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
         frame_entry = qlist_entry(prev, struct PINT_frame_s, link);
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
                        "[SM get_frame] smcb:(%p) frame:(%p)\n", smcb, frame_entry->frame);
-        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "frame: (%p) op-id: %d stk-ptr: %d base-frm: %d frm-cnt: %d\n",
-                       frame_entry->frame, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                       "[SM get_frame] op-id: %d stk-ptr: %d base-frm: %d frm-cnt: %d\n",
+                       smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
         return frame_entry->frame;
     }
 }

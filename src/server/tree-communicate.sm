@@ -282,38 +282,41 @@ static PINT_sm_action tree_communicate_partition_handles(
 /*                      PINT_sm_frame(smcb, PINT_FRAME_CURRENT);*/
     struct PVFS_server_req *this_req = s_op->req;
     int num_partitions = 0, num_files_per_server = 0;
-    int i,j;
+    int i,j,sid;
     struct server_configuration_s *config = PINT_server_config_mgr_get_config();
     int ret = -PVFS_EINVAL;
     struct PVFS_server_req *req = NULL;
     PVFS_capability capability;
+    struct PINT_server_tree_communicate_op *tc; /* convenience pointer */
+    tc = &s_op->u.tree_communicate;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "data_files %d sids %d fs_id %d op %d\n",
+                   num_data_files, num_sids, fs_id, operation);
 
     /* These arrays are used during partitioning to hold lists of remote
-     * and local targets
+     * and local targets.  We assume only one sid per oid may be local.
      */
-    s_op->u.tree_communicate.handle_array_local = calloc(
-                        num_data_files,
-                        sizeof(*s_op->u.tree_communicate.handle_array_local));
-    s_op->u.tree_communicate.handle_array_remote = calloc(
-                        num_data_files,
-                        sizeof(*s_op->u.tree_communicate.handle_array_remote));
-    s_op->u.tree_communicate.local_join_size = calloc(
-                        num_data_files,
-                        sizeof(*s_op->u.tree_communicate.local_join_size));
-    s_op->u.tree_communicate.remote_join_size = calloc(
-                        num_data_files,
-                        sizeof(*s_op->u.tree_communicate.remote_join_size));
+    tc->handle_array_local =  calloc(num_data_files, sizeof(PVFS_OID));
+    tc->handle_array_remote = calloc(num_data_files, sizeof(PVFS_OID));
+    tc->sid_array_local =     calloc(num_data_files, sizeof(PVFS_SID));
+    tc->sid_array_remote =    calloc(num_data_files * num_sids, sizeof(PVFS_SID));
+    tc->local_join_size =     calloc(num_data_files, sizeof(uint32_t));
+    tc->remote_join_size =    calloc(num_data_files, sizeof(uint32_t));
 
-    if (!s_op->u.tree_communicate.handle_array_local  ||
-        !s_op->u.tree_communicate.handle_array_remote ||
-        !s_op->u.tree_communicate.local_join_size     ||
-        !s_op->u.tree_communicate.remote_join_size)
+    if (!tc->handle_array_local  ||
+        !tc->handle_array_remote ||
+        !tc->sid_array_remote ||
+        !tc->sid_array_remote ||
+        !tc->local_join_size     ||
+        !tc->remote_join_size)
     {
         /* in case any of the mallocs succeeded */
-        free(s_op->u.tree_communicate.handle_array_local); 
-        free(s_op->u.tree_communicate.handle_array_remote);
-        free(s_op->u.tree_communicate.local_join_size);
-        free(s_op->u.tree_communicate.remote_join_size);
+        free(tc->handle_array_local); 
+        free(tc->handle_array_remote);
+        free(tc->sid_array_remote);
+        free(tc->sid_array_remote);
+        free(tc->local_join_size);
+        free(tc->remote_join_size);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -328,6 +331,7 @@ static PINT_sm_action tree_communicate_partition_handles(
          */
         for (j = 0; j < num_sids; j++)
         {
+            PVFS_SID *sidbin;
             gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New SID\n");
             /* j is looping through the number of sids per object,
              * a datafile object in this case, 
@@ -337,25 +341,28 @@ static PINT_sm_action tree_communicate_partition_handles(
              * the sids for one datafile; the first group contains sids for the
              * first datafile, and so on. The first sid in a group is the primary.
              */
-            if (PINT_cached_config_server_local( &sid_array[(i * num_sids) + j] ))
+            sidbin = &sid_array[(i * num_sids) + j];
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SID %s\n", PVFS_SID_str(sidbin));
+            if (PINT_cached_config_server_local(sidbin))
             {
                 /* we found a local sid, so put handle on the local list */
                 gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                              "local handle = %s\n",
                              PVFS_OID_str(&handle_array[i]));
 
-                s_op->u.tree_communicate.handle_array_local[
-                          s_op->u.tree_communicate.handle_array_local_count] =
+                /* copy the handle into the s_op space */
+                tc->handle_array_local[tc->handle_array_local_count] =
                                    handle_array[i];
 
+                /* copy sids into the s_op space */
+                /* we assume only one SID for any OID can be local */
+                tc->sid_array_local[tc->handle_array_local_count] = *sidbin;
 
                 //What is this used for?
-                s_op->u.tree_communicate.local_join_size[
-                          s_op->u.tree_communicate.handle_array_local_count] =
-                                   i;
+                tc->local_join_size[tc->handle_array_local_count] = i;
 
                 /* we assume only one SID for any OID can be local */
-                s_op->u.tree_communicate.handle_array_local_count++;
+                tc->handle_array_local_count++;
                 break;
             }            
         }/*end for each sid*/
@@ -370,16 +377,25 @@ static PINT_sm_action tree_communicate_partition_handles(
                          "remote handle = %s\n",
                          PVFS_OID_str(&handle_array[i]));
 
-            s_op->u.tree_communicate.handle_array_remote[
-                      s_op->u.tree_communicate.handle_array_remote_count] = 
+            /* copy OID into s_op space */
+            tc->handle_array_remote[
+                      tc->handle_array_remote_count] = 
                              handle_array[i];
 
+            /* copy SID into s_op space */
+            for (sid = 0; sid < num_sids; sid++)
+            {
+                tc->sid_array_remote[
+                        (tc->handle_array_remote_count * num_sids) + sid] =
+                             sid_array[i * num_sids + sid];
+            }
+
             //What is this used for?
-            s_op->u.tree_communicate.remote_join_size[
-                      s_op->u.tree_communicate.handle_array_remote_count] = 
+            tc->remote_join_size[
+                      tc->handle_array_remote_count] = 
                       i;
 
-            s_op->u.tree_communicate.handle_array_remote_count++;
+            tc->handle_array_remote_count++;
         }
     }/*end for each datafile*/
 
@@ -388,14 +404,15 @@ static PINT_sm_action tree_communicate_partition_handles(
      * a required precursor to pjmps in the next state.  
      * (pjmps execute multiple requests simultaneously.)
      */
-    if (s_op->u.tree_communicate.handle_array_local_count > 0)
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Processing local handles\n");
+    if (tc->handle_array_local_count > 0)
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Local target\n");
-        for (i = 0; i < s_op->u.tree_communicate.handle_array_local_count; i++)
+        for (i = 0; i < tc->handle_array_local_count; i++)
         {
             gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Next Local\n");
             /* Create a stack frame for the local operation. */
-            s_op->u.tree_communicate.num_pjmp_frames++;
+            tc->num_pjmp_frames++;
             js_p->error_code = NEXT_STATE_LOCAL;
 
             /* this creates a new frame and pushes it for a subsequent PJMP */
@@ -421,9 +438,9 @@ static PINT_sm_action tree_communicate_partition_handles(
                                s_op->req->capability,
                                s_op->req->u.tree_setattr.credential,
                                fs_id,
-                               s_op->u.tree_communicate.handle_array_local[0],
-                               0,    /* V3 sid count */
-                               NULL, /* V3 sid array */
+                               tc->handle_array_local[0],
+                               tc->handle_array_local_count,  /* V3 sid count */
+                               tc->sid_array_local,           /* V3 sid array */
                                dummy_obj_attr,
                                s_op->req->hints);
 
@@ -456,9 +473,9 @@ static PINT_sm_action tree_communicate_partition_handles(
                         s_op->req->capability,
                         s_op->req->u.tree_remove.credential,
                         fs_id,
-                        s_op->u.tree_communicate.handle_array_local[i],
-                        s_op->u.tree_communicate.sid_count, /* FIXME */
-                        s_op->u.tree_communicate.sid_array, /* FIXME */
+                        tc->handle_array_local[i],
+                        tc->handle_array_local_count,
+                        tc->sid_array_local,
                         s_op->req->hints);
 
                 /*this identifies which "local" frame is being populated.*/
@@ -481,7 +498,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                          s_op->req->capability,
                          this_req->u.tree_get_file_size.credential,
                          fs_id,
-                         s_op->u.tree_communicate.handle_array_local[i],
+                         tc->handle_array_local[i],
                          PVFS_ATTR_DATA_ALL,
                          s_op->req->hints);
 
@@ -505,7 +522,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                          s_op->req->capability,
                          this_req->u.tree_get_dirent_count.credential,
                          fs_id,
-                         s_op->u.tree_communicate.handle_array_local[i],
+                         tc->handle_array_local[i],
                          PVFS_ATTR_DIRDATA_ALL,
                          s_op->req->hints);
 #else
@@ -538,7 +555,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                     s_op->req->capability,
                     this_req->u.tree_getattr.credential,
                     fs_id,
-                    s_op->u.tree_communicate.handle_array_local[i],
+                    tc->handle_array_local[i],
                     s_op->req->u.tree_getattr.attrmask,
                     s_op->req->hints);
 
@@ -562,7 +579,8 @@ static PINT_sm_action tree_communicate_partition_handles(
 
     /* END OF LOCAL FILES - NOW REMOTE FILES */
 
-    if (s_op->u.tree_communicate.handle_array_remote_count > 0)
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Processing Remote Handles\n");
+    if (tc->handle_array_remote_count > 0)
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Remote target\n");
         /* Decide how to divide the remote handles.
@@ -570,23 +588,25 @@ static PINT_sm_action tree_communicate_partition_handles(
          * from the config file) then go ahead and
          * send to each remaining server individually.
          */
-        if (s_op->u.tree_communicate.handle_array_remote_count >
+        if (tc->handle_array_remote_count >
             config->tree_threshold)
         {
+            /* We continue the tree */
             num_partitions = config->tree_width;
             num_files_per_server =
-                   s_op->u.tree_communicate.handle_array_remote_count /
+                   tc->handle_array_remote_count /
                    config->tree_width;
             if (num_partitions * num_files_per_server <
-                   s_op->u.tree_communicate.handle_array_remote_count)
+                   tc->handle_array_remote_count)
             {
                 num_files_per_server++;
             }
         }
         else
         {
+            /* Send individually */
             num_partitions =
-                     s_op->u.tree_communicate.handle_array_remote_count;
+                     tc->handle_array_remote_count;
             num_files_per_server = 1;
         }
 
@@ -594,12 +614,12 @@ static PINT_sm_action tree_communicate_partition_handles(
                      "num_data_files = %d, num_remote_handles = %d, "
                      "num_partitions = %d, num_files_per_server = %d\n",
                      num_data_files,
-                     s_op->u.tree_communicate.handle_array_remote_count,
+                     tc->handle_array_remote_count,
                      num_partitions, num_files_per_server);
 
         /* We need to send tree-based messages to other servers */
         js_p->error_code = NEXT_STATE_REMOTE;
-        s_op->u.tree_communicate.num_pjmp_frames++;
+        tc->num_pjmp_frames++;
 
         /* Prepare the stack for pjmp. This frame will be used in MPA */
         PINT_CREATE_SUBORDINATE_SERVER_FRAME( /* pushes a frame */
@@ -614,10 +634,11 @@ static PINT_sm_action tree_communicate_partition_handles(
                        tree_communicate_s_op);
 
         /* store the number of partitions */
-        s_op->u.tree_communicate.num_partitions = num_partitions;
+        tc->num_partitions = num_partitions;
 
         /* keep info in the new frame for later use*/
         tree_communicate_s_op->resp = s_op->resp;
+        /* WAS OLD FRAME USING TREE_COMMUNICATE??? */
         tree_communicate_s_op->u.tree_communicate = s_op->u.tree_communicate;
        
         /* set up message pairs for MPA code - jumping there soon */
@@ -651,7 +672,7 @@ static PINT_sm_action tree_communicate_partition_handles(
              */
             for (num_data_files_for_this_server = num_files_per_server;
                  i * num_files_per_server + num_data_files_for_this_server >
-                         s_op->u.tree_communicate.handle_array_remote_count;
+                         tc->handle_array_remote_count;
                  num_data_files_for_this_server--)
             {
                 /* Do nothing; */
@@ -674,10 +695,9 @@ static PINT_sm_action tree_communicate_partition_handles(
                                 this_req->u.tree_setattr.attr,
                                 0,    /* caller handle index */
                                 num_data_files_for_this_server,
-                                &s_op->u.tree_communicate.handle_array_remote[
-                                                    i * num_files_per_server],
-                                0,    /* V3 sid count */
-                                NULL, /* V3 sid array */
+                                &tc->handle_array_remote[i * num_files_per_server],
+                                tc->handle_array_remote_count * num_sids,
+                                tc->sid_array_remote,
                                 s_op->req->hints);
 
                 msg_p->comp_fn = tree_setattr_comp_fn;
@@ -695,10 +715,9 @@ static PINT_sm_action tree_communicate_partition_handles(
                         fs_id,
                         (i * num_files_per_server),
                         num_data_files_for_this_server,
-                        &s_op->u.tree_communicate.handle_array_remote[
-                                        i * num_files_per_server],
-                        s_op->u.tree_communicate.sid_count, /* V3 FIXME */
-                        s_op->u.tree_communicate.sid_array, /* V3 FIXME */
+                        &tc->handle_array_remote[i * num_files_per_server],
+                        tc->handle_array_remote_count * num_sids,
+                        tc->sid_array_remote,
                         s_op->req->hints);
 
                 msg_p->comp_fn = tree_remove_comp_fn;
@@ -716,10 +735,9 @@ static PINT_sm_action tree_communicate_partition_handles(
                         fs_id,
                         (i * num_files_per_server),
                         num_data_files_for_this_server,
-                        &s_op->u.tree_communicate.handle_array_remote[
-                                      i * num_files_per_server],
-                        s_op->u.tree_communicate.sid_count, /* FIXME */
-                        s_op->u.tree_communicate.sid_array, /* FIXME */
+                        &tc->handle_array_remote[i * num_files_per_server],
+                        tc->handle_array_remote_count * num_sids,
+                        tc->sid_array_remote,
                         this_req->u.tree_get_file_size.retry_msgpair_at_leaf,
                         s_op->req->hints);
 
@@ -759,10 +777,9 @@ static PINT_sm_action tree_communicate_partition_handles(
                         fs_id,
                         (i * num_files_per_server),
                         num_data_files_for_this_server,
-                        &s_op->u.tree_communicate.handle_array_remote[
-                                      i * num_files_per_server],
-                        s_op->u.tree_communicate.sid_count, /* FIXME */
-                        s_op->u.tree_communicate.sid_array, /* FIXME */
+                        &tc->handle_array_remote[i * num_files_per_server],
+                        tc->handle_array_remote_count * num_sids,
+                        tc->sid_array_remote,
                         this_req->u.tree_get_dirent_count.retry_msgpair_at_leaf,
                         s_op->req->hints);
 
@@ -793,9 +810,17 @@ static PINT_sm_action tree_communicate_partition_handles(
             }
             break;
 
+/* Why are we creating a new req when we created one previously in the
+ * remove code?  remove code probably isn't the only way into this code
+ * Why aren't we using get dirent count (for remove)
+ */
             case PVFS_SERV_TREE_GETATTR:
             {
                 gossip_lsdebug(GOSSIP_SERVER_DEBUG, "GETATTR\n");
+#if 0
+                /* This is created in remove - maybe not in other places */
+                memcpy(&msg_p->req, s_op->req, sizeof(struct PVFS_server_req));
+#endif
                 PINT_SERVREQ_TREE_GETATTR_FILL(
                         msg_p->req,
                         s_op->req->ctrl.sub,
@@ -804,17 +829,31 @@ static PINT_sm_action tree_communicate_partition_handles(
                         fs_id,
                         (i * num_files_per_server),
                         num_data_files_for_this_server,
-                        &s_op->u.tree_communicate.handle_array_remote[
-                                                     i * num_files_per_server],
-                        /* sid_count this_req->u.tree_getattr.sid_count, */
-                        s_op->u.tree_communicate.sid_count, /* FIXME */
-                        /* sid_array this_req->u.tree_getattr.sid_array, */
-                        s_op->u.tree_communicate.sid_array, /* FIXME */
+                        &tc->handle_array_remote[i * num_files_per_server],
+                        tc->handle_array_remote_count * num_sids,
+                        tc->sid_array_remote,
                         this_req->u.tree_getattr.attrmask,
                         this_req->u.tree_getattr.retry_msgpair_at_leaf,
                         s_op->req->hints);
 
                 msg_p->comp_fn = tree_getattr_comp_fn;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "handles %d sids %d\n",
+                   msg_p->req.u.tree_getattr.handle_count,
+                   msg_p->req.u.tree_getattr.sid_count);
+
+    if (msg_p->req.u.tree_getattr.handle_array)
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "OID %s\n",
+                       PVFS_OID_str(msg_p->req.u.tree_getattr.handle_array));
+    }
+
+    if (msg_p->req.u.tree_getattr.sid_array)
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SID %s\n",
+                       PVFS_SID_str(msg_p->req.u.tree_getattr.sid_array));
+    }
+
 
                 /* if the logical file is mirrored, then we
                  * want the mirroring logic
@@ -845,7 +884,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             } /* end of remote switch */
 
             msg_p->fs_id = fs_id;
-            msg_p->handle = s_op->u.tree_communicate.handle_array_remote[
+            msg_p->handle = tc->handle_array_remote[
                                                    i * num_files_per_server];
             msg_p->sid_array = &sid_array[i * num_sids];
 
@@ -954,14 +993,17 @@ static int tree_setattr_comp_fn(void *v_p,
     /* stash the status for each file handle */
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,"m_resp->u.tree_setattr.handle_count is %d\n"
                                     ,m_resp->u.tree_setattr.handle_count);
+
     for (i = 0; i < m_tree->handle_count; i++)
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,"caller_handle_index:%u "
                                          "\tarray_local_count:%d\n"
                                         ,m_tree->caller_handle_index
                                         ,s_tree_comm->handle_array_local_count);
+
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,"status for file %d is %d\n"
                                         ,i ,m_tree->status[i]);
+
         status_array_index = s_op->u.tree_communicate.remote_join_size[ i +
                               resp_p->u.tree_setattr.caller_handle_index];
 
@@ -1208,6 +1250,7 @@ static int tree_remove_comp_fn(void *v_p,
                                         ,__func__
                                         ,m_tree->caller_handle_index
                                         ,s_tree_comm->handle_array_local_count);
+
         gossip_debug(GOSSIP_SERVER_DEBUG,"%s: status for file %d is %d\n"
                                         ,__func__
                                         ,i
@@ -1481,11 +1524,13 @@ static int tree_get_file_size_comp_fn(void *v_p,
                                         ,__func__
                                         ,i
                                         ,lld(m_tree->size[i]));
+
         gossip_debug(GOSSIP_SERVER_DEBUG,"%s: caller_handle_index:%u "
                                          "\tarray_local_count:%d\n"
                                         ,__func__
                                         ,m_tree->caller_handle_index
                                         ,s_tree_comm->handle_array_local_count);
+
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "%s: error code for datafile %d is %d\n"
                                         ,__func__
@@ -1635,13 +1680,14 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                             + k
                             + s_op->u.tree_communicate.handle_array_local_count;
                         s_op->resp.u.tree_get_file_size.size[index]  = 0;
-                        s_op->resp.u.tree_get_file_size.error[index] =
-                            error_code;
+                        s_op->resp.u.tree_get_file_size.error[index] = error_code;
+
                         gossip_err("%s:index:%d \terror[%d]:%d\n"
                                   ,__func__
                                   ,index
                                   ,index
                                  ,s_op->resp.u.tree_get_file_size.error[index]);
+
                     }/*end for*/
                 }/*end for*/
             }/*end if non-zero error-code*/
@@ -1655,9 +1701,11 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                          "%s: size of local datafile is %lld\n"
                          ,__func__
                          ,lld(old_frame->resp.u.getattr.attr.u.data.size));
+
             gossip_debug(GOSSIP_SERVER_DEBUG,"%s:handle_index:%d\n"
                                             ,__func__
                                             ,old_frame->local_index);
+
             size_array_index = s_op->u.tree_communicate.local_join_size[
                                      old_frame->local_index];
             error_array_index=size_array_index;
@@ -1686,9 +1734,11 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                                     ,__func__
                                     ,s_op->resp.op
                                     ,s_op->resp.status);
+
     gossip_debug(GOSSIP_SERVER_DEBUG,"%s: s_op->addr:%d\n"
                                     ,__func__
                                     ,(int)s_op->addr);
+
     gossip_debug(GOSSIP_SERVER_DEBUG,"%s: resp->caller_handle_index:%u "
                                      "\tresp->handle_count:%d\n"
                                     ,__func__
@@ -1849,6 +1899,24 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
     int ret = 0;
 
     assert(s_op->req->op == PVFS_SERV_TREE_GETATTR);
+
+    /* If handle_count < 1 or sid_count < 1 ABORT REQUEST */
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "handles %d sids %d\n",
+                   s_op->req->u.tree_getattr.handle_count, 
+                   s_op->req->u.tree_getattr.sid_count);
+
+    if (s_op->req->u.tree_getattr.handle_array)
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "OID %s\n",
+                       PVFS_OID_str(s_op->req->u.tree_getattr.handle_array));
+    }
+
+    if (s_op->req->u.tree_getattr.sid_array)
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SID %s\n",
+                       PVFS_SID_str(s_op->req->u.tree_getattr.sid_array));
+    }
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,"req->retry_msgpair_at_leaf:%s\n"
                 ,(req->u.tree_getattr.retry_msgpair_at_leaf ? "YES" : "NO"));

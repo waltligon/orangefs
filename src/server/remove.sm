@@ -623,7 +623,9 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "Starting State Action s_op = (%p) attr_p = (%p)\n",
                    s_op, &s_op->attr);
+
     attr_p = &s_op->attr;
+    /* This pushes a frame */
     PINT_CREATE_SUBORDINATE_SERVER_FRAME(smcb
                                         ,getattr_op
                                         ,attr_p->u.dir.dirdata_sids[0] /*FIXME*/
@@ -634,6 +636,7 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
     PINT_null_capability(&capability);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Filling tree getattr req (%p)\n", req);
+
     PINT_SERVREQ_TREE_GETATTR_FILL(
                         *req,
                         PVFS_REQ_DIRDATA,
@@ -649,6 +652,23 @@ static PINT_sm_action remove_get_dirent_count_setup_tree_getattr(
                         PVFS_ATTR_DIR_DIRENT_COUNT,
                         0,
                         s_op->req->hints);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "handles %d sids %d\n",
+                   req->u.tree_getattr.handle_count,
+                   req->u.tree_getattr.sid_count);
+
+    if (req->u.tree_getattr.handle_array)
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "OID %s\n",
+                       PVFS_OID_str(req->u.tree_getattr.handle_array));
+    }
+
+    if (req->u.tree_getattr.sid_array)
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SID %s\n",
+                       PVFS_SID_str(req->u.tree_getattr.sid_array));
+    }
+
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Cleanup capability\n");
     PINT_cleanup_capability(&capability);
