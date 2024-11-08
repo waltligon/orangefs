@@ -407,10 +407,9 @@ static PINT_sm_action tree_communicate_partition_handles(
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Processing local handles\n");
     if (tc->handle_array_local_count > 0)
     {
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Local target\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Next Local Handle\n");
         for (i = 0; i < tc->handle_array_local_count; i++)
         {
-            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Next Local\n");
             /* Create a stack frame for the local operation. */
             tc->num_pjmp_frames++;
             js_p->error_code = NEXT_STATE_LOCAL;
@@ -548,7 +547,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 
             case PVFS_SERV_TREE_GETATTR:
             {
-                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "GETATTR\n");
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "LOCAL GETATTR\n");
                 PINT_SERVREQ_GETATTR_FILL(
                     *req,
                     s_op->req->ctrl.sub,
@@ -813,14 +812,12 @@ static PINT_sm_action tree_communicate_partition_handles(
 /* Why are we creating a new req when we created one previously in the
  * remove code?  remove code probably isn't the only way into this code
  * Why aren't we using get dirent count (for remove)
+ * Req in remove code is a single request, this is for a tree operation
+ * may have multiple requests.
  */
             case PVFS_SERV_TREE_GETATTR:
             {
-                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "GETATTR\n");
-#if 0
-                /* This is created in remove - maybe not in other places */
-                memcpy(&msg_p->req, s_op->req, sizeof(struct PVFS_server_req));
-#endif
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "TREE-GETATTR\n");
                 PINT_SERVREQ_TREE_GETATTR_FILL(
                         msg_p->req,
                         s_op->req->ctrl.sub,
@@ -838,6 +835,8 @@ static PINT_sm_action tree_communicate_partition_handles(
 
                 msg_p->comp_fn = tree_getattr_comp_fn;
 
+/* Maybe remove this after working */
+
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "handles %d sids %d\n",
                    msg_p->req.u.tree_getattr.handle_count,
                    msg_p->req.u.tree_getattr.sid_count);
@@ -854,6 +853,7 @@ static PINT_sm_action tree_communicate_partition_handles(
                        PVFS_SID_str(msg_p->req.u.tree_getattr.sid_array));
     }
 
+/* end remove */
 
                 /* if the logical file is mirrored, then we
                  * want the mirroring logic
@@ -1980,9 +1980,8 @@ static int tree_getattr_comp_fn(void *v_p,
     uint32_t attr_array_index=0,
              error_array_index=0;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "tree_getattr_comp_fn[%d], caller_handle_index = %u\n",
-                 index, resp_p->u.tree_getattr.caller_handle_index);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "index %d, caller_handle_index = %u\n",
+                   index, resp_p->u.tree_getattr.caller_handle_index);
 
     assert(m_resp->op == PVFS_SERV_TREE_GETATTR);
 
@@ -1993,31 +1992,35 @@ static int tree_getattr_comp_fn(void *v_p,
     }
 
     /* stash the attrs and error codes for each file handle */
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: m_resp->u.tree_getattr.handle_count"
-                                     " is %d\n"
-                                    ,__func__
-                                    ,m_resp->u.tree_getattr.handle_count);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "m_resp->u.tree_getattr.handle_count"
+                                        " is %d\n",
+                                        m_resp->u.tree_getattr.handle_count);
 
     for (i = 0; i < m_tree->handle_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: caller_handle_index:%u "
-                                         "\tarray_local_count:%d\n"
-                                        ,__func__
-                                        ,m_tree->caller_handle_index
-                                        ,s_tree_comm->handle_array_local_count);
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: error code for handle %d is %d\n"
-                                        ,__func__
-                                        ,i
-                                        ,m_tree->error[i]);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "caller_handle_index %u "
+                                            "array_local_count %d\n",
+                                            m_tree->caller_handle_index,
+                                            s_tree_comm->handle_array_local_count);
+
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "rjs (%p)\n", s_op->u.tree_communicate.remote_join_size);
+
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "error code for handle %d is %d\n",
+                                            i, m_tree->error[i]);
 
         attr_array_index = s_op->u.tree_communicate.remote_join_size[ i +
                               resp_p->u.tree_getattr.caller_handle_index];
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "attr_array_index %d\n", attr_array_index);
+
         error_array_index = attr_array_index;
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "error_array_index %d\n", error_array_index);
 
         PINT_copy_object_attr(&op_tree->attr[attr_array_index],
                               &m_tree->attr[i]);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "attributes copied\n");
 
         op_tree->error[error_array_index] = m_tree->error[i];
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "opt_tree->error set\n");
     }
 
     return 0;

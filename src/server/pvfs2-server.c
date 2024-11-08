@@ -2787,14 +2787,14 @@ int server_state_machine_complete(PINT_smcb *smcb)
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
 
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Starting (%p)\n", smcb);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Starting frame (%p)\n", s_op);
 
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
 
     if(s_op->req)
     {
-        gossip_ldebug(GOSSIP_SERVER_DEBUG, "calling PINT_EVENT_END (%p)\n", smcb);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling PINT_EVENT_END\n");
         PINT_EVENT_END(PINT_sm_event_id,
                        server_controlling_pid,
                        NULL,
@@ -2805,19 +2805,19 @@ int server_state_machine_complete(PINT_smcb *smcb)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
-        gossip_ldebug(GOSSIP_SERVER_DEBUG, "calling PVFS_hint_free\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling PVFS_hint_free\n");
         PVFS_hint_free(&s_op->decoded.stub_dec.req.hints);
 
-        gossip_ldebug(GOSSIP_SERVER_DEBUG, "calling PINT_decode_release\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling PINT_decode_release\n");
         PINT_decode_release(&(s_op->decoded), PINT_DECODE_REQ);
     }
 
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "smcb op code (%d).\n", s_op->op);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "smcb op code (%d).\n", s_op->op);
 
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "s_op->unexp_bmi_buff.buffer (%p) "
-                                       "\tNULL(%s).\n", 
-                                       s_op->unexp_bmi_buff.buffer,
-                                       s_op->unexp_bmi_buff.buffer ?
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->unexp_bmi_buff.buffer (%p) "
+                                        "NULL(%s).\n", 
+                                        s_op->unexp_bmi_buff.buffer,
+                                        s_op->unexp_bmi_buff.buffer ?
                                                "NO" : "YES");
 
     /* BMI_unexpected_free MUST execute BEFORE BMI_set_info,
@@ -2826,7 +2826,7 @@ int server_state_machine_complete(PINT_smcb *smcb)
      * become zero.  The addr info holds the "unexpected-free"
      * function pointer.
      */
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "calling BMI_unexpected_free\n");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling BMI_unexpected_free\n");
     BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
                         s_op->unexp_bmi_buff.buffer);
 

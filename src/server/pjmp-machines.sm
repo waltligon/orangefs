@@ -243,12 +243,13 @@ static PINT_sm_action pjmp_execute_terminate( struct PINT_smcb *smcb
 static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
                                         ,job_status_s *js_p)
 {   
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
-                   "op num: %d op: %s frame: (%p) frame count: %d base frame; %d\n",
+                   "op num %d op %s frame (%p) frame count %d base frame %d remt_join_sz (%p)\n",
                    smcb->op, PINT_map_server_op_to_string(smcb->op),
-                   s_op, smcb->frame_count, smcb->base_frame);
+                   s_op, smcb->frame_count, smcb->base_frame,
+                   s_op->u.tree_communicate.remote_join_size);
 
     js_p->error_code = 0;
 

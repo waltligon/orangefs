@@ -67,13 +67,13 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t tmp_id;
-    gossip_log("%s: s_op=%p s_op->decoded.enc_type=%d\n", __func__,
-               s_op, s_op->decoded.enc_type);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op (%p) s_op->decoded.enc_type %d\n",
+                   s_op, s_op->decoded.enc_type);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(s_op %p) %s (FR sm) state: release: (error_code = %d)\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op),
-                 js_p->error_code);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
+                   "s_op (%p) %s (FR sm) state release (error_code = %d)\n",
+                   s_op, PINT_map_server_op_to_string(s_op->req->op),
+                   js_p->error_code);
 
     /* this seems a little odd, but since this is the first state of the
      * nested machine, now is the time to grab the error code if we
@@ -124,20 +124,22 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
     int ret = -1;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
-    gossip_log("%s: s_op->decoded.enc_type is %d\n", __func__, s_op->decoded.enc_type);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->decoded.enc_type %d\n",
+                   s_op->decoded.enc_type);
     
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-	         "(s_op %p) %s (FR sm) state: send_resp (status = %d)\n",
-	         s_op, PINT_map_server_op_to_string(s_op->req->op),
-	         s_op->resp.status);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
+	           "s_op (%p) %s (FR sm) state send_resp (status = %d)\n",
+	           s_op, PINT_map_server_op_to_string(s_op->req->op),
+	           s_op->resp.status);
 
     if (js_p->error_code != 0)
     {
         gossip_lerr("Error: req_sched_release() failure; continuing...\n");
     }
 
-    gossip_log("%s: calling PINT_encode, s_op->decoded.enc_type is %d\n", __func__,
-               s_op->decoded.enc_type);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
+                   "calling PINT_encode, s_op->decoded.enc_type %d\n",
+                   s_op->decoded.enc_type);
 
     ret = PINT_encode(&s_op->resp,
                       PINT_ENCODE_RESP,
@@ -185,8 +187,8 @@ static PINT_sm_action final_response_cleanup(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(s_op %p) %s (FR sm) state: cleanup\n",
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
+                 "s_op (%p) %s (FR sm) state cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);

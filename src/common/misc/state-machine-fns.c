@@ -63,17 +63,18 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
     /* notify parent */
     if (smcb->parent_smcb)
     {
-        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                     "%s: (%p) (error_code: %d)\n",
-                     __func__, smcb, (int32_t)r->error_code);
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                      "(error_code: %d)\n",
+                      (int32_t)r->error_code);
+
          assert(smcb->parent_smcb->children_running > 0);
 
          my_frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
          /* this will loop from TOS down to the base frame */
          /* base frame will not be processed */
 
-         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                      "%s: my_frame:%p\n", __func__, my_frame);
+         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                        "my_frame (%p)\n", my_frame);
 #ifdef WIN32
          qlist_for_each_entry(f,
                               &smcb->parent_smcb->frames,
@@ -90,9 +91,9 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
              }
          }
 
-        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                     "%s: children_running:%d\n",
-                     __func__, smcb->parent_smcb->children_running);
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                       "children_running %d\n",
+                       smcb->parent_smcb->children_running);
 
         if (--smcb->parent_smcb->children_running <= 0)
         {
@@ -108,8 +109,8 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
     {
         if (smcb->parent_smcb)
         {
-            gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                         "%s: calling terminate function.\n", __func__);
+            gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                           "calling terminate function.\n");
         }   
         (*smcb->terminate_fn)(smcb, r);
     }
@@ -219,6 +220,8 @@ PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
      * always after smcb_alloc, which sets the base_frame to 0 since
      * there is only one frame - making this redundant - unless there
      * are undocumented use cases.
+     * Documenting a use case - PJMP needs to push a parent frame before
+     * current frame if it does MPA - this can get the base_frame right.
      */
     /* set the base frame to be the current TOS, which should be 0 */
     smcb->base_frame = smcb->frame_count - 1;
@@ -736,6 +739,8 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
 
         if (frame_entry->frame && frame_entry->task_id == 0)
         {
+            gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                           "Freeing Frame\n");
             /* V3 - are we assured this frame has had any referenced
              * memory freed.  Shouldn't we call a specific free routine
              * on it to make sure and free anything remaining, rather
@@ -744,6 +749,8 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
             /* only free if task_id is 0 */
             free(frame_entry->frame);
         } 
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                       "Unlinking Frame\n");
         qlist_del(&frame_entry->link);
         free(frame_entry);
     }
@@ -817,6 +824,8 @@ static void PINT_push_state(struct PINT_smcb *smcb,
  * A -'ve index indicates a frame from a prior SM
  * smcb->frames.next is the top of stack
  * smcb->frames.prev is the bottom of stack
+ * frames are numbered from 0 at the bottom of the stack
+ * up to smcb->frame_count - 1 at the top of the stack.
  */
 void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
 {
@@ -831,8 +840,7 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
 #endif
 
     if(qlist_empty(&smcb->frames))
-    {
-        gossip_err("FRAME GET ERROR: (%p) index %d target %d -> List empty\n",
+    { gossip_err("FRAME GET ERROR: (%p) index %d target %d -> List empty\n",
                    smcb, index, target);
         return NULL;
     }
@@ -853,10 +861,10 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
         }
         frame_entry = qlist_entry(prev, struct PINT_frame_s, link);
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "[SM get_frame] smcb:(%p) frame:(%p)\n", smcb, frame_entry->frame);
+                       "[SM get_frame] smcb (%p) frame (%p)\n", smcb, frame_entry->frame);
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "[SM get_frame] op-id: %d stk-ptr: %d base-frm: %d frm-cnt: %d\n",
-                       smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
+                       "   [get_frame] op-id %d stk-ptr %d base-frm %d ix %d frm-cnt %d\n",
+                       smcb->op, smcb->stackptr, smcb->base_frame, index, smcb->frame_count);
         return frame_entry->frame;
     }
 }
@@ -1004,7 +1012,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 {
     int retval;
     struct PINT_smcb *new_sm;
-    job_status_s r;
+    job_status_s js;
     struct PINT_frame_s *f;
     void *my_frame;
 
@@ -1012,7 +1020,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Starting\n");
 
-    memset(&r, 0, sizeof(job_status_s));
+    memset(&js, 0, sizeof(job_status_s));
 
     *children_started = 0;
 
@@ -1082,6 +1090,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         new_sm->parent_smcb = smcb;
 
         /* assign frame */
+        PINT_sm_push_frame(new_sm, 999999, my_frame); /* parent frame shared */
         PINT_sm_push_frame(new_sm, f->task_id, f->frame);
 
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
@@ -1109,7 +1118,8 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         /* invoke SM */
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                        "Calling PINT_state_machine_start (%p)\n", new_sm);
-        retval = PINT_state_machine_start(new_sm, &r);
+
+        retval = PINT_state_machine_start(new_sm, &js);
         if(retval < 0)
         {
             gossip_err("PJMP child state machine failed to start.\n");

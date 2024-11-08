@@ -25,6 +25,7 @@
 #include "pint-util.h"
 #include "server-config-mgr.h"
 #include "state-machine.h"
+#include "pvfs2-server.h"
 
 #define MPA_SUM_CT (mop->params.send_ct + mop->params.recv_ct + \
                     mop->params.flow_ct + mop->params.ack_ct)
@@ -171,10 +172,9 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
-                   "(%d msgpair(s))\n", mop->count);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairs %d\n", mop->count);
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"base frame:%d frame count:%d\n"
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"base frame %d frame count %d\n"
                                     ,smcb->base_frame, smcb->frame_count);
 
     /* PVFS_perror_gossip_verbose(); */
@@ -207,7 +207,7 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
         msg_p->op_action = PVFS_MPA_OK;
 
     }
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray init done.");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray init done.\n");
     return SM_ACTION_COMPLETE;
 }
 
@@ -215,21 +215,20 @@ static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "sop->op %d\n", s_op->op);
     int i = 0;
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
-                 smcb, __func__);
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray forking off SMCBs: %s\n",
-                 smcb, __func__);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Setting up SMCBs to fork\n");
     for(i = 0; i < mop->count; i++)
     {
         PINT_sm_msgarray_op *submop;
         submop = (PINT_sm_msgarray_op *)malloc(sizeof(PINT_sm_msgarray_op));
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) SMCB %d forking\n", smcb, i);
         submop->params = mop->params;
         submop->count = mop->count;
         submop->index = i;
         submop->msgarray = mop->msgarray;
         PINT_sm_push_frame(smcb, i + 1, submop); /* task 0 is invalid */
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "SMCB %d ready to fork\n", i);
     }
     return SM_ACTION_COMPLETE;
 }

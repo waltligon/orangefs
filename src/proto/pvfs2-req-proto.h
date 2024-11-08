@@ -1115,6 +1115,7 @@ endecode_fields_4a1a_struct(
     PVFS_SID, sid_array);
 #define extra_size_PVFS_servreq_tree_getattr \
     ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
+     (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_handle)) + \
      extra_size_PVFS_credential)
 
 #define PINT_SERVREQ_TREE_GETATTR_FILL(__req,                   \

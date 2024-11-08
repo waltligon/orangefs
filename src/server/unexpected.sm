@@ -505,7 +505,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
     int task_id;
     PVFS_error tmp_err = 0;
     int remaining = 0;
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running unexp pjmp clnup state action\n");
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "s_op->num_pjmp_frames = %d\n",
                   s_op->num_pjmp_frames);
