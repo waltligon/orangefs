@@ -735,8 +735,21 @@ typedef struct PINT_client_sm
      */
     PINT_sm_msgarray_op msgarray_op;
 
-    PVFS_object_ref object_ref;
-    PVFS_object_ref parent_ref;
+    /* lots of confusion wrt these fields
+     * am going to try to clean up at least wrt mkdir/create/remove
+     * right now the rules below are not universal, but
+     * should become so.
+     */
+    PVFS_object_ref object_ref; /* this is always the target of a req 
+                                   the object req is sent to */
+    PVFS_object_ref parent_ref; /* this is always the direct parent of
+                                   the object */
+
+    /* objects: ... dirent=>dir=>dirdata=>dirent ...
+     * or:      ... dir=>dirdata=>dirent=>metafile=>dfile
+     * dirent is not really an object, but it contains a handle
+     * and sids so it is part of this chain.
+     */
 
     PVFS_credential *cred_p;
     /* Generic capability used with the rename state machine, which is

@@ -928,9 +928,10 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size, /* redundant */
                             sm_p->hints);
 
-    /* after setting up the request, zero out the handle and sid counts in the attr
-     * we don't send lists of oids and sids in the attr, but in the req.  On the
-     * other side we need to remember to put everything back
+    /* After setting up the request, zero out the handle and sid counts in the attr
+     * We don't send lists of oids and sids in the attr, but in the req.
+     * On the other side we need to remember to put everything back.
+     * This stops the encoder from trying to encode lists that aren't there.
      */
     msg_p->req.u.mkdir.attr.parent = NULL;
     msg_p->req.u.mkdir.attr.parent_sids = NULL;
@@ -1083,6 +1084,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                                               sm_p->u.mkdir.dir_attr.meta_sid_count],
                                   dirdata_attr,      /* attrs COPIED by macro */
                                   NULL);
+
         /* this is done in the FILL macro */
         /* PINT_copy_object_attr(&msg_p->req.u.setattr.attr, &dirdata_attr); */
 
@@ -1163,10 +1165,9 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
             sm_p->u.mkdir.object_name,
             llu(dirdata_hash));
 
-    dirdata_server_index =
-        PINT_find_dist_dir_bucket(dirdata_hash,
-            &sm_p->getattr.attr.u.dir.dist_dir_attr,
-            sm_p->getattr.attr.u.dir.dist_dir_bitmap);
+    dirdata_server_index = PINT_find_dist_dir_bucket(dirdata_hash,
+                    &sm_p->getattr.attr.u.dir.dist_dir_attr,
+                    sm_p->getattr.attr.u.dir.dist_dir_bitmap);
 
     dirdata_sid_index = dirdata_server_index *
                         sm_p->getattr.attr.u.dir.dist_dir_attr.sid_count;

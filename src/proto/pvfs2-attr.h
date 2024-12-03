@@ -204,6 +204,8 @@ typedef uint64_t PVFS_object_attrmask;
 
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT         (1UL << 24)  
+#define PVFS_ATTR_DIR_DIRENT_COUNT_INCR    (1UL << 58)   /* buff */
+#define PVFS_ATTR_DIR_DIRENT_COUNT_DECR    (1UL << 59)   /* buff */
 
 /* these attributes are for METAs, but they are set on the DIR to
  * create defaults
@@ -267,20 +269,22 @@ typedef uint64_t PVFS_object_attrmask;
  */
 
 /* internal attribute mask for distributed directory information */
-#define PVFS_ATTR_DIRDATA_DIRENT_COUNT   (1UL << 45)
+#define PVFS_ATTR_DIRDATA_DIRENT_COUNT        (1UL << 45)
+#define PVFS_ATTR_DIRDATA_DIRENT_COUNT_INCR   (1UL << 56) /* number of servers */
+#define PVFS_ATTR_DIRDATA_DIRENT_COUNT_DECR   (1UL << 57) /* number of servers */
 
 /* These are the same attributes shown abive under dir, but they are
  * also part of dirdata s they are repeated here but with a name change
  */
-#define PVFS_ATTR_DIRDATA_TREE_HEIGHT    (1UL << 46)
-#define PVFS_ATTR_DIRDATA_DIRDATA_MIN    (1UL << 47) /* min number of servers */
-#define PVFS_ATTR_DIRDATA_DIRDATA_MAX    (1UL << 48) /* max number of servers */
-#define PVFS_ATTR_DIRDATA_DIRDATA_COUNT  (1UL << 49) /* number of servers */
-#define PVFS_ATTR_DIRDATA_SID_COUNT      (1UL << 50)
-#define PVFS_ATTR_DIRDATA_BITMAP_SIZE    (1UL << 51)   /* buff */
-#define PVFS_ATTR_DIRDATA_SPLIT_SIZE     (1UL << 52)
-#define PVFS_ATTR_DIRDATA_SERVER_NO      (1UL << 53)
-#define PVFS_ATTR_DIRDATA_BRANCH_LEVEL   (1UL << 54)
+#define PVFS_ATTR_DIRDATA_TREE_HEIGHT         (1UL << 46)
+#define PVFS_ATTR_DIRDATA_DIRDATA_MIN         (1UL << 47) /* min number of servers */
+#define PVFS_ATTR_DIRDATA_DIRDATA_MAX         (1UL << 48) /* max number of servers */
+#define PVFS_ATTR_DIRDATA_DIRDATA_COUNT       (1UL << 49) /* number of servers */
+#define PVFS_ATTR_DIRDATA_SID_COUNT           (1UL << 50)
+#define PVFS_ATTR_DIRDATA_BITMAP_SIZE         (1UL << 51)   /* buff */
+#define PVFS_ATTR_DIRDATA_SPLIT_SIZE          (1UL << 52)
+#define PVFS_ATTR_DIRDATA_SERVER_NO           (1UL << 53)
+#define PVFS_ATTR_DIRDATA_BRANCH_LEVEL        (1UL << 54)
 
 #define PVFS_ATTR_DIRDATA_ALL \
     (PVFS_ATTR_DIRDATA_DIRENT_COUNT | \
@@ -322,6 +326,10 @@ typedef uint64_t PVFS_object_attrmask;
         PVFS_ATTR_META_DFILES  | PVFS_ATTR_META_MIRROR_DFILES | \
         PVFS_ATTR_META_UNSTUFFED)
 
+/***************************************
+ * Last mask value used is 59
+ ***************************************/
+
 /**************************************
  * Helper functions for attribute masks
  **************************************/
@@ -344,6 +352,12 @@ static inline int PVFS2_attr_all(uint64_t mask, uint64_t attr)
     }
     return 0;
 }
+
+/**************************************
+ * Related Object Attr functions in other files
+ * PVFS_object_attr_overwrite_setable() in src/io/trove/pvfs-storage.h
+ * PVFS ... in src/common/misc/...
+ **************************************/
 
 /**************************************
  * Code for debugging attribute masks
@@ -704,7 +718,7 @@ endecode_fields_13(
         uint32_t, dir_split_size,
         PVFS_dirhint_layout, dir_layout);
 #endif
-
+/******* DIR Attributes Here! *******/
 /* attributes specific to directory objects */
 struct PVFS_directory_attr_s
 {

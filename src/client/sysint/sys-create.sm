@@ -1503,12 +1503,12 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
               msg_p->req,
               sm_p->getattr.attr.capability,
               *sm_p->cred_p,
-              sm_p->u.create.object_name,                /* item inserted into dir */
-              sm_p->object_ref,                          /* inserted object */
-              sm_p->parent_ref,                          /* back reference */
-              sm_p->getattr.attr,                        /* parent to create dirdata */
-              dirdata_server_index,                      /* target */
-              dirdata_sid_index,                         /* target */
+              sm_p->u.create.object_name,        /* item name inserted into dir */
+              sm_p->object_ref,                  /* inserted object */
+              sm_p->parent_ref,                  /* back reference */
+              sm_p->getattr.attr,                /* parent to create dirdata */
+              dirdata_server_index,              /* target */
+              dirdata_sid_index,                 /* target */
               sm_p->hints);
 
 /* old pre V3 code */
@@ -1530,6 +1530,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
               sm_p->hints);
 #endif
 
+    /* dump crdirent arguments.  good candidate for gossip_if */
     if (gossip_debug_enabled(GOSSIP_CLIENT_DEBUG))
     {
         gossip_debug(GOSSIP_CREATE_DEBUG,

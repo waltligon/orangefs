@@ -327,8 +327,8 @@ static PINT_sm_action mgmt_update_dspace(struct PINT_smcb *smcb,
     PVFS_ds_attr_from_object_attr(ds_attr, dspace_attr);
 
     /* setting dspace */
-    ret = job_trove_dspace_setattr(s_op->req->u.rmdirent.fs_id,
-                                   s_op->req->u.rmdirent.handle,
+    ret = job_trove_dspace_setattr(s_op->req->u.mgmt_remove_dirent.fs_id,
+                                   s_op->req->u.mgmt_remove_dirent.handle,
                                    ds_attr,
                                    TROVE_SYNC,
                                    smcb,

@@ -420,6 +420,41 @@ do {                                                           \
             ((src)->mask & PVFS_ATTR_META_DFILES))             \
             (dest)->u.meta.dfile_count = (src)->u.meta.dfile_count;\
     }                                                          \
+                                                               \
+    if ((src)->mask & PVFS_ATTR_DIR_DIRENT_COUNT &&            \
+        (src)->objtype == PVFS_TYPE_DIRECTORY)                 \
+    {                                                          \
+        if ((src)->mask & PVFS_ATTR_DIR_DIRENT_COUNT_INCR)     \
+        {                                                      \
+            (dest)->u.dir.dirent_count += 1;                   \
+        }                                                      \
+        else if ((src)->mask & PVFS_ATTR_DIR_DIRENT_COUNT_DECR) \
+        {                                                      \
+            (dest)->u.dir.dirent_count -= 1;                   \
+        }                                                      \
+        else                                                   \
+        {                                                      \
+            (dest)->u.dir.dirent_count =                       \
+                            (src)->u.dir.dirent_count;         \
+        }                                                      \
+    }                                                          \
+    if ((src)->mask & PVFS_ATTR_DIRDATA_DIRENT_COUNT &&        \
+        (src)->objtype == PVFS_TYPE_DIRDATA)                   \
+    {                                                          \
+        if ((src)->mask & PVFS_ATTR_DIRDATA_DIRENT_COUNT_INCR) \
+        {                                                      \
+            (dest)->u.dirdata.dirent_count += 1;               \
+        }                                                      \
+        else if ((src)->mask & PVFS_ATTR_DIRDATA_DIRENT_COUNT_DECR) \
+        {                                                      \
+            (dest)->u.dirdata.dirent_count -= 1;               \
+        }                                                      \
+        else                                                   \
+        {                                                      \
+            (dest)->u.dirdata.dirent_count =                   \
+                            (src)->u.dirdata.dirent_count;     \
+        }                                                      \
+    }                                                          \
 } while(0)
 
 #endif /* __PVFS2_STORAGE_H */

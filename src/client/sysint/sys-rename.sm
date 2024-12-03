@@ -1030,7 +1030,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_SERVREQ_RMDIRENT_FILL(
           msg_p->req,
           sm_p->u.rename.parent_attr[sm_p->u.rename.rmdirent_index].capability,
-          sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
+          sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index],
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_count,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_array,

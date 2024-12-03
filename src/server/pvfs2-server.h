@@ -458,13 +458,13 @@ struct PINT_server_setattr_op
 
 struct PINT_server_rmdirent_op
 {
-/*    PVFS_handle dirdata_handle; */
-    PVFS_handle *entry_handle; /* holds handle of dirent object,
-                                * removed entry */
+    PVFS_handle *entry_handle; /* holds handle of dirent object */
     PVFS_SID *sid_array;       /* holds sids of dirent object */
     PVFS_size dirent_count;
-/*    PVFS_object_attr dirdata_attr; */
+    PVFS_ds_attributes dir_ds_attr; 
     PVFS_ds_attributes dirdata_ds_attr; 
+    PVFS_credential credential;/* for server-to-server */
+    PVFS_capability capability;/* for server-to-server */
 };
 
 struct PINT_server_chdirent_op

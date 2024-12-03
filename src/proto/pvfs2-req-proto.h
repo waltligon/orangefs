@@ -1852,7 +1852,7 @@ struct PVFS_servreq_rmdirent
 {
     char *entry;               /* name of entry to remove */
     PVFS_handle handle;        /* handle of dirdata */
-    PVFS_fs_id fs_id;          /* file system ID */
+    PVFS_object_ref parent;    /* fs_id, handle, and sids */
     int32_t sid_count;         /* reflexive - of dirdata */
     PVFS_SID *sid_array;       /* reflexive - of dirdata */
 };
@@ -1860,34 +1860,34 @@ endecode_fields_3a_struct(
     PVFS_servreq_rmdirent,
     string, entry,
     PVFS_handle, handle,
-    PVFS_fs_id, fs_id,
+    PVFS_object_ref, parent,
     int32_t, sid_count,
     PVFS_SID, sid_array);
 #define extra_size_PVFS_servreq_rmdirent \
                     (roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES + 1) + \
                      (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)))
 
-#define PINT_SERVREQ_RMDIRENT_FILL(__req,                \
-                                   __cap,                \
-                                   __fsid,               \
-                                   __handle,             \
-                                   __sid_count,          \
-                                   __sid_array,          \
-                                   __entry,              \
-                                   __hints)              \
-do {                                                     \
-    memset(&(__req), 0, sizeof(__req));                  \
-    (__req).op = PVFS_SERV_RMDIRENT;                     \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                 \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;                \
-    (__req).ctrl.sub  = PVFS_REQ_DIRDATA;                \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));          \
-    (__req).hints = (__hints);                           \
-    (__req).u.rmdirent.fs_id = (__fsid);                 \
-    (__req).u.rmdirent.handle = (__handle);              \
-    (__req).u.rmdirent.sid_count = (__sid_count);        \
-    (__req).u.rmdirent.sid_array = (__sid_array);        \
-    (__req).u.rmdirent.entry = (__entry);                \
+#define PINT_SERVREQ_RMDIRENT_FILL(__req,                         \
+                                   __cap,                         \
+                                   __parent,                      \
+                                   __handle,                      \
+                                   __sid_count,                   \
+                                   __sid_array,                   \
+                                   __entry,                       \
+                                   __hints)                       \
+do {                                                              \
+    memset(&(__req), 0, sizeof(__req));                           \
+    (__req).op = PVFS_SERV_RMDIRENT;                              \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                          \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;                         \
+    (__req).ctrl.sub  = PVFS_REQ_DIRDATA;                         \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                   \
+    (__req).hints = (__hints);                                    \
+    PVFS_object_ref_copy(&(__req).u.rmdirent.parent, &(__parent)); \
+    (__req).u.rmdirent.handle = (__handle);                       \
+    (__req).u.rmdirent.sid_count = (__sid_count);                 \
+    (__req).u.rmdirent.sid_array = (__sid_array);                 \
+    (__req).u.rmdirent.entry = (__entry);                         \
 } while (0);
 
 struct PVFS_servresp_rmdirent
