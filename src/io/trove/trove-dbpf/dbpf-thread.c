@@ -217,9 +217,10 @@ int dbpf_do_one_work_cycle(int *out_count)
              * and move _all_ the ready-to-be-synced operations to the
              * completion queue.
              */
-            ret = dbpf_sync_coalesce(cur_op, (ret == 1 ? 0 : ret), out_count);
+            ret = dbpf_sync_coalesce(cur_op, (ret == DBPF_OP_COMPLETE ? 0 : ret), out_count);
             if(ret < 0)
             {
+                gossip_lerr("Apparent trove sync_coalesce error %d\n", ret);
                 return ret; /* not sure how to recover from failure here */
             }
         }
@@ -229,6 +230,7 @@ int dbpf_do_one_work_cycle(int *out_count)
              * and just return.  Make sure the return code is negative
              * here though.
              */
+            gossip_lerr("Apparent trove service op error %d\n", ret);
             return (ret < 0) ? ret : -ret;
         }
         else

@@ -82,6 +82,7 @@ int dbpf_attr_cache_initialize(
 
     if (s_key_to_attr_table == NULL)
     {
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "initialize cache\n");
         if (cacheable_keywords)
         {
             if ((num_cacheable_keywords < 0) ||
@@ -147,6 +148,7 @@ int dbpf_attr_cache_finalize(void)
 
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "finalize cache\n");
         for(i = 0; i < s_key_to_attr_table->table_size; i++)
         {
             do
@@ -196,6 +198,7 @@ dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_object_ref key)
 
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "search for key\n");
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (hash_link)
         {
@@ -217,7 +220,8 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
 {
     int ret = -1;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
-
+ 
+    gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "search for key\n");
     cache_elem = dbpf_attr_cache_elem_lookup(key);
     if (cache_elem && src_ds_attr)
     {
@@ -225,9 +229,9 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
         {
             memcpy(&cache_elem->attr, src_ds_attr,
                    sizeof(TROVE_ds_attributes));
-            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
-                         "cached attributes for key %s\n",
-                         PVFS_OID_str(&key.handle));
+            gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                          "Updating cached attributes for key %s\n",
+                          PVFS_OID_str(&key.handle));
             ret = 0;
         }
     }
@@ -240,14 +244,15 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
     int ret = -1;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
 
+    gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "search for key\n");
     cache_elem = dbpf_attr_cache_elem_lookup(key);
     if (cache_elem)
     {
         if (cache_elem)
         {
             cache_elem->attr.u.datafile.b_size = b_size;
-            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
-                         "cached b_size for key %s\n",
+            gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                         "Updating cached b_size for key %s\n",
                          PVFS_OID_str(&key.handle));
             ret = 0;
         }
@@ -264,13 +269,16 @@ int dbpf_attr_cache_ds_attr_fetch_cached_data(
 
     if (DBPF_ATTR_CACHE_INITIALIZED() && target_ds_attr)
     {
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "search for key\n");
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (hash_link)
         {
-            cache_elem = qhash_entry(
-                hash_link, dbpf_attr_cache_elem_t, hash_link);
+            cache_elem = qhash_entry(hash_link,
+                                     dbpf_attr_cache_elem_t,
+                                     hash_link);
             assert(cache_elem);
-            memcpy(target_ds_attr, &cache_elem->attr,
+            memcpy(target_ds_attr,
+                   &cache_elem->attr,
                    sizeof(TROVE_ds_attributes));
             ret = 0;
         }
@@ -286,18 +294,19 @@ dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
     if (DBPF_ATTR_CACHE_INITIALIZED() &&
         (cache_elem && key && cache_elem->num_keyval_pairs))
     {
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "search for key\n");
         for(i = 0; i < cache_elem->num_keyval_pairs; i++)
         {
             if ((strcmp(cache_elem->keyval_pairs[i].key, key) == 0) &&
                 (cache_elem->keyval_pairs[i].data != NULL))
             {
-                gossip_debug(
+                gossip_ldebug(
                     GOSSIP_DBPF_ATTRCACHE_DEBUG, "Returning data %p "
-                    "based on key %s and key_str %s (data_sz=%d)\n",
-                    cache_elem->keyval_pairs[i].data,
-                    PVFS_OID_str(&cache_elem->key.handle),
-                    key,
-                    cache_elem->keyval_pairs[i].data_sz);
+                            "based on key %s and key_str %s (data_sz=%d)\n",
+                            cache_elem->keyval_pairs[i].data,
+                            PVFS_OID_str(&cache_elem->key.handle),
+                            key,
+                            cache_elem->keyval_pairs[i].data_sz);
                 return &cache_elem->keyval_pairs[i];
             }
         }
@@ -314,19 +323,21 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
     cache_elem = dbpf_attr_cache_elem_lookup(key);
     if (cache_elem && key_str && cache_elem->num_keyval_pairs)
     {
+        /* redundant if */
         if (!cache_elem || !cache_elem->num_keyval_pairs)
         {
             return ret;
         }
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "search for keyval pair\n");
         for(i = 0; i < cache_elem->num_keyval_pairs; i++)
         {
             if (strcmp(cache_elem->keyval_pairs[i].key, key_str) == 0)
             {
-                gossip_debug(
-                    GOSSIP_DBPF_ATTRCACHE_DEBUG,
-                    "Setting data %p based on key "
-                    "%s and key_str %s (data_sz=%d)\n", data,
-                    PVFS_OID_str(&key.handle), key_str, data_sz);
+                gossip_ldebug(
+                        GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                        "Setting data %p based on key "
+                        "%s and key_str %s (data_sz=%d)\n", data,
+                        PVFS_OID_str(&key.handle), key_str, data_sz);
 
                 if (cache_elem->keyval_pairs[i].data)
                 {
@@ -347,13 +358,15 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
 int dbpf_attr_cache_keyval_pair_fetch_cached_data(
     dbpf_attr_cache_elem_t *cache_elem,
     dbpf_keyval_pair_cache_elem_t *keyval_pair,
-    void *target_data, int *target_data_sz)
+    void *target_data,
+    int *target_data_sz)
 {
     int ret = -1;
 
     if (DBPF_ATTR_CACHE_INITIALIZED() && (keyval_pair &&
                     target_data && target_data_sz))
     {
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "search for keyval pair\n");
         if (cache_elem && keyval_pair)
         {
             if(*target_data_sz < keyval_pair->data_sz)
@@ -379,6 +392,7 @@ int dbpf_attr_cache_insert(
 
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "search for rand elem\n");
         if ((s_current_num_cache_elems + 1) > s_max_num_cache_elems)
         {
             TROVE_object_ref sacrificial_lamb_key =
@@ -420,7 +434,7 @@ int dbpf_attr_cache_insert(
             }
             assert(PVFS_OID_cmp(&sacrificial_lamb_key.handle,
                                 &TROVE_HANDLE_NULL));
-            gossip_debug(
+            gossip_ldebug(
                     GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Cache is full -- "
                     "removing key %s to insert key %s\n",
                     PVFS_OID_str(&sacrificial_lamb_key.handle),
@@ -428,7 +442,7 @@ int dbpf_attr_cache_insert(
             dbpf_attr_cache_remove(sacrificial_lamb_key);
         }
 
-        hash_link = qhash_search(s_key_to_attr_table,&(key));
+        hash_link = qhash_search(s_key_to_attr_table, &(key));
         if (!hash_link)
         {
             cache_elem = (dbpf_attr_cache_elem_t *)
@@ -469,11 +483,10 @@ int dbpf_attr_cache_insert(
                           &(key),
                           &(cache_elem->hash_link));
                 s_current_num_cache_elems++;
-                gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
-                            "dbpf_attr_cache_insert: inserting %s "
-                            "(b_size is %llu)\n",
-                            PVFS_OID_str(&key.handle),
-                            llu(cache_elem->attr.u.datafile.b_size));
+                gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+                              "inserting %s (b_size is %llu)\n",
+                              PVFS_OID_str(&key.handle),
+                              llu(cache_elem->attr.u.datafile.b_size));
             }
             ret = 0;
         }
@@ -489,6 +502,7 @@ int dbpf_attr_cache_remove(TROVE_object_ref key)
 
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "search for key\n");
         hash_link = qhash_search_and_remove(s_key_to_attr_table, &(key));
         if (hash_link)
         {
@@ -497,8 +511,7 @@ int dbpf_attr_cache_remove(TROVE_object_ref key)
                          hash_link);
             assert(cache_elem);
 
-            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
-                         "dbpf_attr_cache_remove: removing %s\n",
+            gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "removing %s\n",
                          PVFS_OID_str(&key.handle));
 
             /* free any keyval data cached as well */

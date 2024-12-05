@@ -1232,6 +1232,8 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
         gossip_err("TROVE:DBPF: dspace dbpf_db_put setattr");
         return -ret;
     }
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "updated ds_attr in dspace: "
+                  "dirdata.dirent_count %ld\n", attr->u.dirdata.dirent_count);
 
     /* now that the disk is updated, update the cache if necessary */
     gen_mutex_lock(&dbpf_attr_cache_mutex);

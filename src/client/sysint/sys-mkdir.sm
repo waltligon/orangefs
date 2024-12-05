@@ -503,7 +503,7 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                  "*** Got newly created dir handle %s\n",
-                 PVFS_OID_str(sm_p->u.mkdir.metadata_handle));
+                 PVFS_OID_str(sm_p->u.mkdir.newdir_handle));
 
     return 0;
 }
@@ -874,9 +874,9 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
      *           is a retry? - YES, I think so!
      */
     ret = PVFS_OBJ_gen_dir(sm_p->parent_ref.fs_id,
-                           &sm_p->u.mkdir.metadata_handle,
+                           &sm_p->u.mkdir.newdir_handle,
                            sm_p->u.mkdir.dir_attr.meta_sid_count, /* in */
-                           &sm_p->u.mkdir.metadata_sid_array,
+                           &sm_p->u.mkdir.newdir_sid_array,
                            sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max, /* in */
                            &sm_p->u.mkdir.dirdata_handles,
                            sm_p->u.mkdir.dir_attr.meta_sid_count, /* in */ /* DUP */
@@ -890,7 +890,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
 
     gossip_debug(GOSSIP_MKDIR_DEBUG,
                      "mkdir selected meta server: %s,\ndirdata servers:\n",
-                     PVFS_OID_str(sm_p->u.mkdir.metadata_handle));
+                     PVFS_OID_str(sm_p->u.mkdir.newdir_handle));
 
     for (i = 0; i < sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max; i++)
     {
@@ -899,10 +899,10 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     }
 
     /* object ref will now refer to newly created metadata object */
-    sm_p->object_ref.handle    = *sm_p->u.mkdir.metadata_handle;
+    sm_p->object_ref.handle    = *sm_p->u.mkdir.newdir_handle;
     sm_p->object_ref.fs_id     = sm_p->parent_ref.fs_id;
     sm_p->object_ref.sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
-    sm_p->object_ref.sid_array = sm_p->u.mkdir.metadata_sid_array;
+    sm_p->object_ref.sid_array = sm_p->u.mkdir.newdir_sid_array;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -915,9 +915,9 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                             *sm_p->cred_p,
                             sm_p->u.mkdir.dir_attr,
                             sm_p->parent_ref.fs_id,
-                            *sm_p->u.mkdir.metadata_handle, /* object */
+                            *sm_p->u.mkdir.newdir_handle, /* object */
                             sm_p->u.mkdir.dir_attr.meta_sid_count, /* redundant */
-                            sm_p->u.mkdir.metadata_sid_array,
+                            sm_p->u.mkdir.newdir_sid_array,
                             &sm_p->parent_ref.handle, /* back ptr */
                             sm_p->parent_ref.sid_array,
                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max, /* redundant */
@@ -946,11 +946,11 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->msgdir = PVFS_IO_WRITE;
     //dirdata_attr.u.dirdata.dist_dir_attr.dirdata_count = sm_p->u.mkdir.dirdata_count;
     msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = *sm_p->u.mkdir.metadata_handle; /* collapse into object_ref */
+    msg_p->handle = *sm_p->u.mkdir.newdir_handle; /* collapse into object_ref */
     /* V3 this assumes fan out from client */
     msg_p->sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
     msg_p->sid_index = 0;
-    msg_p->sid_array = sm_p->u.mkdir.metadata_sid_array;
+    msg_p->sid_array = sm_p->u.mkdir.newdir_sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
 
@@ -1044,8 +1044,8 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
     dirdata_attr.u.dirdata.dirdata_handles = sm_p->u.mkdir.dirdata_handles;
     dirdata_attr.u.dirdata.dirdata_sids = sm_p->u.mkdir.dirdata_sid_array;
 
-    dirdata_attr.parent = sm_p->u.mkdir.metadata_handle;
-    dirdata_attr.parent_sids = sm_p->u.mkdir.metadata_sid_array;
+    dirdata_attr.parent = sm_p->u.mkdir.newdir_handle;
+    dirdata_attr.parent_sids = sm_p->u.mkdir.newdir_sid_array;
 
     ret = PINT_msgpairarray_init(&sm_p->msgarray_op,
                                  sm_p->u.mkdir.dir_attr.meta_sid_count);
@@ -1181,7 +1181,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MKDIR_DEBUG, "hooking dirent %s (%s) under "
                  "parent handle %s, dirdata_handle %s with server_no=%d\n",
                  sm_p->u.mkdir.object_name,
-                 PVFS_OID_str(sm_p->u.mkdir.metadata_handle),
+                 PVFS_OID_str(sm_p->u.mkdir.newdir_handle),
                  PVFS_OID_str(&sm_p->parent_ref.handle),
                  PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
                                                   dirdata_server_index]),
@@ -1392,15 +1392,15 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
         PVFS_perror_gossip("mkdir failed with error", sm_p->error_code);
     }
 
-    if (sm_p->u.mkdir.metadata_handle)
+    if (sm_p->u.mkdir.newdir_handle)
     {
-        free(sm_p->u.mkdir.metadata_handle);
-        sm_p->u.mkdir.metadata_handle = NULL;
+        free(sm_p->u.mkdir.newdir_handle);
+        sm_p->u.mkdir.newdir_handle = NULL;
     }
-    if (sm_p->u.mkdir.metadata_sid_array)
+    if (sm_p->u.mkdir.newdir_sid_array)
     {
-        free(sm_p->u.mkdir.metadata_sid_array);
-        sm_p->u.mkdir.metadata_sid_array = NULL;
+        free(sm_p->u.mkdir.newdir_sid_array);
+        sm_p->u.mkdir.newdir_sid_array = NULL;
     }
     if (sm_p->u.mkdir.dirdata_handles)
     {

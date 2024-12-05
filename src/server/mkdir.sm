@@ -247,7 +247,7 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     /* Restore attribute pointers zero'd out in sys-mkdir.sm */
     dir_attr->parent = s_op->req->u.mkdir.parent;
     dir_attr->parent_sids = s_op->req->u.mkdir.parent_sid_array;
-    dir_attr->meta_sid_count = s_op->req->u.mkdir.sid_count;
+    dir_attr->meta_sid_count = s_op->req->u.mkdir.newdir_sid_count;
     dir_attr->u.dir.dirdata_handles = s_op->req->u.mkdir.dirdata_handles;
     dir_attr->u.dir.dirdata_sids = s_op->req->u.mkdir.dirdata_sid_array;
     dir_attr->u.dir.dist_dir_attr.dirdata_count = s_op->req->u.mkdir.dirdata_count;
@@ -257,7 +257,7 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     
 
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
-    s_op->u.mkdir.handle = s_op->req->u.mkdir.handle;
+    s_op->u.mkdir.handle = s_op->req->u.mkdir.newdir_handle;
 
     if (dir_attr->objtype != PVFS_TYPE_DIRECTORY)
     {
@@ -511,7 +511,11 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
-
+    if (ret < 0)
+    {
+        gossip_lerr("post of dspace_setattr failed\n");
+        return ret;
+    }
     return ret;
 }
 
@@ -620,7 +624,7 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
     s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
-    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.sid_count);
+    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.newdir_sid_count);
     s_op->val_a[2].buffer = s_op->req->u.mkdir.parent;
     keep_keyval_buffers(s_op, 2);
 
@@ -853,17 +857,17 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
         char *p;
 
         s_op->u.mkdir.dirdata_parent_buffer =
-                malloc(OSASZ(1, s_op->req->u.mkdir.sid_count));
+                malloc(OSASZ(1, s_op->req->u.mkdir.newdir_sid_count));
 
         p = (char *)s_op->u.mkdir.dirdata_parent_buffer;
-        ZEROMEM(p, OSASZ(1, s_op->req->u.mkdir.sid_count));
+        ZEROMEM(p, OSASZ(1, s_op->req->u.mkdir.newdir_sid_count));
 
-        memcpy((void *)p, (void *)&s_op->req->u.mkdir.handle, sizeof(PVFS_OID));
+        memcpy((void *)p, (void *)&s_op->req->u.mkdir.newdir_handle, sizeof(PVFS_OID));
         p += sizeof(PVFS_OID);
 
         memcpy((void *)p,
-               (void *)s_op->req->u.mkdir.sid_array, 
-               sizeof(PVFS_SID) * s_op->req->u.mkdir.sid_count);
+               (void *)s_op->req->u.mkdir.newdir_sid_array, 
+               sizeof(PVFS_SID) * s_op->req->u.mkdir.newdir_sid_count);
     }
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " creating local dirdata dspace on coll_id %d\n",
@@ -937,7 +941,11 @@ static PINT_sm_action mkdir_dirdata_attribs(struct PINT_smcb *smcb,
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
-
+    if (ret < 0)
+    {
+        gossip_lerr("post of dspace_setattr failed\n");
+        return ret;
+    }
     return ret;
 }
 
@@ -1003,7 +1011,7 @@ static PINT_sm_action mkdir_dirdata_keyvals(struct PINT_smcb *smcb,
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
     s_op->key_a[2].buffer = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
-    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.sid_count);
+    s_op->val_a[2].buffer_sz = OSASZ(1, s_op->req->u.mkdir.newdir_sid_count);
     s_op->val_a[2].buffer = s_op->u.mkdir.dirdata_parent_buffer;
     keep_keyval_buffers(s_op, 2);
 
@@ -1100,8 +1108,8 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
         msg_p->fs_id = s_op->req->u.mkdir.fs_id;
         /* this picks the remote handles - computed earlier */
         msg_p->handle = s_op->req->u.mkdir.dirdata_handles[h];
-        msg_p->sid_array = &s_op->req->u.mkdir.sid_array[h * s_op->req->u.mkdir.sid_count];
-        msg_p->sid_count = s_op->req->u.mkdir.sid_count;
+        msg_p->sid_array = &s_op->req->u.mkdir.newdir_sid_array[h * s_op->req->u.mkdir.newdir_sid_count];
+        msg_p->sid_count = s_op->req->u.mkdir.newdir_sid_count;
 
         PINT_SERVREQ_SETATTR_FILL(msg_p->req,
                                   PVFS_REQ_DIRDATA, /* sub_op req type */

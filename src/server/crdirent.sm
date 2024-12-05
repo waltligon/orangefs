@@ -120,7 +120,7 @@ nested machine pvfs2_crdirent_work_sm
     {
         run crdirent_check_for_split;
         SPLIT_REQUIRED => do_split;
-        default => final_update_dirdata_attr;
+        default => return;
     }
 
     state do_split
@@ -664,11 +664,14 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
     PVFS_object_attr *dirdata_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
-    dirdata_attr = &s_op->u.crdirent.dirdata_attr;
-    ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
+    /* convenience pointers for attrs
+     */
+    dirdata_attr = &s_op->attr;
+    ds_attr = &(s_op->ds_attr);
 
     dirdata_attr->objtype = PVFS_TYPE_DIRDATA;
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "update timestamp, type is %d\n ", ds_attr->type);
     dirdata_attr->ctime = dirdata_attr->mtime = PINT_util_get_current_time();
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Old dirdata dirent_count %d\n",
@@ -679,13 +682,15 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New dirdata dirent_count %d\n",
                    dirdata_attr->u.dirdata.dirent_count);
 
+    dirdata_attr->mask |= PVFS_ATTR_DIRDATA_DIRENT_COUNT;
+
     /*PVFS_object_attr_to_ds_attr(dirdata_attr, ds_attr);*/
     PVFS_ds_attr_from_object_attr(ds_attr, dirdata_attr);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to update dirdata %s dirent_count %ld\n",
                    PVFS_OID_str(&s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                                              s_op->req->u.crdirent.dd_server_index]),
-                    ds_attr->u.dirdata.dirent_count);
+                   ds_attr->u.dirdata.dirent_count);
                    
 
     /* update timestamps for the dirdata handle. */
@@ -700,9 +705,12 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
                                    &j_id, 
                                    server_job_context, 
                                    s_op->req->hints);
+    if (ret < 0)
+    {
+        gossip_lerr("post of dspace_setattr failed\n");
+        return ret;
+    }
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "update timestamp, type is %d\n ",
-                     ds_attr->type);
     /* decide if parent is local or not */
     if(!PINT_cached_config_server_local(&s_op->req->u.crdirent.parent_ref.sid_array[0]))
     {
@@ -782,33 +790,33 @@ static PINT_sm_action crdirent_update_local_parent_dir(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "writing back local dir updates\n");
 
-    /* PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
+    /* convenience pointers to referring to attrs
      */
     ds_attr = &(s_op->u.crdirent.parent_dir_ds_attr);
     dir_attr =&(s_op->u.crdirent.parent_dir_attr);
 
-    /* converts ds attr to obj attr.  Why? are we sure they aren't
-     * already converted (especially by previous stat) or are we
-     * should we shouldn't just update the ds attrs direct skipping
-     * all this conversion
+    /* just read ds_attr for parent
+     * convert it to object attr
      */
-    PVFS_ds_attr_to_object_attr(ds_attr, dir_attr);
+    PVFS_object_attr_from_ds_attr(dir_attr, ds_attr);
 
-    s_op->u.crdirent.parent_dir_attr.ctime = PINT_util_get_current_time();
-    s_op->u.crdirent.parent_dir_attr.mtime = s_op->u.crdirent.parent_dir_attr.ctime;
+    dir_attr->ctime = PINT_util_get_current_time();
+    dir_attr->mtime = s_op->u.crdirent.parent_dir_attr.ctime;
     /* CTIME and MTIME flags should already be set, but just in case
      * we make sure they are known to be part of the attribs.
      * When we add an item to a dir it is modified, and its attribes
      * are changed thus setting both mtime and ctime
      */
-    dir_attr->mask |= (PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_CTIME |
+    dir_attr->mask |= (PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME |
                        PVFS_ATTR_DIR_DIRENT_COUNT);
 
     /* update dirent_count on parent dir - not same as dirdata */
     dir_attr->u.dir.dirent_count += 1;
 
-    /* convert object attrs to ds attrs for writing to storage */
-    PVFS_object_attr_to_ds_attr(dir_attr, ds_attr);
+    /* now convert object attrs back to ds attrs
+     * for writing to storage
+     */
+    PVFS_ds_attr_from_object_attr(ds_attr, dir_attr);
 
     /* the parent (dir) of the current object (dirdata) is in parent_ref
      */
@@ -822,7 +830,11 @@ static PINT_sm_action crdirent_update_local_parent_dir(struct PINT_smcb *smcb,
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
-
+    if (ret < 0)
+    {
+        gossip_lerr("post of dspace_setattr failed\n");
+        return ret;
+    }
     return ret;
 }
 
@@ -1050,8 +1062,8 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
 /*
  * Function: crdirent_final_update_dirdata_attr
  *
- * Write dirdata metadata to dspace, with updated time stamps and dirent
- * count and anything else modified after the crdirent and split if
+ * Write dirdata metadata to dspace, with updated time stamps
+ * and anything else modified after the crdirent and split if
  * there is one
  */
 static PINT_sm_action crdirent_final_update_dirdata_attr(struct PINT_smcb *smcb,
@@ -1071,15 +1083,20 @@ static PINT_sm_action crdirent_final_update_dirdata_attr(struct PINT_smcb *smcb,
      * If we had a split then in the next state write back the bitmap
      */
 
-    /* This contains the attrs read from the dirdata object */
+    /* This contains the attrs translated from the dirdata object ds_attrs
+     * read from trove disk or cache */
     dspace_attr = &s_op->attr;
 
-    /* This is a buffer for the ds_attrs */
-    ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
+    /* This is a buffer for the dirdata ds_attrs should be valid */
+    ds_attr = &(s_op->ds_attr);
     memset(ds_attr, 0, sizeof(PVFS_ds_attributes));
 
     /* do these need to be updated, or only if no a new object? */
-    dspace_attr->ctime = time(NULL);
+    /* we updated these before, but now we did a split so */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "update timestamp, type is %d\n ",
+                 ds_attr->type);
+
+    dspace_attr->ctime = PINT_util_get_current_time();
     dspace_attr->mtime = dspace_attr->ctime;
 
     /* copy and convert format */
@@ -1100,10 +1117,11 @@ static PINT_sm_action crdirent_final_update_dirdata_attr(struct PINT_smcb *smcb,
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
-
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "update timestamp, type is %d\n ",
-                 ds_attr->type);
+    if (ret < 0)
+    {
+        gossip_lerr("post of dspace_setattr failed\n");
+        return ret;
+    }
     return ret;
 }
 

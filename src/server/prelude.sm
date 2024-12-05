@@ -527,13 +527,13 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                             s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.server_no;
 #endif
         }
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                     "prelude: validate: create_object is %d\n", create_object);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "prelude: validate: create_object is %d\n", create_object);
     } /* endif object not found */
     else
     {
         /* Translate the dspace attributes read from db into object attributes */
-        PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
+        PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
         s_op->target_object_attr = &s_op->attr;
     }
 

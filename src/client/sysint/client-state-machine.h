@@ -242,8 +242,9 @@ struct PINT_client_mkdir_sm
     int stored_error_code;
 
     /* shouldn't all of this be in the dir_attr? */
-    PVFS_handle *metadata_handle;
-    PVFS_SID *metadata_sid_array;
+    /* this is the new directory being made */
+    PVFS_handle *newdir_handle;
+    PVFS_SID *newdir_sid_array;
 
     int dirdata_count;
     PVFS_handle *dirdata_handles;

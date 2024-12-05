@@ -1122,15 +1122,15 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                     "\t\tdirdata_handles  (%p)\n"
                     "\t\tdirdata_sid_array(%p)\n",
                     __func__,
-                    req->u.mkdir.sid_array,
+                    req->u.mkdir.newdir_sid_array,
                     req->u.mkdir.parent,
                     req->u.mkdir.parent_sid_array,
                     req->u.mkdir.dirdata_handles,
                     req->u.mkdir.dirdata_sid_array);
 
-            if (req->u.mkdir.sid_array)
+            if (req->u.mkdir.newdir_sid_array)
             {
-                decode_free(req->u.mkdir.sid_array);
+                decode_free(req->u.mkdir.newdir_sid_array);
             }
             break;
 
