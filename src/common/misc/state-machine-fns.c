@@ -147,7 +147,7 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
     machine_name = PINT_state_machine_current_machine_name(smcb);
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
-                 "[SM Entering]: (%p) %s:%s (status: %d)\n",
+                 "[SM Entering] (%p) %s:%s (status: %d)\n",
                  smcb, machine_name, state_name,
                  (int32_t)r->status_user_tag);
      
@@ -170,10 +170,14 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
     }
 
     /* print post-call debugging info */
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
-                 "[SM Exiting]: (%p) %s:%s (error code: %d), (action: %s)\n",
-                 smcb, machine_name, state_name,
-                 r->error_code, SM_ACTION_STRING(retval));
+    {
+        char emsg[256];
+        PVFS_strerror_r(r->error_code, emsg, 256);
+        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                     "[SM Exiting] (%p) %s:%s (error code %d(%s)), (action %s)\n",
+                     smcb, machine_name, state_name,
+                     r->error_code, emsg, SM_ACTION_STRING(retval));
+    }
 
     if (retval == SM_ACTION_COMPLETE && smcb->current_state->flag == SM_PJMP)
     {
@@ -782,7 +786,7 @@ static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *smcb)
     smcb->base_frame = smcb->state_stack[smcb->stackptr].prev_base_frame;
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM pop_state]: smcb:(%p) op-id: %d stk-ptr: %d base-frm: %d frm-cnt: %d\n",
+                 "[SM pop_state] smcb (%p) op-id %d st-stk-ptr %d base-frm %d frm-cnt %d\n",
                  smcb, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
     
     return smcb->state_stack[smcb->stackptr].state;
@@ -804,7 +808,7 @@ static void PINT_push_state(struct PINT_smcb *smcb,
     }
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM push_state]: smcb:(%p) op-id: %d stk-ptr: %d base-frm: %d frm-cnt: %d\n",
+                 "[SM push_state] smcb (%p) op-id %d st-stk-ptr %d base-frm %d frm-cnt %d\n",
                  smcb, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
 
     assert(smcb->stackptr < PINT_STATE_STACK_SIZE);
@@ -863,7 +867,7 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
                        "[SM get_frame] smcb (%p) frame (%p)\n", smcb, frame_entry->frame);
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "   [get_frame] op-id %d stk-ptr %d base-frm %d ix %d frm-cnt %d\n",
+                       "   [get_frame] op-id %d st-stk-ptr %d base-frm %d ix %d frm-cnt %d\n",
                        smcb->op, smcb->stackptr, smcb->base_frame, index, smcb->frame_count);
         return frame_entry->frame;
     }
@@ -878,7 +882,46 @@ int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p)
 {
     struct PINT_frame_s *newframe;
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM push_frame]: smcb:(%p) frame:(%p) op-id: %d stk-ptr: %d base-frm: %d frm-cnt: %d\n",
+                 "[SM push_frame] smcb (%p) frame (%p) op-id %d st-stk-ptr %d base-frm %d frm-cnt %d\n",
+                 smcb, frame_p, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
+
+    newframe = malloc(sizeof(struct PINT_frame_s));
+    if(!newframe)
+    {
+        return -PVFS_ENOMEM;
+    }
+    newframe->task_id = task_id;
+    newframe->frame = frame_p;
+    newframe->error = 0;
+    qlist_add(&newframe->link, &smcb->frames);
+    smcb->frame_count++;
+
+    return 0;
+}
+
+/* Function: PINT_sm_push_dup_frame
+ * Params: pointer to smcb, void pointer for new frame
+ * Returns: 
+ * Synopsis: pushes a new frame pointer onto the frame_stack
+ */
+int PINT_sm_push_dup_frame(struct PINT_smcb *smcb, int frame_size)
+{
+    void *frame_p = NULL;
+    int task_id = 0; 
+    struct PINT_frame_s *newframe;
+    struct PINT_frame_s *frame_slot;
+
+    frame_p = malloc(frame_size);
+    if (!frame_p)
+    {
+        return -PVFS_ENOMEM;
+    }
+    frame_slot = qlist_entry(smcb->frames.next, struct PINT_frame_s, link);
+    memcpy(frame_p, frame_slot->frame, frame_size);
+    task_id = frame_slot->task_id;
+
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
+                 "[SM push_dup_frame] smcb (%p) frame (%p) op-id %d st-stk-ptr %d base-frm %d frm-cnt %d\n",
                  smcb, frame_p, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
 
     newframe = malloc(sizeof(struct PINT_frame_s));
@@ -932,7 +975,7 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
     free(frame_entry);
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM pop_frame]: smcb:(%p) frame:(%p) op-id: %d stk-ptr: %d base-frm: %d frm-cnt: %d\n",
+                 "[SM pop_frame] smcb (%p) frame (%p) op-id %d st-stk-ptr %d base-frm %d frm-cnt %d\n",
                  smcb, frame, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
     return frame;
 }

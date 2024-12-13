@@ -234,6 +234,7 @@ int PINT_smcb_alloc(struct PINT_smcb **,
 void PINT_smcb_free(struct PINT_smcb *);
 void *PINT_sm_frame(struct PINT_smcb *, int);
 int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);
+int PINT_sm_push_dup_frame(struct PINT_smcb *smcb, int frame_size);
 void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
                         int *task_id,
                         int *error_code,

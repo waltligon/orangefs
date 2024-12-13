@@ -13,8 +13,10 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
+#include "gossip.h"
 #include "pint-distribution.h"
 #include "pint-security.h"
+#include "gossip.h"
 
 #ifndef max
 #define max(a,b) ((a) < (b) ? (b) : (a))
@@ -362,29 +364,34 @@ static inline int PVFS2_attr_all(uint64_t mask, uint64_t attr)
 /**************************************
  * Code for debugging attribute masks
  **************************************/
-static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask, 
-                                     char *fn,
-                                     int lno);
+static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask); 
 
-#define DEBUG_attr_mask(m)                             \
-        do {                                           \
-            __DEBUG_ATTR_MASK(m, __FILE__, __LINE__);  \
+#define DEBUG_attr_mask(m)                                         \
+        do {                                                       \
+            gossip_log("DEBUG_attr_mask called by %s"              \
+                  " in %s at line %d with mask (%p)\n",            \
+                   __func__, __FILE__, __LINE__, &(m));            \
+            __DEBUG_ATTR_MASK(m);                                  \
         } while (0)
 
-#define DATTRPRINT(fmt) printf(fmt);
+#define PINT_attrmask_print(debug_mask, m)                         \
+        do {                                                       \
+            gossip_log("PINT_attrmask_print called by %s"          \
+                  " in %s at line %d with mask (%p)\n",            \
+                   __func__, __FILE__, __LINE__, &(m));            \
+            if(gossip_debug_enabled(debug_mask))                   \
+            {                                                      \
+                __DEBUG_ATTR_MASK(m);                              \
+            }                                                      \
+        } while (0)
 
 #define MASKDEBUG(field,fmt) \
-        do { if ((mask & field) == field) DATTRPRINT(fmt) } while (0)
+        do { if ((mask & field) == field) gossip_log(fmt);} while (0)
 
-static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask,
-                                     char *filename,
-                                     int lineno)
+static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask)
 {
     /* for now we manually turn this on and off - should add a gossip flag */
-    #if 0
-
-    DATTRPRINT("DEBUG_attr_mask (src/proto/pvfs2-attr.h) ");
-    printf("Called from file %s line %d\n", filename, lineno);
+    #if 1
 
     MASKDEBUG(PVFS_ATTR_COMMON_UID,               "COMMON_UID\n");
     MASKDEBUG(PVFS_ATTR_COMMON_GID,               "COMMON_GID\n");

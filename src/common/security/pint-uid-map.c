@@ -106,11 +106,13 @@ int PINT_map_credential(PVFS_credential *cred,
 
     if (cred == NULL || uid == NULL || num_groups == NULL)
     {
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "Invalid *cred, *uid, or *num_groups");
         return -PVFS_EINVAL;
     }
 
 #ifdef ENABLE_SECURITY_CERT
 
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "ENABLE CERTS\n");
     /* do not map unsigned credential (fields won't be used) */
     if (IS_UNSIGNED_CRED(cred))
     {
@@ -123,6 +125,7 @@ int PINT_map_credential(PVFS_credential *cred,
 
 #ifdef ENABLE_CERTCACHE
     /* check certificate cache -- note: CA cert is cached as root */
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "ENABLE CERTCACHE\n");
     entry = PINT_certcache_lookup(&cred->certificate);
     if (entry != NULL)
     {        
@@ -152,11 +155,12 @@ int PINT_map_credential(PVFS_credential *cred,
             }
         }
     }
-#else /* ENABLE_CERTCACHE */
+#else /* NOT ENABLE_CERTCACHE */
     /* if provided certificate is the CA certificate, map to root user 
      * this is used primarily when creating a new file system 
      * note that the credential must have been signed by the CA private key
      */
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "NOT ENABLE CERTCACHE\n");
     ret = check_ca_cert(cred);
     if (ret > 0)
     {
@@ -164,7 +168,7 @@ int PINT_map_credential(PVFS_credential *cred,
         *num_groups = 1;
         group_array[0] = 0;
 
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "Mapped credential to root\n");
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "Mapped credential to root\n");
 
         return 0;
     }
@@ -178,7 +182,8 @@ int PINT_map_credential(PVFS_credential *cred,
     ret = PINT_ldap_map_credential(cred, uid, num_groups, group_array);
 #endif  /* ENABLE_CERTCACHE */
 
-#else /* ENABLE_SECURITY_CERT */
+#else /* NOT ENABLE_SECURITY_CERT */
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "NOT ENABLE CERTS\n");
     /* return info in credential */
     *uid = cred->userid;
     *num_groups = cred->num_groups;
@@ -186,9 +191,13 @@ int PINT_map_credential(PVFS_credential *cred,
            cred->num_groups * sizeof(PVFS_gid));
 #endif /* ENABLE_SECURITY_CERT */
 
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "*uid %d *num_groups %d\n",
+           *uid, *num_groups);
+
     /* return -PVFS_EINVAL if no groups */
-    if (ret == 0 && num_groups == 0)
+    if (ret == 0 && *num_groups == 0)
     {
+        gossip_err("No groups found in map_credentials\n");
         ret = -PVFS_EINVAL;
     }
     

@@ -542,6 +542,7 @@ int do_list(
     name = start;
 
     memset(&lk_response, 0, sizeof(PVFS_sysresp_lookup));
+    fprintf(stderr, "PVFS_util_gen_credential_defaults\n");
     ret = PVFS_util_gen_credential_defaults(&credentials);
     if (ret < 0)
     {
@@ -561,6 +562,7 @@ int do_list(
         }
     }
 
+    fprintf(stderr, "PVFS_sys_lookup\n");
     ret = PVFS_sys_lookup(fs_id,
                           name,
                           &credentials,
@@ -577,11 +579,18 @@ int do_list(
     PVFS_object_ref_copy(&ref, &lk_response.ref);
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
-    if (PVFS_sys_getattr(ref,
-                         PVFS_ATTR_SYS_ALL,
-                         &credentials,
-                         &getattr_response,
-                         NULL) == 0)
+    fprintf(stderr, "PVFS_sys_getattr\n");
+    ret = PVFS_sys_getattr(ref,
+                           PVFS_ATTR_SYS_ALL,
+                           &credentials,
+                           &getattr_response,
+                           NULL);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_sys_getattr", ret);
+        return -1;
+    }
+    else
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
             (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK) ||
@@ -598,6 +607,8 @@ int do_list(
 
             if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
+                
+                fprintf(stderr, "PVFS_sys_getparent\n");
                 if (PVFS_sys_getparent(ref.fs_id,
                                        name,
                                        &credentials,
@@ -636,9 +647,11 @@ int do_list(
         begin = Wtime();
     }
     token = PVFS_ITERATE_START;
+    fprintf(stderr, "Start do loop\n");
     do
     {
         memset(&rd_response, 0, sizeof(PVFS_sysresp_readdir));
+        fprintf(stderr, "PVFS_sys_readdir\n");
         ret = PVFS_sys_readdir(ref,
                                token,
                                MAX_NUM_DIRENTS,
@@ -650,6 +663,7 @@ int do_list(
             PVFS_perror("PVFS_sys_readdir", ret);
             return -1;
         }
+        fprintf(stderr, "PVFS_sys_readdir returns\n");
 
         if (dir_version == 0)
         {
@@ -675,6 +689,8 @@ int do_list(
             printed_dot_info = 1;
         }
 
+        fprintf(stderr, "dirent_outcount is %d\n",
+                rd_response.pvfs_dirent_outcount);
         for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
         {
             cur_file = rd_response.dirent_array[i].d_name;
@@ -692,9 +708,8 @@ int do_list(
             rd_response.dirent_array = NULL;
         }
 
-    }
-
-    while (token != PVFS_ITERATE_END);
+    fprintf(stderr, "end of do loop\n");
+    } while (token != PVFS_ITERATE_END);
 
     if (do_timing)
     {
@@ -714,6 +729,7 @@ int do_list(
         while(current)
         {
             printf("\n");
+            fprintf(stderr, "do_list recursive\n");
             do_list(full_path, current->path, fs_id, opts, entry_buffer);
             current = current->next;
             free(head->path);
@@ -1088,6 +1104,7 @@ int main(int argc, char **argv)
     char *entry_buffer = malloc(ENTRY_MAX);
 
     process_name = argv[0];
+    fprintf(stderr, "parsing args\n");
     user_opts = parse_args(argc, argv);
     if (!user_opts)
     {
@@ -1097,6 +1114,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    fprintf(stderr, "parsing pvfstab\n");
     tab = PVFS_util_parse_pvfstab(NULL);
     if (!tab)
     {
@@ -1109,6 +1127,7 @@ int main(int argc, char **argv)
         memset(pvfs_path[i],0,PVFS_NAME_MAX);
     }
 
+    fprintf(stderr, "PVFS_sys_initialize\n");
     ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if (ret < 0)
     {
@@ -1119,6 +1138,7 @@ int main(int argc, char **argv)
     /* initialize each file system that we found in the tab file */
     for(i = 0; i < tab->mntent_count; i++)
     {
+        fprintf(stderr, "PVFS_sys_fs_add\n");
 	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
 	if (ret == 0 || ret == -PVFS_EEXIST)
         {
@@ -1136,16 +1156,21 @@ int main(int argc, char **argv)
 
     if (user_opts->num_starts == 0)
     {
-	snprintf(current_dir,PVFS_NAME_MAX,"%s/",
+	snprintf(current_dir,
+                 PVFS_NAME_MAX,
+                 "%s/",
 		 tab->mntent_array[0].mnt_dir);
 	user_opts->start[0] = current_dir;
 	user_opts->num_starts = 1;
     }
 
+    fprintf(stderr, "looping through starts\n");
     for(i = 0; i < user_opts->num_starts; i++)
     {
 	ret = PVFS_util_resolve(user_opts->start[i],
-	    &fs_id_array[i], pvfs_path[i], PVFS_NAME_MAX);
+	                        &fs_id_array[i],
+                                pvfs_path[i],
+                                PVFS_NAME_MAX);
 	if ((ret == 0) && (pvfs_path[i][0] == '\0'))
 	{
             strcpy(pvfs_path[i], "/");
@@ -1159,6 +1184,7 @@ int main(int argc, char **argv)
 	}
     }
 
+    fprintf(stderr, "looping through starts\n");
     for(i = 0; i < user_opts->num_starts; i++)
     {
         char *substr = strstr(user_opts->start[i],pvfs_path[i]);
@@ -1192,6 +1218,7 @@ int main(int argc, char **argv)
 
         PINT_string_rm_extra_slashes_rts(user_opts->start[i], 1);
 
+        fprintf(stderr, "calling do_list\n");
         do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], user_opts, entry_buffer);
 
         if (user_opts->num_starts > 1)

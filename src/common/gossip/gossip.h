@@ -108,7 +108,7 @@ do {                                                              \
     gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
 } while(0)
 
-#else /* __KERNEL__ */
+#else /* NOT __KERNEL__ */
 
 /* stdio is needed by gossip_debug_fp declaration for FILE* */
 #include <stdio.h>
@@ -134,10 +134,10 @@ int __gossip_debug(PVFS_debug_mask mask,
                    char prefix,
                    const char *format,
                    ...) __attribute__ ((format(printf, 3, 4)));
-int gossip_err(const char *format,
-               ...) __attribute__ ((format(printf, 1, 2)));
-int gossip_log(const char *format,
-               ...) __attribute__ ((format(printf, 1, 2)));
+int gossip_err(const char *format, ...)
+                   __attribute__ ((format(printf, 1, 2)));
+int gossip_log(const char *format, ...)
+                   __attribute__ ((format(printf, 1, 2)));
 int __gossip_debug_va(PVFS_debug_mask mask,
                       char prefix,
                       const char *format,
