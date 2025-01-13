@@ -33,7 +33,7 @@ typedef enum job_type job_type_t;
  *
  * returns pointer to structure on success, NULL on failure
  */
-struct job_desc *alloc_job_desc(int type)
+struct job_desc *alloc_job_desc(job_type_t jtype)
 {
     struct job_desc *jd = NULL;
 
@@ -46,11 +46,7 @@ struct job_desc *alloc_job_desc(int type)
 
     id_gen_safe_register(&(jd->job_id), jd);
 
-#ifdef WIN32
-    jd->type = (job_type_t) type;
-#else
-    jd->type = type;
-#endif
+    jd->type = jtype;
 
     return (jd);
 };

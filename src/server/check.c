@@ -346,14 +346,14 @@ static int check_mode(enum access_type access,
     gossip_ldebug(GOSSIP_GETATTR_DEBUG,
                   "Checking the mode (permissions)\n");
     
-    DEBUG_attr_mask(attr->mask);
+    /* DEBUG_attr_mask(attr->mask); makes a LOT of output */
 
     if (!(attr->mask & PVFS_ATTR_COMMON_UID) ||
         !(attr->mask & PVFS_ATTR_COMMON_GID) ||
         !(attr->mask & PVFS_ATTR_COMMON_PERM))
     {
         gossip_err("%s: invalid mask\n", __func__);
-        PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attr->mask);
+        /* PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attr->mask); */
         return -PVFS_EINVAL;
     }
 

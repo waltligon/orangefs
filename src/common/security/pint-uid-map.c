@@ -104,9 +104,13 @@ int PINT_map_credential(PVFS_credential *cred,
     certcache_data_t *data;
 #endif
 
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, 
+                  "mapping credential to uid/group list\n");
+
     if (cred == NULL || uid == NULL || num_groups == NULL)
     {
-        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "Invalid *cred, *uid, or *num_groups");
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG,
+                      "Invalid *cred, *uid, or *num_groups");
         return -PVFS_EINVAL;
     }
 
@@ -197,11 +201,19 @@ int PINT_map_credential(PVFS_credential *cred,
     /* return -PVFS_EINVAL if no groups */
     if (ret == 0 && *num_groups == 0)
     {
-        gossip_err("No groups found in map_credentials\n");
+        gossip_err("%s: No groups found in map_credential\n", __func__);
         ret = -PVFS_EINVAL;
     }
     
     return ret;
 }
 
+/*      
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *  
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */ 
 

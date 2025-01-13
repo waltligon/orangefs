@@ -101,6 +101,8 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "releasing request %d\n"
+                   s_op->scheduled_id);
     ret = job_req_sched_release(s_op->scheduled_id,
                                 smcb,
                                 0,

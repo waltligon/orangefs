@@ -310,6 +310,8 @@ int PINT_ldap_map_credential(PVFS_credential *cred,
     LDAPMessage *res, *entry;
     BerElement *ber;
 
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "Extracing uid, groups from cred\n");
+
     /* read subject from cert */
     ret = PINT_cert_to_X509(&cred->certificate, &xcert);
     PINT_SECURITY_CHECK_RET(ret, "could not convert internal cert\n");
@@ -392,17 +394,17 @@ PINT_ldap_map_user_retry:
     *uid = PVFS_UID_MAX;
     group_array[0] = PVFS_GID_MAX;
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
-                 "ldap_search_ext_s(ldap, \"%s\", %d, "
-                 "\"%s\", {\"%s\", \"%s\"}, 0, NULL, NULL, "
-                 "%lu, 0, ...)\n",
-                 __func__,
-                 base,
-                 scope,
-                 filter,
-                 attrs[0],
-                 attrs[1],
-                 timeout.tv_sec);
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "%s: "
+                  "ldap_search_ext_s(ldap, \"%s\", %d, "
+                  "\"%s\", {\"%s\", \"%s\"}, 0, NULL, NULL, "
+                  "%lu, 0, ...)\n",
+                  __func__,
+                  base,
+                  scope,
+                  filter,
+                  attrs[0],
+                  attrs[1],
+                  timeout.tv_sec);
 
     /* search LDAP with the specified values */
     ret = ldap_search_ext_s(ldap, base, scope, filter, attrs, 0,
@@ -424,8 +426,7 @@ PINT_ldap_map_user_retry:
             if (entry != NULL)
             {
                 dn = ldap_get_dn(ldap, entry);
-                gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: found LDAP user %s\n",
-                             __func__, dn);
+                gossip_ldebug(GOSSIP_SECURITY_DEBUG, "found LDAP user %s\n", dn);
 
                 attr_name = ldap_first_attribute(ldap, entry, &ber);
                 while (attr_name != NULL)
@@ -546,9 +547,8 @@ PINT_ldap_map_user_exit:
 
     if (ret != 0)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, 
-                     "%s: error code %d: returning -PVFS_EACCES\n",
-                     __func__, ret);
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG, 
+                      "error code %d: returning -PVFS_EACCES\n", ret);
         ret = -PVFS_EACCES;
     }
 

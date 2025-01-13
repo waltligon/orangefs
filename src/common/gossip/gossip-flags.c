@@ -100,6 +100,8 @@ PVFS_DEBUG_MASK_DECL(GOSSIP_SETATTR_SECURITY_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_CONFIG_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_CREATE_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_GOSSIP_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_IDGEN_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_THREADS_DEBUG);
 
 /* NOTE you MUST add coresponding entries in
  * include/pvfs2-debug.h
@@ -226,6 +228,10 @@ const __keyword_mask_t s_keyword_mask_map[] =
     /* Debug the debugger, in particular some critial flags and such */
     { "gossip", {GOSSIP_GOSSIP_DEBUG_INIT} },
     /* Everything except the periodic events.  Useful for debugging */
+    { "idgen", {GOSSIP_IDGEN_DEBUG_INIT} },
+    /* debug subsystems using the id generator */
+    { "threads", {GOSSIP_THREADS_DEBUG_INIT} },
+    /* debugging for periodic threads - generates a lot of  messages */
     { "verbose", { __DEBUG_ALL_INIT } },
     /* No debug output */
     { "none", {GOSSIP_NO_DEBUG_INIT} },

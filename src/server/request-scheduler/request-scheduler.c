@@ -358,6 +358,8 @@ int PINT_req_sched_post(enum PVFS_server_op op,
     struct qlist_head *iterator;
     int tmp_flag;
 
+
+
     if(sched_policy == PINT_SERVER_REQ_BYPASS)
     {
         if(access_type == PINT_SERVER_REQ_MODIFY && !PVFS_SERV_IS_MGMT_OP(op))
@@ -568,6 +570,7 @@ int PINT_req_sched_post(enum PVFS_server_op op,
 		     PVFS_OID_str(&handle),
                      tmp_element);
     }
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Posting %ld\n", *out_id);
     sched_count++;
     return (ret);
 }
@@ -667,6 +670,8 @@ int PINT_req_sched_unpost(req_sched_id in_id, void **returned_user_ptr)
     struct req_sched_element *tmp_element = NULL;
     struct req_sched_element *next_element = NULL;
     int next_ready_flag = 0;
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Unposting %ld\n", in_id);
 
     /* NOTE: we set the next_ready_flag to 1 if the next element in
      * the queue should be put in the ready list 

@@ -293,7 +293,7 @@ do { \
 do { \
     char string[100]; \
     PVFS_to_string_##type(field, string); \
-    gossip_debug((mask), "\t" #field ": %s\n", string); \
+    gossip_lsdebug((mask), #field ": %s\n", string); \
 } while (0) 
 
 /* create *********************************************************/

@@ -177,6 +177,10 @@ PVFS_DEBUG_MASK(GOSSIP_CONFIG_DEBUG);
 PVFS_DEBUG_MASK(GOSSIP_CREATE_DEBUG);
 #define GOSSIP_GOSSIP_DEBUG_INIT              ((uint64_t)1 << 6) , (uint64_t)0
 PVFS_DEBUG_MASK(GOSSIP_GOSSIP_DEBUG);
+#define GOSSIP_IDGEN_DEBUG_INIT               ((uint64_t)1 << 7) , (uint64_t)0
+PVFS_DEBUG_MASK(GOSSIP_IDGEN_DEBUG);
+#define GOSSIP_THREADS_DEBUG_INIT              ((uint64_t)1 << 8) , (uint64_t)0
+PVFS_DEBUG_MASK(GOSSIP_THREADS_DEBUG);
 
 /* NOTE, you MUST add coresponding entries in
  * src/common/gossip/gossip-flags.c

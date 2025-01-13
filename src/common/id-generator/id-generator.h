@@ -35,7 +35,7 @@ typedef int64_t BMI_id_gen_t;
  *
  * *new_id will be 0 if item is NULL
  */
-static inline void id_gen_fast_register(BMI_id_gen_t * new_id,
+static inline void id_gen_fast_register(BMI_id_gen_t *new_id,
 				       void *item)
 {
 #if SIZEOF_VOID_P == 8

@@ -132,7 +132,7 @@ struct PINT_server_req_entry PINT_server_req_table[] =
 
 /* These functions are used to retrieve data from a request that while common
  * among requests, may not be at the same place in the union.  These are used
- * by code that does not know aprior which request they are processing and wish
+ * by code that does not know apriori which request they are processing and wish
  * to avoid long switch statements.  Examples include the prelude code.
  */
 
@@ -216,6 +216,7 @@ int PINT_server_req_get_credential(struct PVFS_server_req *req,
 {
     int ret;
     CHECK_OP(req->op);
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "req->op %d\n", req->op);
 
     if (!PINT_server_req_table[req->op].params->get_credential)
     {
@@ -264,11 +265,18 @@ void PINT_server_req_get_ctrl(struct PVFS_server_req *req,
  */
 const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "First checking op\n");
+
     CHECK_OP(op);
 
-    /* gossip_log("%s: map server with op %d and params %p\n", __func__,
+    gossip_log("%s: map server with op %d and params %p\n", __func__,
                op, PINT_server_req_table[op].params);
-    */
+    
+    if (PINT_server_req_table[op].params == NULL)
+    {
+        gossip_lerr("Error: params missing for this op\n");
+        return NULL;
+    }
 
     return PINT_server_req_table[op].params->string_name;
 }

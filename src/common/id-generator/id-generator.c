@@ -15,6 +15,7 @@
 #include "quickhash.h"
 #include "gen-locks.h"
 #include "pvfs2-internal.h"
+#include "gossip.h"
 
 #define DEFAULT_ID_GEN_SAFE_TABLE_SIZE 997
 
@@ -42,6 +43,7 @@ int id_gen_safe_initialize()
 {
     if (!ID_GEN_SAFE_INITIALIZED())
     {
+        gossip_ldebug(GOSSIP_IDGEN_DEBUG, "initializaing id generator\n");
         s_id_gen_safe_table = qhash_init(
             hash_key_compare, hash_key, DEFAULT_ID_GEN_SAFE_TABLE_SIZE);
         if (!s_id_gen_safe_table)
@@ -55,6 +57,7 @@ int id_gen_safe_initialize()
 
 int id_gen_safe_finalize()
 {
+    gossip_ldebug(GOSSIP_IDGEN_DEBUG, "finalizing id generator\n");
     s_id_gen_safe_init_count--;
     if(s_id_gen_safe_init_count == 0 && ID_GEN_SAFE_INITIALIZED())
     {
@@ -74,9 +77,11 @@ int id_gen_safe_register(BMI_id_gen_t *new_id, void *item)
     id_gen_safe_t *id_elem = NULL;
 
     assert(s_id_gen_safe_table != NULL);
+    gossip_ldebug(GOSSIP_IDGEN_DEBUG, "adding item\n");
 
     if (!item)
     {
+        gossip_ldebug(GOSSIP_IDGEN_DEBUG, "exit on missing item\n");
 	return -EINVAL;
     }
 
@@ -85,6 +90,7 @@ int id_gen_safe_register(BMI_id_gen_t *new_id, void *item)
     id_elem = (id_gen_safe_t *)malloc(sizeof(id_gen_safe_t));
     if (!id_elem)
     {
+        gossip_ldebug(GOSSIP_IDGEN_DEBUG, "exit on malloc failure\n");
         return -ENOMEM;
     }
 
@@ -100,6 +106,7 @@ int id_gen_safe_register(BMI_id_gen_t *new_id, void *item)
 
     *new_id = id_elem->id;
 
+    gossip_ldebug(GOSSIP_IDGEN_DEBUG, "added id = %ld\n", id_elem->id);
     gen_mutex_unlock(&s_id_gen_safe_mutex);
     return 0;
 }
@@ -109,6 +116,8 @@ void *id_gen_safe_lookup(BMI_id_gen_t id)
     void *ret = NULL;
     id_gen_safe_t *id_elem = NULL;
     struct qlist_head *hash_link = NULL;
+    
+    gossip_ldebug(GOSSIP_IDGEN_DEBUG, "search for id = %ld\n", id);
 
     if (ID_GEN_SAFE_INITIALIZED())
     {
@@ -117,12 +126,25 @@ void *id_gen_safe_lookup(BMI_id_gen_t id)
         hash_link = qhash_search(s_id_gen_safe_table, &id);
         if (hash_link)
         {
+            gossip_ldebug(GOSSIP_IDGEN_DEBUG,
+                          "found id in hash = %ld\n", id);
             id_elem = qlist_entry(hash_link, id_gen_safe_t, hash_link);
-            assert(id_elem);
-            assert(id_elem->id == id);
-            assert(id_elem->item);
+            if (id_elem)
+            {
+                gossip_ldebug(GOSSIP_IDGEN_DEBUG,
+                              "found id in list = %ld\n", id_elem->id);
+                /* this are not good asserts - we want error reporting */
+                assert(id_elem);
+                assert(id_elem->id == id);
+                assert(id_elem->item);
 
-            ret = id_elem->item;
+                ret = id_elem->item;
+            }
+        }
+        else
+        {
+            gossip_ldebug(GOSSIP_IDGEN_DEBUG,
+                          "id not found = %ld\n", id);
         }
         gen_mutex_unlock(&s_id_gen_safe_mutex);
     }
@@ -135,20 +157,30 @@ int id_gen_safe_unregister(BMI_id_gen_t new_id)
     id_gen_safe_t *id_elem = NULL;
     struct qlist_head *hash_link = NULL;
 
+    gossip_ldebug(GOSSIP_IDGEN_DEBUG,
+                  "search and remove id = %ld\n", new_id);
+
     if (ID_GEN_SAFE_INITIALIZED())
     {
         gen_mutex_lock(&s_id_gen_safe_mutex);
 
         hash_link = qhash_search_and_remove(
-            s_id_gen_safe_table, &new_id);
+                                         s_id_gen_safe_table, &new_id);
         if (hash_link)
         {
+            gossip_ldebug(GOSSIP_IDGEN_DEBUG,
+                          "item found and removed id = %ld\n", new_id);
             id_elem = qlist_entry(hash_link, id_gen_safe_t, hash_link);
             assert(id_elem);
 
             id_elem->item = NULL;
             free(id_elem);
             ret = 0;
+        }
+        else
+        {
+            gossip_ldebug(GOSSIP_IDGEN_DEBUG,
+                          "item not found id = %ld\n", new_id);
         }
         gen_mutex_unlock(&s_id_gen_safe_mutex);
     }

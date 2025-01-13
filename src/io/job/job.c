@@ -1041,9 +1041,12 @@ int job_req_sched_post(enum PVFS_server_op op,
     struct job_desc *jd = NULL;
     int ret = -1;
 
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Allocate Job Descriptor\n");
+
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "failed malloc %d?\n", (int)jd->job_id);
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
@@ -1051,6 +1054,14 @@ int job_req_sched_post(enum PVFS_server_op op,
     jd->u.req_sched.post_flag = 1;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "\n"
+                                       "\t\t\tjob_desc:\n"
+                                       "\t\t\tjob_id: %ld\n"
+                                       "\t\t\tuser_ptr: (%p)\n",
+                                       jd->job_id, jd->job_user_ptr);
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "scheduling %d\n", (int)jd->job_id);
 
     ret = PINT_req_sched_post(op,
                               fs_id,
@@ -1060,18 +1071,21 @@ int job_req_sched_post(enum PVFS_server_op op,
                               jd,
                               &(jd->u.req_sched.id));
 
+
     if (ret < 0)
     {
         /* error posting */
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "post error %d\n", (int)jd->u.req_sched.id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        return (1);
+        return (1); /* why 1? errors should be -1 */
     }
 
     if (ret == 1)
     {
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "immediate completion %d\n", (int)jd->u.req_sched.id);
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -1079,6 +1093,8 @@ int job_req_sched_post(enum PVFS_server_op op,
         /* don't delete the job desc until a matching release comes through */
         return (1);
     }
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "wait for completion %d\n", (int)jd->u.req_sched.id);
 
     /* if we hit this point, job did not immediately complete-
      * queue to test later
@@ -1222,6 +1238,7 @@ int job_req_sched_release(job_id_t in_completed_id,
     struct job_desc *match_jd = NULL;
     struct job_desc *jd = NULL;
     int ret = -1;
+    struct PINT_smcb *smcb = user_ptr; /* for ls debug statements */
 
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
@@ -1232,6 +1249,9 @@ int job_req_sched_release(job_id_t in_completed_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "search for scheduler id %d\n",
+                  (int)in_completed_id);
 
     match_jd = id_gen_safe_lookup(in_completed_id);
     if (!match_jd)
@@ -1244,6 +1264,8 @@ int job_req_sched_release(job_id_t in_completed_id,
         jd = NULL;
         return 1;
     }
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "found, now releasing\n");
 
     ret = PINT_req_sched_release(match_jd->u.req_sched.id,
                                  jd,
@@ -2305,6 +2327,9 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     int ret = -1;
     struct job_desc *jd = NULL;
     void* user_ptr_internal GCC_UNUSED;
+    struct PINT_smcb *smcb = (struct PINT_smcb *)user_ptr;
+
+    gossip_lsdebug(GOSSIP_JOB_DEBUG, "Reading dspace attribute\n");
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr

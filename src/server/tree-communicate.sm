@@ -279,7 +279,7 @@ static PINT_sm_action tree_communicate_partition_handles(
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *tree_communicate_s_op = s_op;
-/*                      PINT_sm_frame(smcb, PINT_FRAME_CURRENT);*/
+    struct PINT_server_op *ts_op = NULL; /* to access tree frame */
     struct PVFS_server_req *this_req = s_op->req;
     int num_partitions = 0, num_files_per_server = 0;
     int i,j,sid;
@@ -288,7 +288,10 @@ static PINT_sm_action tree_communicate_partition_handles(
     struct PVFS_server_req *req = NULL;
     PVFS_capability capability;
     struct PINT_server_tree_communicate_op *tc; /* convenience pointer */
+
     tc = &s_op->u.tree_communicate;
+
+    ts_op = ((struct PINT_server_op *)tree_communicate_s_op);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "data_files %d sids %d fs_id %d op %d\n",
                    num_data_files, num_sids, fs_id, operation);
@@ -422,13 +425,18 @@ static PINT_sm_action tree_communicate_partition_handles(
                                fs_id,
                                req);                  /* req in new frame */
 
+
             switch (operation)
             {
             case PVFS_SERV_TREE_SETATTR:
             {
                 PVFS_object_attr dummy_obj_attr;
                 gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SETATTR\n");
-                 
+                   
+                /* Will be needed in a bit */
+                ts_op->req->u.tree_setattr.credential =
+                       s_op->req->u.setattr.credential;
+
                 memset(&dummy_obj_attr, 0, sizeof(PVFS_object_attr));
             
                 PINT_SERVREQ_SETATTR_FILL(
@@ -467,6 +475,11 @@ static PINT_sm_action tree_communicate_partition_handles(
             case PVFS_SERV_TREE_REMOVE:
             {
                 gossip_lsdebug(GOSSIP_SERVER_DEBUG, "REMOVE\n");
+
+                /* Will be needed in a bit */
+                ts_op->req->u.tree_remove.credential =
+                       s_op->req->u.remove.credential;
+
                 PINT_SERVREQ_REMOVE_FILL(
                         *req,
                         s_op->req->capability,
@@ -491,6 +504,11 @@ static PINT_sm_action tree_communicate_partition_handles(
             case PVFS_SERV_TREE_GET_FILE_SIZE:
             {
                 gossip_lsdebug(GOSSIP_SERVER_DEBUG, "FILE_SIZE\n");
+
+                /* Will be needed in a bit */
+                ts_op->req->u.tree_get_file_size.credential =
+                       s_op->req->u.getattr.credential;
+
                 PINT_SERVREQ_GETATTR_FILL(
                          *req,
                          PVFS_REQ_DATAFILE,
@@ -515,10 +533,15 @@ static PINT_sm_action tree_communicate_partition_handles(
                 gossip_lsdebug(GOSSIP_SERVER_DEBUG, "DIRENT_CNT\n");
 /* I don't really remember why this was changed WBL */
 #if 1
+                /* Will be needed in a bit */
+                ts_op->req->u.tree_get_dirent_count.credential =
+                       s_op->req->u.getattr.credential;
+
+                PINT_debug_capability(&s_op->req->capability, "from request");
                 PINT_SERVREQ_GETATTR_FILL(
                          *req,
                          PVFS_REQ_DIRDATA,
-                         s_op->req->capability,
+                         s_op->req->capability, /* original request cap */
                          this_req->u.tree_get_dirent_count.credential,
                          fs_id,
                          tc->handle_array_local[i],
@@ -548,6 +571,11 @@ static PINT_sm_action tree_communicate_partition_handles(
             case PVFS_SERV_TREE_GETATTR:
             {
                 gossip_lsdebug(GOSSIP_SERVER_DEBUG, "LOCAL GETATTR\n");
+
+                /* Will be needed in a bit */
+                ts_op->req->u.tree_getattr.credential =
+                       s_op->req->u.getattr.credential;
+
                 PINT_SERVREQ_GETATTR_FILL(
                     *req,
                     s_op->req->ctrl.sub,
@@ -572,6 +600,7 @@ static PINT_sm_action tree_communicate_partition_handles(
             default:
                 break;
             } /* end local switch */
+            
         } /* end for each local handle */
     } /* end if local */
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done with local\n");
@@ -1741,6 +1770,8 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
     /* assert(s_op->req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT); */
     assert(req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT);
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "frame (%p)\n", s_op);
+
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "req->retry_msgpair_at_leaf:%s\n",
           (req->u.tree_get_dirent_count.retry_msgpair_at_leaf ? "YES" : "NO"));
 
@@ -1757,6 +1788,12 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
      * at the resp area on the s_op, was a getattr resp a moment ago.
      * Could push a whole new frame, or stash the resp somewhere while
      * the tree does its thing.
+     *
+     * Now this is a new frame with a new resp area - it still has
+     * whatever getattr wrote in it, but writes now will not change
+     * the original frame.  Need to remove this once we are done
+     * here and hopefully the state machine can pick back up where
+     * it left off.  The req is also new for the same reason.
      */
     resp->u.tree_get_dirent_count.caller_handle_index =
             req->u.tree_get_dirent_count.caller_handle_index;

@@ -84,17 +84,19 @@ void *dbpf_thread_function(void *ptr)
     struct timeval base;
     struct timespec wait_time;
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function started\n");
+    gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread started\n");
 
     PINT_event_thread_start("TROVE-DBPF");
     while(dbpf_thread_running)
     {
+        gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread running - check queue\n");
         /* check if we any have ops to service in our work queue */
         gen_mutex_lock(&dbpf_op_queue_mutex);
         op_queued_empty = qlist_empty(&dbpf_op_queue);
 
         if (!op_queued_empty)
         {
+            gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread running - found op\n");
             gen_mutex_unlock(&dbpf_op_queue_mutex);
             dbpf_do_one_work_cycle(&out_count);
 #ifndef __PVFS2_TROVE_AIO_THREADED__
@@ -121,6 +123,7 @@ void *dbpf_thread_function(void *ptr)
         }
         else
         {
+            gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread running - no op found\n");
             /* compute how long to wait */
             gettimeofday(&base, NULL);
             wait_time.tv_sec = base.tv_sec +
@@ -133,20 +136,24 @@ void *dbpf_thread_function(void *ptr)
                 wait_time.tv_sec++;
             }
 
+            gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread sleeping for %d seconds\n",
+                          TROVE_DEFAULT_TEST_TIMEOUT / 1000);
+
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
                                          &dbpf_op_queue_mutex,
                                          &wait_time);
             if( ret == EINVAL || ret == EPERM )
             {
                 /* an error other than timeout occured */
-                gossip_debug(GOSSIP_TROVE_DEBUG, "%s: pthread_cond_timedwait "
-                             "returned an error\n", __func__);
+                gossip_ldebug(GOSSIP_THREADS_DEBUG,
+                              "pthread_cond_timedwait returned an error\n");
             }
             gen_mutex_unlock(&dbpf_op_queue_mutex);
         }
+        gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread running - looping\n");
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function ending\n");
+    gossip_ldebug(GOSSIP_THREADS_DEBUG, "dbpf_thread_function ending\n");
     PINT_event_thread_stop();
 #endif
     return ptr;

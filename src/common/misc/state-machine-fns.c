@@ -927,6 +927,7 @@ int PINT_sm_push_dup_frame(struct PINT_smcb *smcb, int frame_size)
     newframe = malloc(sizeof(struct PINT_frame_s));
     if(!newframe)
     {
+        free(frame_p);
         return -PVFS_ENOMEM;
     }
     newframe->task_id = task_id;
@@ -1043,7 +1044,7 @@ static int child_sm_frame_terminate(struct PINT_smcb * smcb,
 
 /* Function: PINT_sm_start_child_frames
  * Params: pointer to an smcb pointer and pointer to count of children
- *         started
+ *         started (out)
  * Returns: number of children started
  * Synopsis: This starts all the new child SMs based on the frame_stack
  *           This is called by the invoke function above which expects the
@@ -1057,7 +1058,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
     struct PINT_smcb *new_sm;
     job_status_s js;
     struct PINT_frame_s *f;
-    void *my_frame;
+    void *parent_frame;
 
     assert(smcb);
 
@@ -1067,7 +1068,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 
     *children_started = 0;
 
-    my_frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    parent_frame = PINT_sm_frame(smcb, PINT_FRAME_CURRENT); /* parent's frame */
     /* Iterate once up front to determine how many children we are going to
      * run.  This has to be set before starting any children, otherwise if
      * the first one immediately completes it will mistakenly believe it is
@@ -1080,7 +1081,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 #endif
     {
         /* run from TOS until the parent frame */
-        if(f->frame == my_frame)
+        if(f->frame == parent_frame)
         {
             break;
         }
@@ -1102,7 +1103,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 #endif
     {
         /* run from TOS until the parent frame */
-        if(f->frame == my_frame)
+        if(f->frame == parent_frame)
         {
             break;
         }
@@ -1121,8 +1122,9 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 
         if (new_sm == NULL)
         {
-            /* rewrite this func to return an error code! */
+            /* this func returns void - should fix */
             /* return -PVFS_ENOMEM; */
+            return;
         }
 
         /* we select the SM by calling PINT_sm_task_map below */
@@ -1133,8 +1135,9 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         new_sm->parent_smcb = smcb;
 
         /* assign frame */
-        PINT_sm_push_frame(new_sm, 999999, my_frame); /* parent frame shared */
+        PINT_sm_push_frame(new_sm, 999999, parent_frame); /* parent frame shared */
         PINT_sm_push_frame(new_sm, f->task_id, f->frame);
+
 
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                        "Push frame (%p) to smcb: (%p) task: %d\n",
