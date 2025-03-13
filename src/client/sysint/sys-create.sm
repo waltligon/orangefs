@@ -177,7 +177,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     struct PVFS_sys_mntent mntent;
 
     gossip_debug(GOSSIP_CREATE_DEBUG, "PVFS_isys_create entered\n");
-
+    
     if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
         (object_name == NULL) || (resp == NULL))

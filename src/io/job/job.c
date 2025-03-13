@@ -430,7 +430,8 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
      * return and fill in the status structure.  If it needs to be tested
      * for completion later, then queue up a job_desc structure.
      */
-
+    gossip_debug(GOSSIP_JOB_DEBUG,
+        "ELIZA DEBUG: (job) JOB BMI SEND LIST\n");
     int ret = -1;
     struct job_desc *jd = NULL;
     void* user_ptr_internal = NULL;
@@ -485,6 +486,9 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
 
     if (ret < 0)
     {
+        //fprintf(stdout, " ELIZA DEBUG: (job) error in job_bmi_send_list\n");
+        gossip_debug(GOSSIP_JOB_DEBUG,
+        "ELIZA DEBUG: (job) error in job_bmi_send_list\n");
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
@@ -495,6 +499,9 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
 
     if (ret == 1)
     {
+        //fprintf(stdout, "ELIZA DEBUG: (job) complete immediate\n");
+        gossip_debug(GOSSIP_JOB_DEBUG,
+        "ELIZA DEBUG: (job) complete immediate\n");
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -503,7 +510,9 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
         jd = NULL;
         return (ret);
     }
-
+    //fprintf(stdout, "ELIZA DEBUG: (job) queue up to test later\n");
+    gossip_debug(GOSSIP_JOB_DEBUG,
+        "ELIZA DEBUG: (job) queue up to test later\n");
     /* if we fall to this point, the job did not immediately complete and
      * we must queue up to test it later
      */

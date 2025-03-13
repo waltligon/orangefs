@@ -155,7 +155,7 @@ int main (int argc, char ** argv)
         {
             buffer_size = user_opts->file_size - total_written;
         }
-	
+
 	ret = generic_write(&dest, buffer, total_written, 
 		buffer_size, &credentials);
 	if (ret != buffer_size)
@@ -170,7 +170,7 @@ int main (int argc, char ** argv)
 	}
 	total_written += buffer_size;
     }
-
+    
     time2 = Wtime();
 
     if (user_opts->show_timings) 
@@ -414,9 +414,10 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
     int ret = -1;
     char *entry_name;		    /* name of the pvfs2 file */
     char str_buf[PVFS_NAME_MAX];    /* basename of pvfs2 file */
- 
+
     if (obj->fs_type == UNIX_FILE)
     {
+        
         memset(&stat_buf, 0, sizeof(struct stat));
 
         stat(obj->u.ufs.path, &stat_buf);
@@ -617,7 +618,7 @@ static int generic_open(file_object *obj, PVFS_credential *credentials,
                 else {
                     new_dist=NULL;
                 }
-            
+    
 		ret = PVFS_sys_create(entry_name, parent_ref, 
                                       obj->u.pvfs2.attr, credentials,
                                       new_dist, &resp_create, NULL, hints);
@@ -640,6 +641,8 @@ void make_attribs(PVFS_sys_attr *attr, PVFS_credential *credentials,
     attr->group = credentials->group_array[0];
     attr->perms = PVFS_util_translate_mode(mode, 0);
     attr->mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+    //set type (seventh bit in mask) 
+    attr->mask = attr->mask | PVFS_ATTR_SYS_TYPE;
     attr->dfile_count = nr_datafiles;
 
     if (attr->dfile_count > 0)
