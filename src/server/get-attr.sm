@@ -340,7 +340,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
      * point. - NOW done in bulk because it is much more likely that we
      * fail to add new fields than have a hard time understanding the
      * fields.
-    */
+     */
     respattr = &s_op->resp.u.getattr.attr;
     memset(respattr, 0, sizeof(PVFS_object_attr));
 
@@ -364,8 +364,10 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                  "\t\tmeta_sid_count = %d]\n",
                  PVFS_ds_type_to_string(respattr->objtype),
                  respattr->objtype,
-                 s_op->ds_attr.fs_id,
-                 PVFS_OID_str(&s_op->ds_attr.handle),
+                 //s_op->ds_attr.fs_id,
+                 s_op->target_fs_id,
+                 //PVFS_OID_str(&s_op->ds_attr.handle),
+                 PVFS_OID_str(&s_op->target_handle),
                  respattr->mask,
                  respattr->owner,
                  respattr->group,
@@ -489,7 +491,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
 
             gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                            "handle %s refers to a directory\n",
-                           PVFS_OID_str(&s_op->u.getattr.handle));
+                           PVFS_OID_str(&s_op->target_handle));
+                           //PVFS_OID_str(&s_op->u.getattr.handle));
             /* We need some of this error checking back, but the bit
              * flipping going on does not seem right.  Need a careful
              * review of this.
@@ -534,6 +537,10 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
    * return the bitmap and dirdata handles from keyval db along with data from the 
    * PVFS_TYPE_DIRECTORY dspace record.  dirent_count is only retrieved when we
    * are processing a PVFS_TYPE_DIRDATA dspace record.
+   *
+   * This depends if we will take a global or distributed view.  Presumably the DIRECTORY
+   * record has dirent_count for a global count.  Alternatively DIRDATA has a local count 
+   * for distributed.
    *
    * is that right?  I think it shuold be controlled from metadata and a flag. WBL
    */
@@ -1188,19 +1195,20 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         }
     }
     //respattr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
-    if (s_op->u.getattr.attrmask & PVFS_ATTR_LATEST)
-    {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, 
-                     " client requests latest size\n");
-        s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_SIZE;
-        js_p->error_code = STATE_META_SIZE;
-    }
-    else
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_FASTEST)
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG,
                      " client requests fastest size\n");
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_SIZE;
         s_op->resp.u.getattr.attr.u.meta.size = s_op->attr.u.meta.size;
+    }
+    else
+    {
+        /* default is LATEST */
+        gossip_debug(GOSSIP_GETATTR_DEBUG, 
+                     " client requests latest size\n");
+        s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_SIZE;
+        js_p->error_code = STATE_META_SIZE;
     }
 
     /* otherwise deliberately preserve existing error code */
@@ -1373,12 +1381,13 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Found dspace, now ready keyvale\n");
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Found dspace, now read keyvals\n");
 
     /* this should not assert, but error and drop the request
      * so the server doesn't die.  We should be building with NDEBUG
      * for real installations.  Probably just good error messages
      * are best.
+     * Validity of the inputs should go earlier in the path, no?
      */
     assert(attr->u.dir.dist_dir_attr.dirdata_count > 0);
     assert(attr->u.dir.dist_dir_attr.bitmap_size > 0);
@@ -1394,7 +1403,7 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
      ******************************
      */
 
-    /* allocate space for bitmap, dirdata OIDS and OIDS, parent OID and SIDS */
+    /* allocate space for bitmap, dirdata OIDS and SIDS, parent OID and SIDS */
     attr->u.dir.dist_dir_bitmap =
                 malloc(attr->u.dir.dist_dir_attr.bitmap_size *
                              sizeof(PVFS_dist_dir_bitmap_basetype));
@@ -1412,11 +1421,13 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                    "arrays allocated for attr(%p)\n"
+                   "\t\tdistdir bitmap=(%p)\n"
                    "\t\tdirdata_handles=(%p)\n"
                    "\t\tdirdata_sids=(%p)\n"
                    "\t\tparent_sids=(%p)\n"
                    "\t\tparent=(%p)\n",
                    attr,
+                   attr->u.dir.dist_dir_bitmap,
                    attr->u.dir.dirdata_handles,
                    attr->u.dir.dirdata_sids,
                    attr->parent_sids,
@@ -1497,9 +1508,13 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
     keep_keyval_buffers(s_op, 2);
     /*----------------------------------------------------------------------------*/
 
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Calling trove keyval read list: fs_id %d\n",
+                                         s_op->target_fs_id);
     js_p->error_code = 0;
-    ret = job_trove_keyval_read_list(s_op->u.getattr.fs_id,
-                                     s_op->u.getattr.handle,
+    ret = job_trove_keyval_read_list(s_op->target_fs_id,
+                                     s_op->target_handle,
+                                     //s_op->u.getattr.fs_id,
+                                     //s_op->u.getattr.handle,
                                      s_op->key_a,
                                      s_op->val_a,
                                      s_op->error_a,
@@ -1513,6 +1528,9 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
                                      server_job_context,
                                      s_op->req->hints);
 
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                   "finished with getattr_read_directory_list(%d:%d)\n",
+                   ret, js_p->error_code);
     return ret;
 }
 
@@ -1527,14 +1545,17 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     PVFS_object_attr *attr_p;
     unsigned char *c;
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "frame (%p)\n", s_op);
+    attr_p = &s_op->resp.u.getattr.attr;
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                 "frame: (%p), attr_p: (%p)\n", s_op, attr_p);
 
     /*
      * Check for return of last database (keyval) read
      * and debugging of results
      */
 
-    /* check for ENOENT */
+    /* check for ENOENT on keyval read */
     if (js_p->error_code != 0)
     {
         if (js_p->error_code == -TROVE_ENOENT)
@@ -1551,10 +1572,6 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    attr_p = &s_op->resp.u.getattr.attr;
-
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                 "frame: (%p), attr_p: (%p)\n", s_op, attr_p);
 
     /* gossip parent */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
@@ -1563,7 +1580,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
                  "\t\tdist_dir_bitmap (%p)\n"
                  "\t\tparent: %s\n"
                  "\t\tdirdata_count %d\n",
-                 PVFS_OID_str(&s_op->u.getattr.handle),
+                 PVFS_OID_str(&s_op->target_handle),
                  attr_p->u.dir.dirdata_handles,
                  attr_p->u.dir.dist_dir_bitmap,
                  PVFS_OID_str(attr_p->parent),
@@ -1571,7 +1588,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
 
     /* gossip dir bitmap */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                 "dist_dir_bitmap: ");
+                 "dist_dir_bitmap: \n");
 
     for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {
@@ -1613,8 +1630,10 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
                  Trove_Special_Keys[DIST_PARAMS_KEY].key, 
                  Trove_Special_Keys[SERVER_LIST_KEY].key,
                  Trove_Special_Keys[DIR_SERVER_LIST_KEY].key,
-                 s_op->u.getattr.fs_id,
-                 PVFS_OID_str(&s_op->u.getattr.handle));
+                 //s_op->u.getattr.fs_id,
+                 s_op->target_fs_id,
+                 //PVFS_OID_str(&s_op->u.getattr.handle));
+                 PVFS_OID_str(&s_op->target_handle));
 
     gossip_debug(GOSSIP_GETATTR_DEBUG, "mallocing space\n");
 
@@ -1714,7 +1733,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         {
             if (attr_p->u.dir.hint.dist_params_len == 0)
             {
-                break;
+                continue;
             }
             s_op->val_a[j].buffer = attr_p->u.dir.hint.dist_params;
             s_op->val_a[j].buffer_sz = attr_p->u.dir.hint.dist_params_len;            
@@ -1725,7 +1744,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         {
             if (attr_p->u.dir.hint.dist_name_len == 0)
             {
-                break;
+                continue;
             }
             s_op->val_a[j].buffer = attr_p->u.dir.hint.dist_name;
             s_op->val_a[j].buffer_sz = attr_p->u.dir.hint.dist_name_len;
@@ -1736,7 +1755,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         {
             if (attr_p->u.dir.hint.layout.server_list.bufsize == 0)
             {
-                break;
+                continue;
             }
             s_op->val_a[j].buffer =
                      attr_p->u.dir.hint.layout.server_list.servers;
@@ -1749,7 +1768,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         {
             if (attr_p->u.dir.hint.dir_layout.server_list.bufsize == 0)
             {
-                break;
+                continue;
             }
             s_op->val_a[j].buffer =
                     attr_p->u.dir.hint.dir_layout.server_list.servers;
@@ -1760,11 +1779,29 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         }
     }
 
-    if (j == 0)
+    if (j == 0) /* ie none of the hints are present */
     {
         /* a dir object does not have to have these hints 
          * if not, skip the keyval read and go on to the next state 
+         * free memory allocated
          */
+
+        free(attr_p->u.dir.hint.dist_params);
+        attr_p->u.dir.hint.dist_params = NULL;
+        free(attr_p->u.dir.hint.dist_name);
+        attr_p->u.dir.hint.dist_name = NULL;
+        free(attr_p->u.dir.hint.layout.server_list.servers);
+        attr_p->u.dir.hint.layout.server_list.servers = NULL;
+        free(attr_p->u.dir.hint.dir_layout.server_list.servers);
+        attr_p->u.dir.hint.dir_layout.server_list.servers = NULL;
+        //free(s_op->key_a);
+        //s_op->key_a = NULL;
+        //free(s_op->val_a);
+        //s_op->val_a = NULL;
+        //free(s_op->error_a);
+        //s_op->error_a = NULL;
+
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "None of the hints so exit early\n");
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -1774,7 +1811,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     /* read key val pairs */
     js_p->error_code = 0;
     ret = job_trove_keyval_read_list(s_op->u.getattr.fs_id, 
-                                     s_op->u.getattr.handle,
+                                     s_op->target_handle,
                                      s_op->key_a,
                                      s_op->val_a,
                                      s_op->error_a,
@@ -1833,7 +1870,8 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
     if (s_op->val_a && s_op->key_a)
     {
 
-        if (s_op->error_a[DIST_NAME_KEY] == 0)
+        if (s_op->error_a[DIST_NAME_KEY] == 0 &&
+            s_op->val_a[DIST_NAME_KEY].buffer)
         {
             gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
                 "val_a[DIST_NAME_KEY] (%p) read_sz = %d dist_name = %s\n", 
@@ -1849,7 +1887,8 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
             attr_p->u.dir.hint.dist_name_len = 0;
         }            
 
-        if (s_op->error_a[DIST_PARAMS_KEY] == 0)
+        if (s_op->error_a[DIST_PARAMS_KEY] == 0  &&
+            s_op->val_a[DIST_PARAMS_KEY].buffer)
         {
             gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
                 "val_a[DIST_PARAMS_KEY] (%p) read_sz = %d dist_params = %s\n", 
@@ -1866,6 +1905,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
         }
 
 #if 0
+        /* no longer in keyvals, read along with dspace */
         if (s_op->error_a[DEFAULT_NUM_DFILES_KEY] == 0)
         {
             long int dfile_count = 0;
@@ -1985,23 +2025,26 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
      * reading and summarizing the dirdata dirent counts to
      * the dir
      */
-    if (s_op->u.getattr.attrmask & PVFS_ATTR_LATEST)
+    //DEBUG_attr_mask(s_op->u.getattr.attrmask);
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_FASTEST)
     {
-        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                       "dirent_count needed.\n");
-        attr_p->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
-        js_p->error_code = STATE_DIRENT_CNT;
-    }
-    else
-    {
-        /* request defaults to FASTEST so dir dirent_count is
+        /* request defaults to LATEST so dir dirent_count is
          * sufficient - do we need to set a mask bit?
          * assert seems way out of place here
          */
-        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "dirent_count not needed\n");
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                       "dirent_count not needed\n");
         assert(attr_p->mask & PVFS_ATTR_COMMON_ALL);
     }
-
+    else
+    {
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                       "dirent_count needed.\n");
+        attr_p->mask |= PVFS_ATTR_LATEST;
+        attr_p->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+        js_p->error_code = STATE_DIRENT_CNT;
+    }
+/*--------------*/
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                  "frame s_op: (%p), attr_p: (%p), "
                  "dirdata_handles (%p), "
@@ -2033,9 +2076,25 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
 #endif
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "frame (%p)\n", s_op);
 
+    /* we are setting up to jump to tree code, and from there a pjmp
+     * we need to make sure the new processes have both a frame and a
+     * parent frame, and reasonable data in the req.  We copy the resp
+     * too just in case.
+     */
     PINT_sm_push_dup_frame(smcb, sizeof(PINT_server_op));
-    new_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT + 1);
+    new_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT + 1); /* get new frame */
+
+    new_op->op = PVFS_SERV_TREE_GET_DIRENT_COUNT; /* tree op we are about to jump to */
     new_op->req = (struct PVFS_server_req *)malloc(sizeof(struct PVFS_server_req));
+
+    memcpy(new_op->req, s_op->req, sizeof(struct PVFS_server_req));
+    memcpy(&new_op->resp, &s_op->resp, sizeof(struct PVFS_server_resp));
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "fs_id %d\n", new_op->target_fs_id);
+    new_op->msgarray_op.msgarray = NULL;
+    new_op->key_a = NULL;
+    new_op->val_a = NULL;
+
+    //DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG, &new_op->orig_cred);
     /* This op now has its own frame, req, and resp to work with.
      * Data may need to be copied back before removal
      * other values are the same as the start of this func
@@ -2050,7 +2109,9 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
     /* Note: permission not required for tree_get_dirent_count op */
     PINT_null_capability(&capability);
 
+    /* should we not initialize the new_op msg_array_op? */
     PINT_msgpair_init(&s_op->msgarray_op);
+    PINT_msgpair_init(&new_op->msgarray_op);
     msg_p = &new_op->msgarray_op.msgpair;
 
     /* initialize the dirent_array, which will hold
@@ -2069,13 +2130,16 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                    "getattr->dirent_array (%p)\n",
-                   (void *)getattr_p->dirent_array);
+                   (void *)new_op->u.getattr.dirent_array);
+                   //(void *)getattr_p->dirent_array);
 
+    /* set up the tree op */
     PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
                                     msg_p->req, /* dest is new_op */
                                     capability,
-                                    getattr_p->credential,
-                                    getattr_p->fs_id,
+                                    getattr_p->credential, /* is this right? */
+                                    s_op->target_fs_id,
+                                    //getattr_p->fs_id,
                                     0,
                                     attr_p->u.dir.dist_dir_attr.dirdata_count,
                                     attr_p->u.dir.dirdata_handles,
@@ -2121,6 +2185,7 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
     /* frame is pushed in call_msgpairarray in src/server/pjmp-machines */
     /* PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op); */
 
+    /* This now continues in the tree code */
     return SM_ACTION_COMPLETE;
 }
 
@@ -2134,6 +2199,8 @@ static PINT_sm_action getattr_check_if_capability_required(
                                                   job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *p_op = PINT_sm_frame(smcb, PINT_FRAME_PARENT);
+    int task, error_code, remain, i;
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "frame (%p)\n", s_op);
 
@@ -2146,6 +2213,27 @@ static PINT_sm_action getattr_check_if_capability_required(
         return SM_ACTION_COMPLETE;
     }
 
+    /* we are back to getattr so we need to pop the tree frame
+     * but not before we make sure the results of the tree op
+     * are recorded
+     */
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "copy tree result\n");
+    s_op->resp.u.getattr.attr.u.dir.dirent_count = 0;
+    for (i = 0; i < p_op->resp.u.tree_get_dirent_count.handle_count; i++)
+    {
+        s_op->resp.u.getattr.attr.u.dir.dirent_count = 
+                p_op->resp.u.tree_get_dirent_count.dentcnt[i];
+    }
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "popping frame\n");
+    PINT_sm_pop_frame(smcb, &task, &error_code, &remain);
+    /* get the top frame */
+    //s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* Now check if we need to create a capability
+     */
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "check if cap needed\n");
     if (s_op->u.getattr.attrmask & PVFS_ATTR_CAPABILITY)
     {
         js_p->error_code = STATE_CAPABILITY;
@@ -2460,7 +2548,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "frame (%p)\n", s_op);
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                   "getattr_setup_resp: previous state error_code = %d\n",
+                   "previous state error_code = %d\n",
                    js_p->error_code);
     if (js_p->error_code > 0)
     {
@@ -2478,10 +2566,12 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
     }
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "Handle %s \n\t\t"
-                 "retrieved attrs: [type = %d owner = %d group = %d perms = %o\n\t\t"
-                 "atime = %llu, mtime = %llu, ctime = %llu, ntime = %llu, \n\t\t"
-                 "dist_size = %d, dirent_count = %d]\n",
+                 "Handle %s retrieved attrs: \n\t\t"
+                 "type = %d \n\t\towner = %d \n\t\t"
+                 "group = %d \n\t\tperms = %o\n\t\t"
+                 "atime = %llu, \n\t\tmtime = %llu, \n\t\t"
+                 "ctime = %llu, \n\t\tntime = %llu, \n\t\t"
+                 "dist_size = %d, \n\t\tdirent_count = %d\n",
                  PVFS_OID_str(&s_op->u.getattr.handle), respattr->objtype,
                  respattr->owner, respattr->group, respattr->perms,
                  llu(respattr->atime), llu(respattr->mtime),
@@ -2562,7 +2652,6 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
 
         /* !!! may change later */
         gossip_debug(GOSSIP_GETATTR_DEBUG, " SERVER RETURNING DIR:\n"
-                     "\t\tdirent_count           = %llu \n"
                      "\t\tdirdata_max            = %d \n"
                      "\t\tdirdata_min            = %d \n"
                      "\t\tdirdata_count          = %d \n"
@@ -2573,7 +2662,6 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                      "\t\tdfile_count(hint)      = %d \n"
                      "\t\tdist_name_len(hint)    = %d \n"
                      "\t\tdist_params_len(hint)  = %d \n",
-                     llu(respattr->u.dir.dirent_count),
                      respattr->u.dir.dist_dir_attr.dirdata_max,
                      respattr->u.dir.dist_dir_attr.dirdata_min,
                      respattr->u.dir.dist_dir_attr.dirdata_count,

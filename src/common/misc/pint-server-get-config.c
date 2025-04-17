@@ -22,8 +22,6 @@
 #include "security-util.h"
 #include "sid.h"
 
-/* This is defined in pvfs2-server.h */
-/* extern job_context_id server_job_context; */
 
 /* <====================== PUBLIC FUNCTIONS =====================> */
 

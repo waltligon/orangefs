@@ -5,7 +5,7 @@
  *
  * Identity-mapping functions                                                                
  *
-*/
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -107,12 +107,15 @@ int PINT_map_credential(PVFS_credential *cred,
     gossip_ldebug(GOSSIP_SECURITY_DEBUG, 
                   "mapping credential to uid/group list\n");
 
-    if (cred == NULL || uid == NULL || num_groups == NULL)
+    if (cred == NULL || uid == NULL || 
+        num_groups == NULL || group_array == NULL)
     {
         gossip_ldebug(GOSSIP_SECURITY_DEBUG,
-                      "Invalid *cred, *uid, or *num_groups");
+                      "Invalid *cred, *uid, *num_groups or *group_array");
         return -PVFS_EINVAL;
     }
+
+    //DEBUG_PVFS_CREDENTIAL(GOSSIP_SECURITY_DEBUG, cred);
 
 #ifdef ENABLE_SECURITY_CERT
 

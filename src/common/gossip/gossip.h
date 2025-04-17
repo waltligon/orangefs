@@ -210,6 +210,13 @@ static inline int GDM_ZERO(PVFS_debug_mask mask)
 }
 #endif
 
+#define gossip_if(__mask) \
+do {                                                      \
+   if (gossip_debug_enabled(__mask))                      
+
+#define gossip_end \
+} while(0)
+
 /* try to avoid function call overhead by checking masks in macro */
 #define gossip_debug(mask, format, f...)                  \
 do {                                                      \

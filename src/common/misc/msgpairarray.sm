@@ -211,13 +211,16 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+/* This pushes frames to start new SMs with a PJMP
+ */
 static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "sop->op %d\n", s_op->op);
     int i = 0;
+
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "parent s_op->op %d\n", s_op->op);
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Setting up SMCBs to fork\n");
     for(i = 0; i < mop->count; i++)
     {
@@ -228,11 +231,14 @@ static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
         submop->index = i;
         submop->msgarray = mop->msgarray;
         PINT_sm_push_frame(smcb, i + 1, submop); /* task 0 is invalid */
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "SMCB %d ready to fork\n", i);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "SMCB %d(%p) ready to fork\n", i, smcb);
     }
     return SM_ACTION_COMPLETE;
 }
 
+/*This cleans up the PJMP processes after they are done
+ */
 static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {
@@ -365,11 +371,13 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         if (msg_p->fs_id != PVFS_FS_ID_NULL)
         {
             server_config = PINT_server_config_mgr_get_config(msg_p->fs_id);
+            /* assert or print error and return? */
             assert(server_config);
 
             cur_fs = PINT_config_find_fs_id(server_config, msg_p->fs_id);
-            PINT_server_config_mgr_put_config(server_config);
+            /* assert or print error and return? */
             assert(cur_fs);
+            PINT_server_config_mgr_put_config(server_config);
             msg_p->enc_type = cur_fs->encoding;
         } 
         if (!ENCODING_IS_VALID(msg_p->enc_type))
@@ -386,6 +394,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         }
 
     try_next_encoding:
+        /* is this really a problem?  should we return an error */
         assert(ENCODING_IS_VALID(msg_p->enc_type));
 
         ret = PINT_encode(&msg_p->req,
@@ -475,6 +484,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         /* it is impossible for this recv to complete at this point
          * without errors; we haven't sent the request yet!
          */
+        /* assert or return error? */
         assert(ret < 0 || msg_p->recv_status.error_code != 0);
         if (ret < 0)
         {
@@ -508,10 +518,13 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     /* if we reach here, the recv has been posted without failure, but
      * has not completed yet
      */
+    /* assert?  why?  we don't use ret before it is assigned again
+     * so this really doesn't matter
+     */
     assert(ret == 0);
     mop->params.recv_ct++;
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair index %d: posting send\n",i);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair index %d: posting send\n", i);
 
     /* post send of request; job_id stored in send_id */
     ret = job_bmi_send_list(msg_p->encoded_req.dest,
@@ -555,6 +568,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     {
         gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Successful post, immediate successful completion\n");
         /* immediate successful completion */
+        msg_p->op_status = msg_p->send_status.error_code; /* should be zero */
         msg_p->send_id = 0;
     }
     else
@@ -564,7 +578,10 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         mop->params.send_ct++;
     }
  
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Exiting correctly, still waiting on completions\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "Exiting correctly, still waiting for %d "
+                   "send and %d recv completions\n",
+                   mop->params.send_ct, mop->params.recv_ct);
     /* we are still waiting on operations to complete, next state
      * transition will handle them
      */
@@ -1640,7 +1657,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
     int ret = -1;
     const char *server_string;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: calling PINT_decode\n", __func__);
+    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG, "calling PINT_decode\n");
 
     ret = PINT_decode(encoded_resp_p,
                       PINT_DECODE_RESP,
@@ -1648,7 +1665,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                       *svr_addr_p,
                       actual_resp_sz);
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: PINT_decode return %d\n", __func__, ret);
+    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG, "PINT_decode return %d\n", ret);
     
     if (ret > -1)
     {
@@ -1686,8 +1703,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
             return(-EPROTONOSUPPORT);
         }
     }
-    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG,
-                  "returning %d\n", ret);
+    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG, "returning %d\n", ret);
     return ret;
 }
 

@@ -121,7 +121,7 @@ struct job_desc
 
 typedef struct qlist_head *job_desc_q_p;
 
-struct job_desc *alloc_job_desc(int type);
+struct job_desc *alloc_job_desc(enum job_type type);
 void dealloc_job_desc(struct job_desc *jd);
 job_desc_q_p job_desc_q_new(void);
 void job_desc_q_cleanup(job_desc_q_p jdqp);
@@ -131,6 +131,7 @@ void job_desc_q_remove(struct job_desc *desc);
 int job_desc_q_empty(job_desc_q_p jdqp);
 struct job_desc *job_desc_q_shownext(job_desc_q_p jdqp);
 void job_desc_q_dump(job_desc_q_p jdqp);
+void job_desc_q_clear(job_desc_q_p jdqp, void *target);
 
 #endif /* __JOB_DESC_QUEUE_H */
 

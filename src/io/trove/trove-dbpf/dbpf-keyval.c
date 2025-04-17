@@ -155,7 +155,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_read handle: %s\n)",
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_read handle: %s\n)",
                  PVFS_OID_str(&handle));
                          
     ret = dbpf_op_init_queued_or_immediate(&op,
@@ -200,7 +200,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 {
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id, 0, NULL}; /* other fields? */
     struct dbpf_keyval_db_entry key_entry;
     struct dbpf_data key, data;
     int ret;
@@ -226,7 +226,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     ret = dbpf_db_get(op_p->coll_p->keyval_db, &key, &data);
     if (ret != 0)
     {
-        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+        gossip_ldebug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "warning: keyval read error on handle %s and key=%*s (%s)\n",
                      PVFS_OID_str(&op_p->handle), op_p->u.k_read.key->buffer_sz,
                      (char *)op_p->u.k_read.key->buffer, strerror(ret));
@@ -234,7 +234,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
         /* if data buffer is too small returns ERANGE error */
         if (data.len > op_p->u.k_read.val->buffer_sz)
         {
-            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+            gossip_ldebug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "warning: Value buffer too small %d < %lu\n",
                          op_p->u.k_read.val->buffer_sz, data.len);
             /* let the user know */
@@ -261,13 +261,13 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
              * NOTE: this can happen if the keyword isn't registered, or if
              * there is no associated cache_elem for this key
              */
-            gossip_debug(
+            gossip_ldebug(
                 GOSSIP_DBPF_ATTRCACHE_DEBUG,
                 "** CANNOT cache data retrieved (key is %s)\n", (char *)key_entry.key);
         }
         else
         {
-            gossip_debug(
+            gossip_ldebug(
                 GOSSIP_DBPF_ATTRCACHE_DEBUG,
                 "*** cached keyval data retrieved (key is %s)\n", (char *)key_entry.key);
         }
@@ -358,7 +358,7 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
 
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 {
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id, 0, NULL};
     struct dbpf_keyval_db_entry key_entry;
     struct dbpf_data key, data;
     int ret;
@@ -1118,13 +1118,17 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     int ret;
 
+    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_read_list\n)");
+
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
+                      "Collection lookup failed\n");
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_keyval_read_list\n)");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "ready to enqueue\n");
                          
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -1139,6 +1143,8 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
                                            &op_p);
     if(ret < 0)
     {
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
+                      "Enqueue failed: %d\n", ret);
         return ret;
     }
 
@@ -1148,6 +1154,8 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     op_p->u.k_read_list.err_array = err_array;
     op_p->u.k_read_list.count = count;
     op_p->hints = hints;
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "ready to service\n");
 
     return dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
 }
@@ -1250,6 +1258,8 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
+        gossip_ldebug(GOSSIP_TROVE_DEBUG, "Invalid coll_id %d\n",
+                      coll_id);
         return -TROVE_EINVAL;
     }
 
@@ -1268,6 +1278,9 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
                                            &op_p);
     if(ret < 0)
     {
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
+                      "dbpf_op_init_queued_or_immediate returned %d\n",
+                      ret);
         return ret;
     }
 
@@ -1282,6 +1295,8 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
                     1,
                     PINT_PERF_ADD);
 
+    gossip_ldebug(GOSSIP_TROVE_DEBUG,
+                  "Calling dbpf_queue_or_service\n");
     ret = dbpf_queue_or_service(op_p, q_op_p, coll_p, out_op_id_p, 0, 0);
     return ret;
 }

@@ -190,7 +190,8 @@ int dbpf_do_one_work_cycle(int *out_count)
             if(DBPF_OP_IS_KEYVAL(cur_op->op.type)) 
             {
                 --synccount;
-                gossip_debug(GOSSIP_TROVE_DEBUG, "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount);
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount);
             }
 
             cur_op->op.state = OP_IN_SERVICE;
@@ -205,16 +206,28 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
 
         /* otherwise, service the current operation now */
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: STARTING TROVE "
-                     "SERVICE ROUTINE (%s)\n",
+        gossip_ldebug(GOSSIP_TROVE_OP_DEBUG,
+                      "[DBPF THREAD]: STARTING TROVE SERVICE ROUTINE (%s)\n",
                      dbpf_op_type_to_str(cur_op->op.type));
 
         ret = cur_op->op.svc_fn(&(cur_op->op));
 
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: FINISHED TROVE "
-                     "SERVICE ROUTINE (%s) (ret: %d)\n",
-                     dbpf_op_type_to_str(cur_op->op.type),
-                     ret);
+        {
+            char emsg[256];
+            if (ret < 0)
+            {
+                PVFS_strerror_r(ret, emsg, 256);
+            }
+            else
+            {
+                strcpy(emsg, "Op Complete");
+            }
+
+            gossip_ldebug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: FINISHED TROVE "
+                         "SERVICE ROUTINE %s ret: %d (%s)\n",
+                         dbpf_op_type_to_str(cur_op->op.type),
+                         ret, emsg);
+        }
         if (ret == DBPF_OP_COMPLETE || ret < 0)
         {
             /* Some dbpf calls may return non-fatal errors

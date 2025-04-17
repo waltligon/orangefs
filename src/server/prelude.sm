@@ -148,16 +148,25 @@ nested machine pvfs2_prelude_sm
 static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret;
+    PVFS_credential *cred = NULL;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: req_sched\n", s_op,
+                 "s_op (%p) %s (prelude sm) state: sreq_sche\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
-    gossip_lsdebug(GOSSIP_MIRROR_DEBUG,
-                 "Executing pvfs2_prelude_sm:prelude_setup...\n");
-    gossip_lsdebug(GOSSIP_MIRROR_DEBUG,
-                 "\tbase frame:%d\tframe count:%d\n"
-                 ,smcb->base_frame,smcb->frame_count);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "\tbase frame:%d\tframe count:%d\n",
+                   smcb->base_frame, smcb->frame_count);
+
+    PINT_server_req_get_credential(s_op->req, &cred);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "cred ptr (%p)\n", cred);
+    /* some requests don't have a credential */
+    if (cred)
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "copying credentials to s_op\n");
+        DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG, cred);
+        COPY_PVFS_CREDENTIAL(&s_op->orig_cred, cred);
+    }
 
     /* gets the target fs_id and handle from the request and copies
      * them in the s_op
@@ -173,7 +182,7 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     /** gets the target's attrs from the request and copies into the s_op **/
     /* ret = PINT_server_req_get_attr(s_op->req, &s_op->attr); */
 
-    /* There is a valied NULL return for some OPs */
+    /* There is a valid NULL return for some OPs */
 
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
@@ -387,7 +396,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
         /* */
 
-        create_object = 1;    /* default to create unless zereo'd below */
+        create_object = 1;    /* default to create unless zero'd below */
         js_p->error_code = 0; /* Clear ENOENT */
         switch (s_op->req->op)
         {
@@ -532,6 +541,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         s_op->target_object_attr = &s_op->attr;
     }
 
+    //DEBUG_attr_mask(s_op->attr.mask);
+
     /* Remaining logic deals with new or existing object. */
 
     if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE)
@@ -544,11 +555,17 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* keeping this one to see the state of cap field after getattr
+     */
     PINT_debug_capability(&s_op->req->capability, "Received");
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
         /*
+         * Is this the place to do this?  seems like this should be done
+         * before the request gets going - checked in the same place
+         * capabilities are checked.
+         *
          * if we are exporting a volume readonly, disallow any operation 
          * that modifies the state of the file-system.
          */
@@ -562,6 +579,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     }
 
     PINT_server_req_get_credential(s_op->req, &cred);
+    /* keeping this one to see the state of cred field after getattr
+     */
+    DEBUG_PVFS_CREDENTIAL(GOSSIP_SECURITY_DEBUG, cred);
     if (cred != NULL)
     {
 #ifdef ENABLE_CREDCACHE
@@ -602,7 +622,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             goto complete;
         }
     }
-    gossip_lsdebug(GOSSIP_SECURITY_DEBUG, "cred passed verification\n");
+    gossip_lsdebug(GOSSIP_SECURITY_DEBUG, "cred passed signature verification\n");
 
     if ((s_op->target_fs_id != PVFS_FS_ID_NULL) && (cred != NULL))
     {
@@ -621,8 +641,14 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
         /* Translate the uid and gid's in case we need to do some squashing 
          * based on the export and the client address
+         *
+         * Again, is halfway through a getattr the right place?  Maybe
+         * so if the user has requested capability.  Still, my gut feeling
+         * is the credential should be left unmodified, and a call to gen
+         * the capability should take all of this into consideration.
          */
         /* TODO: testing */
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling translate_ids\n");
         if (translate_ids(s_op->target_fs_id,
                           uid, 
                           group_array[0],
@@ -630,6 +656,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                           &translated_gid,
                           s_op->addr) == 1)
         {
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "modyfying the credential\n");
             /* TODO: not applicable to certificates */
             /* modify the credential. doesn't support secondary groups */
             cred->userid = translated_uid;
@@ -670,6 +697,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "checking capability\n");
     /* check capability cache for non-null capabilities */
 #ifdef ENABLE_CAPCACHE
     capcache_hit = 1;
@@ -740,6 +768,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 complete:
 
     FINISH_PROFILER("pv2", profiler, 1);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "State Action Complete\n");
      
     /* if everything has checked out so far except the
      * dspace record is missing, then create the dspace record

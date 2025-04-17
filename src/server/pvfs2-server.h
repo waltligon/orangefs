@@ -663,9 +663,15 @@ struct PINT_server_tree_communicate_op
     PVFS_SID* sid_array_remote; 
     uint32_t *local_join_size;
     uint32_t *remote_join_size;
-    int handle_array_local_count; /* use these to index into sid array */
+    int handle_array_local_count; /* use this to index into local arrays */
     int handle_array_remote_count;
     int handle_index;
+    int local_index;              /* tells each task which handle to use */
+    int remote_index;
+    PVFS_ds_attributes ds_attr;   /* used in tree op for multiple jobs */
+    job_id_t tmp_id;              /* used in tree op for multiple jobs */
+    int dirent_count;             /* targets for tree operations */
+    int file_size;
 };
 
 struct PINT_server_mgmt_get_dirent_op
@@ -744,18 +750,19 @@ typedef struct PINT_server_op
     struct BMI_unexpected_info unexp_bmi_buff;
 
     /* decoded request and response structures */
-    struct PVFS_server_req    *req; 
-    struct PVFS_server_resp    resp; 
+    struct PVFS_server_req    *req;      /* usually points to decoded */
+    struct PVFS_server_resp    resp;     /* non-encoded */
 
     /* encoded request and response structures */
-    struct PINT_encoded_msg    encoded;
-    struct PINT_decoded_msg    decoded;
+    struct PINT_encoded_msg    encoded;  /* encoded req */
+    struct PINT_decoded_msg    decoded;  /* decoded req */
 
     PINT_sm_msgarray_op        msgarray_op;
 
     /* used by prelude when creating a "missing" DIRDATA or DATA object */
     int32_t                    new_target_object;  /* flag for state machine */
     PVFS_handle                target_handle;
+    PVFS_SID                  *target_sid_array;   /* not used yet */
     PVFS_fs_id                 target_fs_id;
     PVFS_object_attr          *target_object_attr;
 
@@ -763,6 +770,8 @@ typedef struct PINT_server_op
 
     enum PINT_server_req_access_type access_type;
     enum PINT_server_sched_policy sched_policy;
+
+    struct PVFS_credential     orig_cred;
     
     /* used in a pjmp to remember how many frames we pushed but be
      * careful about nesting
@@ -773,7 +782,7 @@ typedef struct PINT_server_op
     /* Used just about everywhere so this is a std place to keep it */
     int32_t                    metasidcnt; /* number of sids per handle for metadata */
 
-    union
+    union PINT_server_union
     {
         /* request-specific scratch spaces for use during processing */
         struct PINT_server_create_op create;
@@ -817,15 +826,13 @@ typedef struct PINT_server_op
 /* This creates  new frame in __s_op and pushes it for a subsequent PJMP
  *
  * In the big if :
- * a __location value of LOCAL will result in LOCAL
- * and a __location value of REMOTE will result in REMOTE
- * any other avlue will check the __sid against the local server
+ * the sid is compared to the local host sid to determine LOCAL or REMOTE
  */
-#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                                \
-                                             __s_op,                                \
-                                             __sid,                                 \
-                                             __fs_id,                               \
-                                             __req)                                 \
+#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,  /*IN MOD*/                    \
+                                             __s_op,  /*OUT*/                       \
+                                             __sid,   /*IN*/                        \
+                                             __fs_id, /*IN*/                        \
+                                             __req)   /*OUT*/                       \
 do {                                                                                \
       struct server_configuration_s *__config = PINT_server_config_mgr_get_config();\
       __s_op = (PINT_server_op *)malloc(sizeof(struct PINT_server_op));             \
@@ -836,6 +843,9 @@ do {                                                                            
           return -PVFS_ENOMEM;                                                      \
       }                                                                             \
       memset(__s_op, 0, sizeof(struct PINT_server_op));                             \
+      /* This sets a pointer to the __s_op deocded area in the req */               \
+      /* There isn't anything in the decoded area because we just */                \
+      /* malloc'd and zero'd __s_op */                                              \
       __s_op->req = &__s_op->decoded.stub_dec.req;                                  \
       __req = __s_op->req;                                                          \
       if (!PVFS_SID_is_null(&(__sid)) &&                                            \
@@ -1081,6 +1091,7 @@ extern struct PINT_state_machine_s pvfs2_pjmp_mirror_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_create_immutable_copies_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_get_attr_work_sm;
 extern struct PINT_state_machine_s pvfs2_pjmp_set_attr_work_sm;
+extern struct PINT_state_machine_s pvfs2_pjmp_get_dirent_count_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_set_attr_work_sm;

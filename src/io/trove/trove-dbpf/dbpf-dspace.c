@@ -1323,7 +1323,7 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id, 0, NULL};
 
     ret = dbpf_dspace_attr_get(op_p->coll_p, ref, op_p->u.d_getattr.attr_p);
     if(ret < 0)
@@ -1331,7 +1331,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         return(ret);
     }
 
-    return 1;
+    return 1;    /* 1? Why 1? I would think this was 0 */
 }
 
 static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)

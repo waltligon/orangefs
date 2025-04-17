@@ -66,14 +66,34 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
+    int i = 0;
     job_id_t tmp_id;
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op (%p) s_op->decoded.enc_type %d\n",
                    s_op, s_op->decoded.enc_type);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
                    "s_op (%p) %s (FR sm) state release (error_code = %d)\n",
-                   s_op, PINT_map_server_op_to_string(s_op->req->op),
+                   s_op, PINT_map_server_op_to_string(s_op->resp.op),
                    js_p->error_code);
+
+    for (i = 0; i < smcb->frame_count; i++)
+    {
+        struct PINT_server_op *top = PINT_sm_frame(smcb, PINT_FRAME_CURRENT - i);
+        gossip_log("final_response_release (%p): frame %d top (%p) op %d resp_op %d\n",
+                   smcb, PINT_FRAME_CURRENT - i, top, top->op, top->resp.op);
+        if (top->op == 52)
+        {
+            gossip_log("final_response_release (%p): handle count %d dirent_count %ld\n",
+                   smcb, top->resp.u.tree_get_dirent_count.handle_count,
+                   *top->resp.u.tree_get_dirent_count.dentcnt);
+        }
+        if (top->op == 4)
+        {
+            gossip_log("final_response_release (%p): handle count %d dirent_count %ld attr type %d\n",
+                   smcb, top->resp.u.getattr.attr.u.dir.dist_dir_attr.dirdata_count,
+                   top->resp.u.getattr.attr.u.dir.dirent_count, top->resp.u.getattr.attr.objtype);
+        }
+    }
 
     /* this seems a little odd, but since this is the first state of the
      * nested machine, now is the time to grab the error code if we
@@ -101,8 +121,8 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "releasing request %d\n"
-                   s_op->scheduled_id);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "releasing request %d\n",
+                   (int)s_op->scheduled_id);
     ret = job_req_sched_release(s_op->scheduled_id,
                                 smcb,
                                 0,
@@ -126,12 +146,13 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
     int ret = -1;
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = PINT_server_config_mgr_get_config();
+
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->decoded.enc_type %d\n",
                    s_op->decoded.enc_type);
     
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
 	           "s_op (%p) %s (FR sm) state send_resp (status = %d)\n",
-	           s_op, PINT_map_server_op_to_string(s_op->req->op),
+	           s_op, PINT_map_server_op_to_string(s_op->resp.op),
 	           s_op->resp.status);
 
     if (js_p->error_code != 0)
@@ -150,13 +171,23 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
                       s_op->decoded.enc_type);
     if (ret < 0)
     {
-        gossip_lerr("Error: PINT_encode() failure.\n");
+        gossip_lerr("Error: PINT_encode() failure\n");
         PINT_gossip_err_server_resp(&s_op->resp);
 
         js_p->error_code = ret;
         return 1;
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "Encode returns list count %d total_size %ld\n",
+                   s_op->encoded.list_count, s_op->encoded.total_size);
+
+    /* not sure we actually need all this
+     * we should be able to sum up the values in the tree code
+     * Does this comment even make sense?  If not remove it
+     */
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling job_bmi_send_list\n");
     /* send the response */
     ret = job_bmi_send_list(s_op->addr,
                             s_op->encoded.buffer_list,

@@ -438,6 +438,11 @@ int main(int argc, char **argv)
     }
 #endif
 
+/* ===================================================================
+ *                        MAIN LOOP
+ * ==================================================================
+ */
+
     gossip_debug_fp(stderr, 'S', GOSSIP_LOGSTAMP_DATETIME,
                     "PVFS2 Server ready.\n");
 
@@ -446,12 +451,18 @@ int main(int argc, char **argv)
     {
         int i, comp_ct = PVFS_SERVER_TEST_COUNT;
 
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "waiting for next group of jobs\n");
+
         if (signal_recvd_flag != 0)
         {
+            gossip_ldebug(GOSSIP_SERVER_DEBUG, "Caught A Signal\n");
             /* If the signal is a SIGHUP, catch and reload configuration */
             if (signal_recvd_flag == SIGHUP)
             {
+                gossip_ldebug(GOSSIP_SERVER_DEBUG, "Reloading Config\n");
                 reload_config();
+
+                gossip_ldebug(GOSSIP_SERVER_DEBUG, "Rotate Logs\n");
 
                 /* re-open log file to allow normal rotation */
                 gossip_reopen_file(server_config.logfile, "a");
@@ -471,6 +482,7 @@ int main(int argc, char **argv)
                 if (qlist_empty(&inprogress_sop_list))
                 {
                     ret = 0;
+                    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Shutdown Server\n");
                     siglevel = signal_recvd_flag;
                     goto server_shutdown;
                 }
@@ -490,19 +502,29 @@ int main(int argc, char **argv)
         }
 
         /*
-          Loop through the completed jobs and handle whatever comes
-          next
-        */
-        for (i = 0; i < comp_ct; i++)
-        {
+         * Loop through the completed jobs, handle whatever comes next
+         */
+        for (i = 0; i < comp_ct; i++) {
+            gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                          "Running next job on the list i %d comp_ct %d\n",
+                          i, comp_ct);
+            
+            /* DEBUG LOOP */
+            {int s; for (s = i; s < comp_ct; s++)
+            {
+                PINT_smcb *smcb = server_completed_job_p_array[s];
+                gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG,
+                              "Job smcb on the list (%p)\n", smcb); }}
+
             /* int unexpected_msg = 0; */
             struct PINT_smcb *smcb = server_completed_job_p_array[i];
 
-               /* NOTE: PINT_state_machine_next() is a function that
-                * is shared with the client-side state machine
-                * processing, so it is defined in the src/common
-                * directory.
-                */
+            /* NOTE: PINT_state_machine_continue() is a function that
+             * is shared with the client-side state machine
+             * processing, so it is defined in the src/common/misc
+             * directory.
+             */
+            gossip_ldebug(GOSSIP_SERVER_DEBUG, "continuing smcb (%p)\n", smcb);
             ret = PINT_state_machine_continue(smcb,
                                               &server_job_status_array[i]);
 
@@ -514,9 +536,10 @@ int main(int argc, char **argv)
 
             /* else ret == SM_ACTION_DEFERED */
         }
-    }
+    }  /* END OF MAIN LOOP - WHEN WE EXIT WE'RE DONE */
 
 server_shutdown:
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Server Shutting Down - Exited Main Loop\n");
     server_shutdown(server_status_flag, ret, siglevel);
     /* NOTE: the server_shutdown() function does not return; it always ends
      * by calling exit.  This point in the code should never be reached.
@@ -2814,11 +2837,8 @@ int server_state_machine_complete(PINT_smcb *smcb)
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "smcb op code (%d).\n", s_op->op);
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->unexp_bmi_buff.buffer (%p) "
-                                        "NULL(%s).\n", 
-                                        s_op->unexp_bmi_buff.buffer,
-                                        s_op->unexp_bmi_buff.buffer ?
-                                               "NO" : "YES");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->unexp_bmi_buff.buffer (%p)\n", 
+                                        s_op->unexp_bmi_buff.buffer);
 
     /* BMI_unexpected_free MUST execute BEFORE BMI_set_info,
      * because BMI_set_info will remove the addr info from the
