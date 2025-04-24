@@ -328,7 +328,7 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "bitmap:\n");
     for(i = attr_p->u.dirdata.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {       
-        unsigned char *c = (unsigned char *)(attr_p->u.dirdata.dist_dir_bitmap + i);
+        unsigned char *c GCC_UNUSED = (unsigned char *)(attr_p->u.dirdata.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 " i=%d : %02x %02x %02x %02x\n",
                 i, c[3], c[2], c[1], c[0]);

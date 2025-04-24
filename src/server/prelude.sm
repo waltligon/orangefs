@@ -602,7 +602,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 #endif
         if (!ret)
         {
-            char sig_buf[16];
+            char sig_buf[16] __attribute__ ((unused));
 
             gossip_lsdebug(GOSSIP_SECURITY_DEBUG, 
                          "Credential (%s) from %s failed verification.\n",
@@ -730,7 +730,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     }
     else
     {
-        char sig_buf[16]; 
+        char sig_buf[16] __attribute__ ((unused)); 
 
         gossip_lsdebug(GOSSIP_SECURITY_DEBUG, 
                      "Capability (%s) from %s failed verification.\n",

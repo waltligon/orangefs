@@ -294,7 +294,8 @@ static PINT_sm_action pjmp_get_dirent_count_work_init(struct PINT_smcb *smcb,
                                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *p_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *p_op GCC_UNUSED
+                         = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_tree_communicate_op *tc = &s_op->u.tree_communicate;
     PINT_sm_action sm_status = SM_ACTION_COMPLETE;
     int i = tc->local_index;
@@ -382,27 +383,29 @@ static PINT_sm_action cleanup_msgpairarray (struct PINT_smcb *smcb
 {   
    gossip_debug(GOSSIP_SERVER_DEBUG,"Executing pvfs2_pjmp_call_msgpairarray_sm:cleanup_msgpairarray"
                                     "....\n");
-   struct PINT_server_op *s_op = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
+   struct PINT_server_op *s_op GCC_UNUSED
+                             = PINT_sm_frame(smcb,PINT_FRAME_CURRENT);
 
-   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op:%p\n",s_op);
+   gossip_if (GOSSIP_SERVER_DEBUG)
+   {
+        gossip_log("\ts_op:%p\n", s_op);
 
-   gossip_debug(GOSSIP_SERVER_DEBUG,"\tjs_p->error_code:%d\n"
-                                   ,js_p->error_code);
-   gossip_debug(GOSSIP_SERVER_DEBUG,"\tBEFORE POP:smcb->frame_base:%d"
-                                    "\tframe_count:%d\n"
-                                   ,smcb->base_frame,smcb->frame_count);
+        gossip_log("\tjs_p->error_code:%d\n" ,js_p->error_code);
+        gossip_log("\tBEFORE POP:smcb->frame_base:%d\tframe_count:%d\n"
+                                        ,smcb->base_frame,smcb->frame_count);
 
+        gossip_log("\ts_op->msgarray_op.msgpair.req.op:%d\n"
+                                         ,s_op->msgarray_op.msgpair.req.op );
 
-   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op->msgarray_op.msgpair.req.op:%d\n"
-                                    ,s_op->msgarray_op.msgpair.req.op );
-
-   gossip_debug(GOSSIP_SERVER_DEBUG,"\ts_op->resp.status:%d\n"
-                                   ,s_op->resp.status);
-
-   return SM_ACTION_TERMINATE;
+        gossip_log("\ts_op->resp.status:%d\n" ,s_op->resp.status);
+    }
+    gossip_end; 
+    return SM_ACTION_TERMINATE;
 } /* end action cleanup_msgpairarray */
 
-static PINT_sm_action pjmp_remove_work_release_job(struct PINT_smcb *smcb, job_status_s *js_p)
+static GCC_UNUSED
+PINT_sm_action pjmp_remove_work_release_job(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
 {
    int ret = -1;
    job_id_t tmp_id;
@@ -421,14 +424,16 @@ static PINT_sm_action pjmp_remove_work_release_job(struct PINT_smcb *smcb, job_s
    return ret;  
 } /* end pjmp_remove_work_release_job */
 
-static PINT_sm_action pjmp_remove_work_execute_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
+static GCC_UNUSED
+PINT_sm_action pjmp_remove_work_execute_terminate(struct PINT_smcb *smcb,
+                                                         job_status_s *js_p)
 {
    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
    js_p->error_code = s_op->u.remove.saved_error_code;
 
    return SM_ACTION_TERMINATE;
-}/* end pjmp_remove_execute_terminate */
+} /* end pjmp_remove_execute_terminate */
 
 
 /*

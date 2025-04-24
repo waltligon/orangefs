@@ -1242,7 +1242,7 @@ int job_req_sched_release(job_id_t in_completed_id,
     struct job_desc *match_jd = NULL;
     struct job_desc *jd = NULL;
     int ret = -1;
-    struct PINT_smcb *smcb = user_ptr; /* for ls debug statements */
+    struct PINT_smcb *smcb GCC_UNUSED = user_ptr; /* for ls debug statements */
 
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
@@ -2333,7 +2333,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     int ret = -1;
     struct job_desc *jd = NULL;
     void* user_ptr_internal GCC_UNUSED;
-    struct PINT_smcb *smcb = (struct PINT_smcb *)user_ptr;
+    struct PINT_smcb *smcb GCC_UNUSED = (struct PINT_smcb *)user_ptr;
 
     gossip_lsdebug(GOSSIP_JOB_DEBUG, "Reading dspace attribute\n");
 

@@ -226,7 +226,7 @@ static PINT_sm_action mgmt_remove_dirent(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     int i;
-    unsigned char *c;
+    unsigned char *c __attribute__ ((unused));
     PVFS_object_attr *attr_p;
 
     js_p->error_code = 0;

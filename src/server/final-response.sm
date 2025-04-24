@@ -76,24 +76,28 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
                    s_op, PINT_map_server_op_to_string(s_op->resp.op),
                    js_p->error_code);
 
-    for (i = 0; i < smcb->frame_count; i++)
+    gossip_if(GOSSIP_SERVER_DEBUG)
     {
-        struct PINT_server_op *top = PINT_sm_frame(smcb, PINT_FRAME_CURRENT - i);
-        gossip_log("final_response_release (%p): frame %d top (%p) op %d resp_op %d\n",
-                   smcb, PINT_FRAME_CURRENT - i, top, top->op, top->resp.op);
-        if (top->op == 52)
+        for (i = 0; i < smcb->frame_count; i++)
         {
-            gossip_log("final_response_release (%p): handle count %d dirent_count %ld\n",
-                   smcb, top->resp.u.tree_get_dirent_count.handle_count,
-                   *top->resp.u.tree_get_dirent_count.dentcnt);
-        }
-        if (top->op == 4)
-        {
-            gossip_log("final_response_release (%p): handle count %d dirent_count %ld attr type %d\n",
-                   smcb, top->resp.u.getattr.attr.u.dir.dist_dir_attr.dirdata_count,
-                   top->resp.u.getattr.attr.u.dir.dirent_count, top->resp.u.getattr.attr.objtype);
+            struct PINT_server_op *top = PINT_sm_frame(smcb, PINT_FRAME_CURRENT - i);
+            gossip_log("final_response_release (%p): frame %d top (%p) op %d resp_op %d\n",
+                       smcb, PINT_FRAME_CURRENT - i, top, top->op, top->resp.op);
+            if (top->op == 52)
+            {
+                gossip_log("final_response_release (%p): handle count %d dirent_count %ld\n",
+                       smcb, top->resp.u.tree_get_dirent_count.handle_count,
+                       *top->resp.u.tree_get_dirent_count.dentcnt);
+            }
+            if (top->op == 4)
+            {
+                gossip_log("final_response_release (%p): handle count %d dirent_count %ld attr type %d\n",
+                       smcb, top->resp.u.getattr.attr.u.dir.dist_dir_attr.dirdata_count,
+                       top->resp.u.getattr.attr.u.dir.dirent_count, top->resp.u.getattr.attr.objtype);
+            }
         }
     }
+    gossip_end;
 
     /* this seems a little odd, but since this is the first state of the
      * nested machine, now is the time to grab the error code if we
@@ -187,7 +191,9 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
      * Does this comment even make sense?  If not remove it
      */
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling job_bmi_send_list\n");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "calling job_bmi_send_list with addr %ld tag %d\n",
+                   s_op->addr, s_op->tag);
     /* send the response */
     ret = job_bmi_send_list(s_op->addr,
                             s_op->encoded.buffer_list,

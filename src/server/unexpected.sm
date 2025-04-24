@@ -276,6 +276,9 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                       s_op->unexp_bmi_buff.addr,
                       s_op->unexp_bmi_buff.size);
 
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Client addr %ld tag %d (from s_op unexp_bmi_buff %p)\n",
+                   s_op->unexp_bmi_buff.addr, s_op->unexp_bmi_buff.tag, s_op);
+
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, 
                    "After req decode enc_type is %d\n", s_op->decoded.enc_type);
 
@@ -312,6 +315,14 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     smcb->op = s_op->req->op;
     s_op->op = s_op->req->op;
+
+    /* Save addr, tag, for easy access 
+     */
+    s_op->addr = s_op->unexp_bmi_buff.addr;
+    s_op->tag = s_op->unexp_bmi_buff.tag;
+
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Client addr %ld tag %d (from s_op %p)\n",
+                   s_op->addr, s_op->tag, s_op);
 
     PINT_server_req_get_credential(s_op->req, &cred);
     DEBUG_PVFS_CREDENTIAL(GOSSIP_UNEXP_DEBUG, cred);
@@ -357,6 +368,9 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     memcpy(local_op_frame, s_op, sizeof(struct PINT_server_op));
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Pushing local op frame\n");
     s_op->num_pjmp_frames = 1;
+
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Client addr %ld tag %d (from local_op_frame %p)\n",
+                   local_op_frame->addr, local_op_frame->tag, local_op_frame);
 
     ret = PINT_sm_push_frame(smcb, PJMP_LOCAL, local_op_frame);
 

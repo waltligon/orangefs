@@ -183,45 +183,49 @@ void job_desc_q_dump(job_desc_q_p jdqp)
     job_desc_q_p scratch;
     struct job_desc *tmp_job_desc = NULL;
 
-    gossip_err("job_desc_q_dump():\n");
-    gossip_err("------------------\n");
-
-    /* iterate all the way through the queue */
-    qlist_for_each_safe(iterator, scratch, jdqp)
+    gossip_if(GOSSIP_JOB_DEBUG)
     {
-        tmp_job_desc = qlist_entry(iterator, struct job_desc,
-                        job_desc_q_link);
-	gossip_err("  job id: %ld.\n", (long) tmp_job_desc->job_id);
-	switch (tmp_job_desc->type)
-	{
-	case JOB_BMI:
-	    gossip_err("    type: JOB_BMI.\n");
-	    gossip_err("    bmi_id: %ld.\n", (long) tmp_job_desc->u.bmi.id);
-	    break;
-	case JOB_BMI_UNEXP:
-	    gossip_err("    type: JOB_BMI_UNEXP.\n");
-	    break;
-	case JOB_TROVE:
-	    gossip_err("    type: JOB_TROVE.\n");
-	    break;
-	case JOB_FLOW:
-	    gossip_err("    type: JOB_FLOW.\n");
-	    break;
-	case JOB_REQ_SCHED:
-	    gossip_err("    type: JOB_REQ_SCHED.\n");
-	    break;
-	case JOB_DEV_UNEXP:
-	    gossip_err("    type: JOB_DEV_UNEXP.\n");
-	    break;
-	case JOB_REQ_SCHED_TIMER:
-	    gossip_err("    type: JOB_REQ_SCHED_TIMER.\n");
-	    break;
-	case JOB_NULL:
-	    gossip_err("    type: JOB_NULL.\n");
-	    break;
-	}
-        gossip_err("     user ptr:(%p)\n", tmp_job_desc->job_user_ptr);
+        gossip_log("job_desc_q_dump():\n");
+        gossip_log("------------------\n");
+
+        /* iterate all the way through the queue */
+        qlist_for_each_safe(iterator, scratch, jdqp)
+        {
+            tmp_job_desc = qlist_entry(iterator, struct job_desc,
+                            job_desc_q_link);
+	    gossip_log("  job id: %ld.\n", (long) tmp_job_desc->job_id);
+	    switch (tmp_job_desc->type)
+	    {
+	    case JOB_BMI:
+	        gossip_log("    type: JOB_BMI.\n");
+	        gossip_log("    bmi_id: %ld.\n", (long) tmp_job_desc->u.bmi.id);
+	        break;
+	    case JOB_BMI_UNEXP:
+	        gossip_log("    type: JOB_BMI_UNEXP.\n");
+	        break;
+	    case JOB_TROVE:
+	        gossip_log("    type: JOB_TROVE.\n");
+	        break;
+	    case JOB_FLOW:
+	        gossip_log("    type: JOB_FLOW.\n");
+	        break;
+	    case JOB_REQ_SCHED:
+	        gossip_log("    type: JOB_REQ_SCHED.\n");
+	        break;
+	    case JOB_DEV_UNEXP:
+	        gossip_log("    type: JOB_DEV_UNEXP.\n");
+	        break;
+	    case JOB_REQ_SCHED_TIMER:
+	        gossip_log("    type: JOB_REQ_SCHED_TIMER.\n");
+	        break;
+	    case JOB_NULL:
+    	        gossip_log("    type: JOB_NULL.\n");
+	        break;
+	    }
+            gossip_log("     user ptr:(%p)\n", tmp_job_desc->job_user_ptr);
+        }
     }
+    gossip_end;
 
     return;
 }

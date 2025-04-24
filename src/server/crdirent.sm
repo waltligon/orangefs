@@ -402,7 +402,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
     int i = 0;
-    unsigned char *c = NULL;
+    unsigned char *c __attribute__ ((unused)) = NULL;
     PVFS_object_attr *attr_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
@@ -986,7 +986,7 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PVFS_object_attr *attr_p = NULL;
-    unsigned char *c = NULL;
+    unsigned char *c __attribute__ ((unused)) = NULL;
 
     PINT_ACCESS_DEBUG(s_op,
                       GOSSIP_ACCESS_DEBUG,

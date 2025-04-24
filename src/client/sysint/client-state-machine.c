@@ -532,7 +532,7 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
                                           void *user_ptr /* in */)
 {
     PINT_sm_action sm_ret;
-    PVFS_error ret = -PVFS_EINVAL;
+    PVFS_error ret GCC_UNUSED = -PVFS_EINVAL;
     job_status_s js;
     int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -844,8 +844,7 @@ PVFS_error PINT_client_state_machine_test(PVFS_sys_op_id op_id,
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *smcb_p_array[MAX_RETURNED_JOBS] = {NULL};
 
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "PINT_client_state_machine_test id %lld\n",lld(op_id));
+    gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, "id %lld\n", lld(op_id));
 
     gen_mutex_lock(&test_mutex);
 
@@ -894,9 +893,8 @@ PVFS_error PINT_client_state_machine_test(PVFS_sys_op_id op_id,
                        PINT_smcb_op(tmp_smcb));
             continue;
         }
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "sm control op %d\n",
-                     PINT_smcb_op(tmp_smcb));
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "sm control op %d\n",
+                      PINT_smcb_op(tmp_smcb));
 
         if (!PINT_smcb_complete(tmp_smcb))
         {

@@ -234,7 +234,7 @@ static int mgmt_get_dirent(struct PINT_smcb *smcb, job_status_s *js_p)
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     int i;
-    unsigned char *c;
+    unsigned char *c GCC_UNUSED;
     PVFS_object_attr *attr_p;
 
     js_p->error_code = 0;

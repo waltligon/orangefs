@@ -22,7 +22,7 @@
     do { if (gossip_debug_enabled(debugmask)) \
            { \
              int i; \
-             unsigned char *c = NULL; \
+             unsigned char *c __attribute__ ((unused)) = NULL; \
             gossip_debug(debugmask, "distributed directory bitmap:\n"); \
             for(i = dist_dir_attr.bitmap_size - 1; i >= 0 ; i--) \
             { \

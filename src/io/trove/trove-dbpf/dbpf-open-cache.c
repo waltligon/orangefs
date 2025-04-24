@@ -710,7 +710,7 @@ int fast_unlink(const char *pathname,
 static void* unlink_bstream(void *context)
 {
     struct unlink_context *loc_context = (struct unlink_context *) context;
-    int ret;
+    int ret GCC_UNUSED;
     time_t start_time;
     struct qlist_head *tmp_item;
     struct file_struct *tmp_st;

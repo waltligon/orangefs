@@ -452,7 +452,7 @@ static int rename_parent_getattr_comp_fn(void *v_p,
     PVFS_object_attr *attr;
     PVFS_dist_dir_hash_type hash;
     int dirdata_index, i;
-    unsigned char *c;
+    unsigned char *c GCC_UNUSED;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_parent_getattr_comp_fn\n");
 

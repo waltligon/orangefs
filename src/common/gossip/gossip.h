@@ -20,6 +20,10 @@
 #ifndef __GOSSIP_H
 #define __GOSSIP_H
 
+#if 0
+#define GOSSIP_DISABLE_DEBUG 1
+#endif
+
 #ifdef WIN32
 #include "wincommon.h"
 #endif
@@ -149,17 +153,28 @@ int gossip_debug_fp(FILE *fp,
                     ...) __attribute__ ((format(printf, 4, 5)));
 
 #ifdef GOSSIP_DISABLE_DEBUG
+
 #define gossip_debug(mask, format, f...) do {} while(0)
 #define gossip_perf_log(format, f...) do {} while(0)
 #define gossip_isset(__m1, __m2) 0
 #define gossip_debug_enabled(__m) 0
-#else /* GOSSIP_DISABLE_DEBUG */
+#define gossip_if(__mask) do { if (0)
+#define gossip_end } while(0)
+
+#else /* NOT GOSSIP_DISABLE_DEBUG */
 
 #define gossip_isset(__m1,__m2) ((__m1.mask1 & (__m2).mask1) || \
                                  (__m1.mask2 & (__m2).mask2))
 
 #define gossip_debug_enabled(__m)  \
                   (gossip_debug_on && gossip_isset(gossip_debug_mask, __m))
+
+#define gossip_if(__mask)            \
+do {                                 \
+   if (gossip_debug_enabled(__mask))                      
+
+#define gossip_end                   \
+} while(0)
 
 #if 0
 /* Gossip Debug Mask inline func combines multiple mask values into one
@@ -209,13 +224,6 @@ static inline int GDM_ZERO(PVFS_debug_mask mask)
     return mask.mask1 || mask.mask2;
 }
 #endif
-
-#define gossip_if(__mask) \
-do {                                                      \
-   if (gossip_debug_enabled(__mask))                      
-
-#define gossip_end \
-} while(0)
 
 /* try to avoid function call overhead by checking masks in macro */
 #define gossip_debug(mask, format, f...)                  \
@@ -283,31 +291,40 @@ int gossip_log(const char *format, ...);
 int gossip_err(const char *format, ...);
 
 #ifdef GOSSIP_DISABLE_DEBUG
+
 #ifdef WIN32
 #define gossip_debug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
 #define gossip_ldebug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
 #define gossip_lsdebug(__m, __f, ...) __gossip_debug_stub(__m, '?', __f, __VA_ARGS__);
-#else /* WIN32 */
+#else /* NOT WIN32 */
 #define gossip_debug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
 #define gossip_lsdebug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
 #endif /* WIN32 */
+
 #define gossip_isset(__m1, __m2) 0
 #define gossip_debug_enabled(__m) 0
-#else /* GOSSIP_DISABLE_DEBUG */
+
+#define gossip_if(__mask)
+#define gossip_end
+
+#else /* NOT GOSSIP_DISABLE_DEBUG */
+
 #ifdef WIN32
 #define gossip_debug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
 #define gossip_ldebug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
 #define gossip_lsdebug(__m, __f, ...) __gossip_debug(__m, '?', __f, __VA_ARGS__);
-#else /* WIN32 */
+#else /* NOT WIN32 */
 #define gossip_debug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #define gossip_lsdebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #endif /* WIN32 */
+
 #define gossip_isset(__m1, __m2) ((__m1.mask1 & (__m2).mask1) || \
                                   (__m1.mask2 & (__m2).mask2))
 #define gossip_debug_enabled(__m) ((gossip_debug_on != 0) && \
                                    gossip_isset(gossip_debug_mask, __m))
+
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err

@@ -237,7 +237,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     PVFS_handle handle;
     PINT_server_req_perm_fun perm_fun;
     int ret = -PVFS_EINVAL, i;
-    char op_mask[16];
+    char op_mask[16] GCC_UNUSED;
 
     gossip_ldebug(GOSSIP_SECURITY_DEBUG, "checking operation %s\n", 
                    PINT_map_server_op_to_string(s_op->req->op));

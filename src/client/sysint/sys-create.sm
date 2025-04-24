@@ -1430,7 +1430,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     int dirdata_server_index;
     int dirdata_sid_index;
     int i;
-    unsigned char *c;
+    unsigned char *c GCC_UNUSED;
 
     gossip_debug(GOSSIP_CREATE_DEBUG,
                  "create state: crdirent_setup_msgpair\n");

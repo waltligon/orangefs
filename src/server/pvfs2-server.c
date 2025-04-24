@@ -512,7 +512,8 @@ int main(int argc, char **argv)
             /* DEBUG LOOP */
             {int s; for (s = i; s < comp_ct; s++)
             {
-                PINT_smcb *smcb = server_completed_job_p_array[s];
+                PINT_smcb *smcb __attribute__ ((unused)) =
+                                server_completed_job_p_array[s];
                 gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG,
                               "Job smcb on the list (%p)\n", smcb); }}
 
@@ -2721,7 +2722,7 @@ int server_state_machine_alloc_noreq(enum PVFS_server_op op,
         }
 
         tmp_op = PINT_sm_frame(*smcb, PINT_FRAME_CURRENT);
-        tmp_op->op = op;
+        tmp_op->op = op; /* initial value, might change */
         tmp_op->target_handle = PVFS_HANDLE_NULL;
         tmp_op->target_fs_id = PVFS_FS_ID_NULL;
 
@@ -2912,7 +2913,7 @@ struct PINT_state_machine_s *server_op_state_get_machine(int op, int dflag)
 }
 
 /** Waits for a single server state machine to finish
- * This is a specialized routine that exected ONE state machine
+ * This is a specialized routine that expects ONE state machine
  * to be running - it runs an abreviated loop to finish that one
  * machine before returning.  Does not check for signals and stuff,
  * this is only intended for early startup of the server.

@@ -1080,7 +1080,8 @@ static int tree_setattr_comp_fn(void *v_p,
     struct PVFS_server_resp *m_resp = resp_p;         /*msgpair resp structure*/
     struct PVFS_servresp_tree_setattr *op_tree = &(op_resp->u.tree_setattr);
     struct PVFS_servresp_tree_setattr *m_tree  = &(m_resp->u.tree_setattr);
-    struct PINT_server_tree_communicate_op *s_tree_comm = &(s_op->u.tree_communicate);
+    struct PINT_server_tree_communicate_op *s_tree_comm GCC_UNUSED 
+                                             = &(s_op->u.tree_communicate);
     int i;
     uint32_t status_array_index=0;
 
@@ -1334,7 +1335,8 @@ static int tree_remove_comp_fn(void *v_p,
     struct PVFS_server_resp *m_resp = resp_p;         /*msgpair resp structure*/
     struct PVFS_servresp_tree_remove *op_tree = &(op_resp->u.tree_remove);
     struct PVFS_servresp_tree_remove *m_tree  = &(m_resp->u.tree_remove);
-    struct PINT_server_tree_communicate_op *s_tree_comm = &(s_op->u.tree_communicate);
+    struct PINT_server_tree_communicate_op *s_tree_comm GCC_UNUSED
+                                                = &(s_op->u.tree_communicate);
     int i;
     uint32_t status_array_index=0;
 
@@ -1610,7 +1612,7 @@ static int tree_get_file_size_comp_fn(void *v_p,
                                       &(op_resp->u.tree_get_file_size);
     struct PVFS_servresp_tree_get_file_size *m_tree  =
                                       &(m_resp->u.tree_get_file_size);
-    struct PINT_server_tree_communicate_op *s_tree_comm =
+    struct PINT_server_tree_communicate_op *s_tree_comm GCC_UNUSED =
                                       &(s_op->u.tree_communicate); 
     int i;
     uint32_t size_array_index=0,
@@ -1946,7 +1948,7 @@ static int tree_get_dirent_count_comp_fn(void *v_p,
                                       &(op_resp->u.tree_get_dirent_count);
     struct PVFS_servresp_tree_get_dirent_count *m_tree  =
                                       &(m_resp->u.tree_get_dirent_count);
-    struct PINT_server_tree_communicate_op *s_tree_comm =
+    struct PINT_server_tree_communicate_op *s_tree_comm GCC_UNUSED =
                                       &(s_op->u.tree_communicate);
     int i;
     uint32_t dentcnt_array_index=0,
@@ -2033,7 +2035,7 @@ static PINT_sm_action tree_getattr_setup(struct PINT_smcb *smcb,
                                          job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PVFS_server_req *req = s_op->req;
+    struct PVFS_server_req *req GCC_UNUSED = s_op->req;
     struct PVFS_credential *cred;
     int ret = 0;
 
@@ -2121,7 +2123,8 @@ static int tree_getattr_comp_fn(void *v_p,
     struct PVFS_server_resp *m_resp = resp_p;         /*msgpair resp structure*/
     struct PVFS_servresp_tree_getattr *op_tree = &(op_resp->u.tree_getattr);
     struct PVFS_servresp_tree_getattr *m_tree  = &(m_resp->u.tree_getattr);
-    struct PINT_server_tree_communicate_op *s_tree_comm = &(s_op->u.tree_communicate);
+    struct PINT_server_tree_communicate_op *s_tree_comm GCC_UNUSED = 
+                                                 &(s_op->u.tree_communicate);
     int i;
     uint32_t attr_array_index=0,
              error_array_index=0;

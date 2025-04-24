@@ -217,10 +217,10 @@ static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));
+    PINT_server_op *s_op GCC_UNUSED = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));
     int i = 0;
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "parent s_op->op %d\n", s_op->op);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "parent s_op (%p) s_op->op %d\n", s_op, s_op->op);
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Setting up SMCBs to fork\n");
     for(i = 0; i < mop->count; i++)
     {
@@ -326,7 +326,8 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
-    int ret = -PVFS_EINVAL, i = 0, tmp = 0;
+    int ret = -PVFS_EINVAL, tmp = 0;
+    int i GCC_UNUSED = 0;
     struct server_configuration_s *server_config = NULL;
     PVFS_msg_tag_t session_tag;
     struct filesystem_configuration_s *cur_fs = NULL;
@@ -443,6 +444,8 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     /*store the session tag for this msgpair, so the msgpair completion */
     /*function can pass it to the caller of msgpairarray.               */
     msg_p->session_tag = session_tag;
+    mop->params.recv_ct = 0;
+    mop->params.send_ct = 0;
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair index %d: posting recv\n", i);
 

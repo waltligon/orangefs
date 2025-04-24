@@ -1543,7 +1543,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     int ret, i, j;
     job_id_t tmp_id;
     PVFS_object_attr *attr_p;
-    unsigned char *c;
+    unsigned char *c GCC_UNUSED;
 
     attr_p = &s_op->resp.u.getattr.attr;
 
@@ -2648,7 +2648,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
     {
         uint32_t dd_count_i;
         int bcount;
-        unsigned char *c;
+        unsigned char *c GCC_UNUSED;
 
         /* !!! may change later */
         gossip_debug(GOSSIP_GETATTR_DEBUG, " SERVER RETURNING DIR:\n"
@@ -2723,6 +2723,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
      */
 #endif
 
+    /* free some mirror stuff, free_keyval_buffers */
     free_nested_getattr_data(s_op);
     return SM_ACTION_COMPLETE;
 }

@@ -935,7 +935,7 @@ static PINT_sm_action cleanup_mirror_work(struct PINT_smcb *smcb,
     struct PVFS_servresp_mirror *respmir_p = &(s_op->resp.u.mirror);
     struct PVFS_servreq_mirror *reqmir_p = &(s_op->req->u.mirror);
     struct PINT_server_mirror_op *mir_p = &(s_op->u.mirror);
-    write_job_t *jobs = mir_p->jobs;
+    write_job_t *jobs __attribute__ ((unused)) = mir_p->jobs;
     int i,ret;
     job_id_t job_id;
 

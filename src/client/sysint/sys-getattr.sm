@@ -482,7 +482,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
             uint32_t dirent_file_count_i;
             uint32_t dirent_sid_count_i;
             int tmp_i;
-            unsigned char *c;
+            unsigned char *c GCC_UNUSED;
 
             gossip_debug(GOSSIP_GETATTR_DEBUG, "DIRECTORY\n");
 
@@ -2121,7 +2121,7 @@ static PINT_sm_action getattr_client_capcache_insert(struct PINT_smcb *smcb,
                                                      job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret;
+    int ret GCC_UNUSED;
     PVFS_uid local_uid;
 
     gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);

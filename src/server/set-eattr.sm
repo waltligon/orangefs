@@ -116,7 +116,7 @@ static int seteattr_verify_eattribs(struct PINT_smcb *smcb, job_status_s *js_p)
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Current Frame Pointer in set-eattr.sm "
                                      "is %p.\n",s_op);       
 
-    PVFS_object_attr *a_p = NULL;
+    PVFS_object_attr *a_p GCC_UNUSED = NULL;
     a_p = &s_op->attr;
 
     js_p->error_code = 0;
@@ -150,24 +150,22 @@ static int seteattr_verify_eattribs(struct PINT_smcb *smcb, job_status_s *js_p)
     }
 
     /* iterate through the keys that are being written */
-    int j = 0;
-    char *valBuf = NULL;
     for (i = 0; i < s_op->req->u.seteattr.nkey; i++)
     {
 #ifndef GOSSIP_DISABLE_DEBUG
-        if (gossip_debug_on)
+        gossip_if (GOSSIP_MIRROR_DEBUG)
         {
-            gossip_debug(GOSSIP_MIRROR_DEBUG
-                    ,"\tkey:%s\n"
-                    ,(char *)s_op->req->u.seteattr.key[i].buffer);
+            int j GCC_UNUSED = 0;
+            char *valBuf GCC_UNUSED = NULL;
+            gossip_log("\tkey:%s\n",
+                       (char *)s_op->req->u.seteattr.key[i].buffer);
             valBuf = (char *)s_op->req->u.seteattr.val[i].buffer;
             for (j = 0; j < s_op->req->u.seteattr.val[i].buffer_sz; j++)
             {
-                gossip_debug(GOSSIP_MIRROR_DEBUG,"\tval[%d]=%#x\n"
-                                            ,j
-                                            ,(unsigned int)valBuf[j]);
+                gossip_log("\tval[%d]=%#x\n", j, (unsigned int)valBuf[j]);
             }
         }
+        gossip_end;
 #endif
         js_p->error_code = PINT_eattr_namespace_verify(
                                       &s_op->req->u.seteattr.key[i],

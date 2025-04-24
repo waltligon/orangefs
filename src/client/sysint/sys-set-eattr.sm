@@ -84,7 +84,7 @@ PVFS_error PVFS_isys_seteattr_list(PVFS_object_ref ref,
     if(gossip_debug_enabled(GOSSIP_SETEATTR_DEBUG))
     {
         int i = 0;
-        int j; char *valBuf = (char *)val_array[i].buffer;
+        int j; char *valBuf GCC_UNUSED = (char *)val_array[i].buffer;
         gossip_debug(GOSSIP_SETEATTR_DEBUG,"Setting extended attributes:\n");
         for(; i < nkey; ++i)
         {
