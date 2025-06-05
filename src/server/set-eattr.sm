@@ -113,7 +113,7 @@ static int seteattr_verify_eattribs(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i; 
 
-    gossip_debug(GOSSIP_MIRROR_DEBUG,"Current Frame Pointer in set-eattr.sm "
+    gossip_lsdebug(GOSSIP_MIRROR_DEBUG,"Current Frame Pointer in set-eattr.sm "
                                      "is %p.\n",s_op);       
 
     PVFS_object_attr *a_p GCC_UNUSED = NULL;
@@ -121,7 +121,7 @@ static int seteattr_verify_eattribs(struct PINT_smcb *smcb, job_status_s *js_p)
 
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_SETEATTR_DEBUG,
+    gossip_lsdebug(GOSSIP_SETEATTR_DEBUG,
                  "  ext attr list write to handle %s refers to a %s\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
                  PVFS_OID_str(&s_op->req->u.seteattr.handle),
@@ -157,12 +157,12 @@ static int seteattr_verify_eattribs(struct PINT_smcb *smcb, job_status_s *js_p)
         {
             int j GCC_UNUSED = 0;
             char *valBuf GCC_UNUSED = NULL;
-            gossip_log("\tkey:%s\n",
+            gossip_adebug("\tkey:%s\n",
                        (char *)s_op->req->u.seteattr.key[i].buffer);
             valBuf = (char *)s_op->req->u.seteattr.val[i].buffer;
             for (j = 0; j < s_op->req->u.seteattr.val[i].buffer_sz; j++)
             {
-                gossip_log("\tval[%d]=%#x\n", j, (unsigned int)valBuf[j]);
+                gossip_adebug("\tval[%d]=%#x\n", j, (unsigned int)valBuf[j]);
             }
         }
         gossip_end;

@@ -368,19 +368,22 @@ static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask);
 
 #define DEBUG_attr_mask(m)                                         \
         do {                                                       \
-            gossip_log("DEBUG_attr_mask called by %s"              \
-                  " in %s at line %d with mask (%p)\n",            \
-                   __func__, __FILE__, __LINE__, &(m));            \
-            __DEBUG_ATTR_MASK(m);                                  \
+            if(gossip_debug_enabled(GOSSIP_ATTRMASK_DEBUG))        \
+            {                                                      \
+                gossip_log("DEBUG_attr_mask called by %s"          \
+                      " in %s at line %d with mask (%p)\n",        \
+                       __func__, __FILE__, __LINE__, &(m));        \
+                __DEBUG_ATTR_MASK(m);                              \
+            }                                                      \
         } while (0)
 
 #define PINT_attrmask_print(debug_mask, m)                         \
         do {                                                       \
-            gossip_log("PINT_attrmask_print called by %s"          \
-                  " in %s at line %d with mask (%p)\n",            \
-                   __func__, __FILE__, __LINE__, &(m));            \
             if(gossip_debug_enabled(debug_mask))                   \
             {                                                      \
+                gossip_log("PINT_attrmask_print called by %s"      \
+                      " in %s at line %d with mask (%p)\n",        \
+                       __func__, __FILE__, __LINE__, &(m));        \
                 __DEBUG_ATTR_MASK(m);                              \
             }                                                      \
         } while (0)
@@ -391,66 +394,63 @@ static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask);
 static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask)
 {
     /* for now we manually turn this on and off - should add a gossip flag */
-    #if 1
-
-    MASKDEBUG(PVFS_ATTR_COMMON_UID,               "COMMON_UID\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_GID,               "COMMON_GID\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_PERM,              "COMMON_PERM\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_ATIME,             "COMMON_ATIME\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_CTIME,             "COMMON_CTIME\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_MTIME,             "COMMON_MTIME\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_NTIME,             "COMMON_NTIME\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_TYPE,              "COMMON_TYPE (OBJ)\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_ATIME_SET,         "COMMON_ATIME_SET\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_CTIME_SET,         "COMMON_CTIME_SET\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_MTIME_SET,         "COMMON_MTIME_SET\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_PARENT,            "COMMON_PARENT\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_SID_COUNT,         "COMMON_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_META_DIST,                "META_DIST\n");
-    MASKDEBUG(PVFS_ATTR_META_DIST_SIZE,           "META_DIST_SIZE\n");
-/**/MASKDEBUG(PVFS_ATTR_META_DFILES,              "META_DFILES\n");
-    MASKDEBUG(PVFS_ATTR_META_DFILE_COUNT,         "META_DFILE_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_META_SID_COUNT,           "META_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_META_MIRROR_MODE,         "META_MIRROR\n");
-    MASKDEBUG(PVFS_ATTR_META_SIZE,                "META_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_META_FLAGS,               "META_FLAGS\n");
-    MASKDEBUG(PVFS_ATTR_DATA_SIZE,                "DATA_SIZE\n");
-/**/MASKDEBUG(PVFS_ATTR_SYMLNK_TARGET,            "SYMLINK_TARGET\n");
-    MASKDEBUG(PVFS_ATTR_DIR_DIRENT_COUNT,         "DIR_DIRENT_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_NAME_LEN,   "DIR_HINT_DIST_NAME_LEN\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN, "DIR_HINT_DIST_PARAMS_LEN\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DFILE_COUNT,     "DIR_HINT_DFILE_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_SID_COUNT,       "DIR_HINT_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_LAYOUT,          "DIR_HINT_LAYOUT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIRDATA_MIN,     "DIR_HINT_DIRDATA_MIN\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIRDATA_MAX,     "DIR_HINT_DIRDATA_MAX\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_SPLIT_SIZE,      "DIR_HINT_SPLIT_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIR_LAYOUT,      "DIR_HINT_DIR_LAYOUT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_TREE_HEIGHT,          "DIR_TREE_HEIGHT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_MIN,          "DIR_DIRDATA_MIN\n");
-    MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_MAX,          "DIR_DIRDATA_MAX\n");
-    MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_COUNT,        "DIR_DIRDATA_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_SID_COUNT,            "DIR_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_BITMAP_SIZE,          "DIR_BITMAP_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIR_SPLIT_SIZE,           "DIR_SPLIT_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIR_SERVER_NO,            "DIR_SERVER_NO\n");
-    MASKDEBUG(PVFS_ATTR_DIR_BRANCH_LEVEL,         "DIR_BRANCH_LEVEL\n");
-/**/MASKDEBUG(PVFS_ATTR_DIR_DIRDATA,              "DIR_DIRDATA\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT,                 "DIR_HINT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRENT_COUNT,     "DIRDATA_DIRENT_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_TREE_HEIGHT,      "DIRDATA_TREE_HEIGHT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_MIN,      "DIRDATA_DIRDATA_MIN\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_MAX,      "DIRDATA_DIRDATA_MAX\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_COUNT,    "DIRDATA_DIRDATA_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_SID_COUNT,        "DIRDATA_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_BITMAP_SIZE,      "DIRDATA_BITMAP_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_SPLIT_SIZE,       "DIRDATA_SPLIT_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_SERVER_NO,        "DIRDATA_SERVER_NO\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_BRANCH_LEVEL,     "DIRDATA_BRANCH_LEVEL\n");
-/**/MASKDEBUG(PVFS_ATTR_CAPABILITY,               "CAPABILITY\n");
-    MASKDEBUG(PVFS_ATTR_FASTEST,                  "FASTEST\n");
-    MASKDEBUG(PVFS_ATTR_LATEST,                   "LATEST\n");
-    #endif
+        MASKDEBUG(PVFS_ATTR_COMMON_UID,               "COMMON_UID\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_GID,               "COMMON_GID\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_PERM,              "COMMON_PERM\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_ATIME,             "COMMON_ATIME\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_CTIME,             "COMMON_CTIME\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_MTIME,             "COMMON_MTIME\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_NTIME,             "COMMON_NTIME\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_TYPE,              "COMMON_TYPE (OBJ)\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_ATIME_SET,         "COMMON_ATIME_SET\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_CTIME_SET,         "COMMON_CTIME_SET\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_MTIME_SET,         "COMMON_MTIME_SET\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_PARENT,            "COMMON_PARENT\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_SID_COUNT,         "COMMON_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_META_DIST,                "META_DIST\n");
+        MASKDEBUG(PVFS_ATTR_META_DIST_SIZE,           "META_DIST_SIZE\n");
+    /**/MASKDEBUG(PVFS_ATTR_META_DFILES,              "META_DFILES\n");
+        MASKDEBUG(PVFS_ATTR_META_DFILE_COUNT,         "META_DFILE_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_META_SID_COUNT,           "META_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_META_MIRROR_MODE,         "META_MIRROR\n");
+        MASKDEBUG(PVFS_ATTR_META_SIZE,                "META_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_META_FLAGS,               "META_FLAGS\n");
+        MASKDEBUG(PVFS_ATTR_DATA_SIZE,                "DATA_SIZE\n");
+    /**/MASKDEBUG(PVFS_ATTR_SYMLNK_TARGET,            "SYMLINK_TARGET\n");
+        MASKDEBUG(PVFS_ATTR_DIR_DIRENT_COUNT,         "DIR_DIRENT_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_NAME_LEN,   "DIR_HINT_DIST_NAME_LEN\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN, "DIR_HINT_DIST_PARAMS_LEN\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DFILE_COUNT,     "DIR_HINT_DFILE_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_SID_COUNT,       "DIR_HINT_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_LAYOUT,          "DIR_HINT_LAYOUT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIRDATA_MIN,     "DIR_HINT_DIRDATA_MIN\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIRDATA_MAX,     "DIR_HINT_DIRDATA_MAX\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_SPLIT_SIZE,      "DIR_HINT_SPLIT_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIR_LAYOUT,      "DIR_HINT_DIR_LAYOUT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_TREE_HEIGHT,          "DIR_TREE_HEIGHT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_MIN,          "DIR_DIRDATA_MIN\n");
+        MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_MAX,          "DIR_DIRDATA_MAX\n");
+        MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_COUNT,        "DIR_DIRDATA_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_SID_COUNT,            "DIR_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_BITMAP_SIZE,          "DIR_BITMAP_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIR_SPLIT_SIZE,           "DIR_SPLIT_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIR_SERVER_NO,            "DIR_SERVER_NO\n");
+        MASKDEBUG(PVFS_ATTR_DIR_BRANCH_LEVEL,         "DIR_BRANCH_LEVEL\n");
+    /**/MASKDEBUG(PVFS_ATTR_DIR_DIRDATA,              "DIR_DIRDATA\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT,                 "DIR_HINT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_DIRENT_COUNT,     "DIRDATA_DIRENT_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_TREE_HEIGHT,      "DIRDATA_TREE_HEIGHT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_MIN,      "DIRDATA_DIRDATA_MIN\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_MAX,      "DIRDATA_DIRDATA_MAX\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_COUNT,    "DIRDATA_DIRDATA_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_SID_COUNT,        "DIRDATA_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_BITMAP_SIZE,      "DIRDATA_BITMAP_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_SPLIT_SIZE,       "DIRDATA_SPLIT_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_SERVER_NO,        "DIRDATA_SERVER_NO\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_BRANCH_LEVEL,     "DIRDATA_BRANCH_LEVEL\n");
+    /**/MASKDEBUG(PVFS_ATTR_CAPABILITY,               "CAPABILITY\n");
+        MASKDEBUG(PVFS_ATTR_FASTEST,                  "FASTEST\n");
+        MASKDEBUG(PVFS_ATTR_LATEST,                   "LATEST\n");
 }
 
 #undef MASKDEBUG

@@ -661,7 +661,7 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
 
     if(s_op->req)
     {
-        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "op:%d client:%d, reqid:%d, rank:%d\n",
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "op %d hints:client %d, reqid %d, rank %d\n",
                      s_op->req->op,
                      PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                      PINT_HINT_GET_REQUEST_ID(s_op->req->hints),

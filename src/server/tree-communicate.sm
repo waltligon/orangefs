@@ -1881,7 +1881,7 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
      * use tree_get_dirent_count on the same frame!  resp is looking
      * at the resp area on the s_op, was a getattr resp a moment ago.
      * Could push a whole new frame, or stash the resp somewhere while
-     * the tree does its thing.
+     * the tree does its thing. PUSH A DUP FRAME to fix this so ...
      *
      * Now this is a new frame with a new resp area - it still has
      * whatever getattr wrote in it, but writes now will not change
@@ -1998,24 +1998,39 @@ static int tree_get_dirent_count_comp_fn(void *v_p,
     return 0;
 } /* tree_get_dirent_count_completion_function */
 
+/* tree_get_dirent_count_cleanup
+ * We have just returned from the tree pjmp
+ * We are about to return from a jump
+ * The data is in our current frame, and needs to be
+ * migrated back.  That could be done here or in 
+ * "check_if_capability_required" which seems out
+ * of place, so I'm going to try it here.
+ */
 static int tree_get_dirent_count_cleanup(struct PINT_smcb *smcb,
                                          job_status_s *js_p)
 {
-   PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-   struct PVFS_servresp_tree_get_dirent_count *s_tree =
-                         &(s_op->resp.u.tree_get_dirent_count);
+    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_server_op *p_op = PINT_sm_frame(smcb, PINT_FRAME_PARENT);
 
-   /*cleanup response structure*/
-   if (s_tree->dentcnt)
-   {
-       free(s_tree->dentcnt);
-   }
-   if (s_tree->error)
-   {
-       free(s_tree->error);
-   }
+    p_op->resp.u.getattr.attr.u.dir.dirent_count =
+            s_op->resp.u.getattr.attr.u.dir.dirent_count;
 
-   return(server_state_machine_complete(smcb));
+    /*cleanup response structure*/
+#if 0
+    struct PVFS_servresp_tree_get_dirent_count *s_tree =
+                          &(s_op->resp.u.tree_get_dirent_count);
+
+    if (s_tree->dentcnt)
+    {
+        free(s_tree->dentcnt);
+    }
+    if (s_tree->error)
+    {
+        free(s_tree->error);
+    }
+#endif
+ 
+    return(server_state_machine_complete(smcb));
 }
 
 /* remove frames pushed to start the tasks of the PJMP.
@@ -2026,7 +2041,25 @@ static int tree_get_dirent_count_cleanup(struct PINT_smcb *smcb,
 static PINT_sm_action tree_get_dirent_count_work_cleanup(struct PINT_smcb *smcb,
                                                          job_status_s *js_p)
 {
-    return PINT_sm_pop_old_pjmp_frames(smcb, smcb->pjmp_frame_count);
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *p_op = PINT_sm_frame(smcb, PINT_FRAME_PARENT);
+    int ret = 0;
+    /* Transfer tree data to parent, then remove pjmp frames
+     */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "adding dirent_count %ld (%p) to parent frame %ld (%p)\n",
+                   s_op->resp.u.getattr.attr.u.dir.dirent_count,
+                   s_op,
+                   p_op->resp.u.getattr.attr.u.dir.dirent_count,
+                   p_op);
+
+    /* finished correctly - add dirent_count to parent frame */
+    p_op->resp.u.getattr.attr.u.dir.dirent_count +=
+                   s_op->resp.u.getattr.attr.u.dir.dirent_count;
+
+    ret = PINT_sm_pop_old_pjmp_frames(smcb, smcb->pjmp_frame_count);
+
+    return ret;
 }
 
 /*--------------------------------------------------------------------------*/

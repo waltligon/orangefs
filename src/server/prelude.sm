@@ -152,8 +152,8 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: sreq_sche\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+                   "s_op (%p) %s (prelude sm) state: sreq_sche\n", s_op,
+                   PINT_map_server_op_to_string(s_op->req->op));
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "\tbase frame:%d\tframe count:%d\n",
                    smcb->base_frame, smcb->frame_count);
@@ -188,7 +188,7 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Prelude gets fs_id = %d "
-                   "handle = %s\n access = %d sched = %d\n", 
+                   "handle = %s access = %d sched = %d\n", 
                    s_op->target_fs_id, PVFS_OID_str(&s_op->target_handle),
                    s_op->access_type, s_op->sched_policy);
 
@@ -259,7 +259,8 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
     }
     else
     {
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "job posted to scheduler\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "job NOT posted to scheduler due to flag\n");
         return SM_ACTION_COMPLETE;;
     }
     return ret;
@@ -280,8 +281,8 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+                   "s_op (%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
+                   PINT_map_server_op_to_string(s_op->req->op));
 
     /* if the handle is 0, that indicates that the request does not
      * operate on a specific handle, so there is nothing we can do
@@ -290,7 +291,7 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     if (!PVFS_OID_cmp(&s_op->target_handle, &PVFS_HANDLE_NULL))
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                     "Null handle - prelude bypass getattr\n");
+                       "Null handle - prelude bypass getattr\n");
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -299,7 +300,7 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     if (s_op->req->op == PVFS_SERV_MKDIR || s_op->req->op == PVFS_SERV_CREATE)
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                     "Creating new object - prelude bypass getattr\n");
+                       "Creating new object - prelude bypass getattr\n");
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -310,7 +311,7 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                   "About to retrieve attributes for handle %s\n",
+                   "About to retrieve attributes for local handle %s\n",
                    PVFS_OID_str(&s_op->target_handle));
 
     ret = job_trove_dspace_getattr(s_op->target_fs_id,
@@ -339,7 +340,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     DECLARE_PROFILER(profiler);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: prelude_validate\n", s_op,
+                 "s_op (%p) %s (prelude sm)\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
 
     /* Profile validate operation */

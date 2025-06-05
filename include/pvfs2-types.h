@@ -402,11 +402,11 @@ void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
 typedef enum
 {
     PVFS_TYPE_NONE =              0,
-    PVFS_TYPE_METAFILE =    (1 << 0),
-    PVFS_TYPE_DATAFILE =    (1 << 1),
-    PVFS_TYPE_DIRECTORY =   (1 << 2),
-    PVFS_TYPE_SYMLINK =     (1 << 3),
-    PVFS_TYPE_DIRDATA =     (1 << 4),
+    PVFS_TYPE_METAFILE =    (1 << 0), /* 1 */
+    PVFS_TYPE_DATAFILE =    (1 << 1), /* 2 */
+    PVFS_TYPE_DIRECTORY =   (1 << 2), /* 4 */
+    PVFS_TYPE_SYMLINK =     (1 << 3), /* 8 */
+    PVFS_TYPE_DIRDATA =     (1 << 4), /* 16 */
     PVFS_TYPE_INTERNAL =    (1 << 5)   /* for the server's private use */
 } PVFS_ds_type;
 #define PVFS_DS_TYPE_COUNT      7      /* total number of DS types defined in

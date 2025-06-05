@@ -668,7 +668,7 @@ struct PINT_server_tree_communicate_op
     int handle_index;
     int local_index;              /* tells each task which handle to use */
     int remote_index;
-    PVFS_ds_attributes ds_attr;   /* used in tree op for multiple jobs */
+    PVFS_ds_attributes ds_attr;   /* getattr puts results here - not req */
     job_id_t tmp_id;              /* used in tree op for multiple jobs */
     int dirent_count;             /* targets for tree operations */
     int file_size;

@@ -40,6 +40,9 @@
  * function.  See src/server/server-state-machine.c for examples.
  */
 
+/* these are state runtime control that directs each state in
+ * executing.  Most common are RUN, JUMP, PJMP and SWITCH
+ */
 enum PINT_state_code {
     SM_NONE   = 0,
     SM_NEXT   = 1,
@@ -108,7 +111,7 @@ typedef struct PINT_smcb
     /* usage specific routine to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int, int);
     /* state machine context and control variables */
-    int op; /* this field externally indicates type of state machine */
+    int op; /* this field externally indicates type of state machine/request */
     PVFS_id_gen_t op_id; /* unique ID for this operation */
     struct PINT_smcb *parent_smcb; /* points to parent smcb or NULL */
     int op_terminate; /* indicates SM is ready to terminate */

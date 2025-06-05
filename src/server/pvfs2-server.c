@@ -451,7 +451,7 @@ int main(int argc, char **argv)
     {
         int i, comp_ct = PVFS_SERVER_TEST_COUNT;
 
-        gossip_ldebug(GOSSIP_SERVER_DEBUG, "waiting for next group of jobs\n");
+        gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG, "waiting for next group of jobs\n");
 
         if (signal_recvd_flag != 0)
         {
@@ -505,7 +505,7 @@ int main(int argc, char **argv)
          * Loop through the completed jobs, handle whatever comes next
          */
         for (i = 0; i < comp_ct; i++) {
-            gossip_ldebug(GOSSIP_SERVER_DEBUG,
+            gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG,
                           "Running next job on the list i %d comp_ct %d\n",
                           i, comp_ct);
             
@@ -514,7 +514,7 @@ int main(int argc, char **argv)
             {
                 PINT_smcb *smcb __attribute__ ((unused)) =
                                 server_completed_job_p_array[s];
-                gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG,
+                gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG,
                               "Job smcb on the list (%p)\n", smcb); }}
 
             /* int unexpected_msg = 0; */

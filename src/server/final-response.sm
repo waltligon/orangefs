@@ -155,9 +155,28 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
                    s_op->decoded.enc_type);
     
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
-	           "s_op (%p) %s (FR sm) state send_resp (status = %d)\n",
-	           s_op, PINT_map_server_op_to_string(s_op->resp.op),
+	           "s_op (%p) resp (%p) %s (FR sm) (status = %d)\n",
+	           s_op, &s_op->resp,
+                   PINT_map_server_op_to_string(s_op->resp.op),
 	           s_op->resp.status);
+
+    if (s_op->resp.op == 4) /* getattr */
+    {
+        if (s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
+        {
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                           "file_size %ld object type %d\n",
+                           s_op->resp.u.getattr.attr.u.meta.size,
+                           s_op->resp.u.getattr.attr.objtype);
+        }
+        else /* assume it is a directory */
+        {
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                           "dirent_count %ld object type %d\n",
+                           s_op->resp.u.getattr.attr.u.dir.dirent_count,
+                           s_op->resp.u.getattr.attr.objtype);
+        }
+    }
 
     if (js_p->error_code != 0)
     {

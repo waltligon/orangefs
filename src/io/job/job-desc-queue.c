@@ -124,7 +124,7 @@ void job_desc_q_add(job_desc_q_p jdqp,
     if (jdqp)
     {
         assert(desc);
-        gossip_ldebug(GOSSIP_JOB_DEBUG, "adding (%p)-(%p)\n", desc, desc->job_user_ptr);
+        gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG, "adding (%p)-(%p)\n", desc, desc->job_user_ptr);
 
         /* note that we are adding to tail to preserve fifo order */
         qlist_add_tail(&(desc->job_desc_q_link), jdqp);
@@ -140,7 +140,7 @@ void job_desc_q_add(job_desc_q_p jdqp,
 void job_desc_q_remove(struct job_desc *desc)
 {
     assert(desc);  
-    gossip_ldebug(GOSSIP_JOB_DEBUG, "removing (%p)-(%p)\n", desc, desc->job_user_ptr);
+    gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG, "removing (%p)-(%p)\n", desc, desc->job_user_ptr);
     qlist_del(&(desc->job_desc_q_link));
 }
 

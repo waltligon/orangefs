@@ -4336,7 +4336,7 @@ int job_testcontext(job_id_t *out_id_array_p,
     /*int original_count = *inout_count_p;*/
     int pthread_ret = -1;
 
-    gossip_ldebug(GOSSIP_JOB_DEBUG, "THREADED VERSION\n");
+    gossip_ldebug(GOSSIP_JOB_DEBUG, "THREADED VERSION of Testcontext\n");
 
     /* use this as a chance to do a cheap test on the request
      * scheduler
@@ -4371,7 +4371,11 @@ int job_testcontext(job_id_t *out_id_array_p,
 
     gossip_ldebug(GOSSIP_JOB_DEBUG, "Calling completion_query_context\n");
 
-    job_desc_q_dump(completion_queue_array[context_id]);
+        gossip_if(GOSSIP_SM_JOBQ_DEBUG)
+        {
+            job_desc_q_dump(completion_queue_array[context_id]);
+        }
+        gossip_end;
 
     while(((ret = completion_query_context(
                              out_id_array_p,
@@ -4384,8 +4388,12 @@ int job_testcontext(job_id_t *out_id_array_p,
         gossip_ldebug(GOSSIP_JOB_DEBUG,
                       "completion_query_context return inout_count_p %d\n",
                       *inout_count_p);
-
-        job_desc_q_dump(completion_queue_array[context_id]);
+ 
+        gossip_if(GOSSIP_SM_JOBQ_DEBUG)
+        {
+            job_desc_q_dump(completion_queue_array[context_id]);
+        }
+        gossip_end;
 
         /**inout_count_p = original_count;*/
 
@@ -4465,7 +4473,11 @@ int job_testcontext(job_id_t *out_id_array_p,
      */
     gen_mutex_lock(&completion_mutex);
 
-    job_desc_q_dump(completion_queue_array[context_id]);
+        gossip_if(GOSSIP_SM_JOBQ_DEBUG)
+        {
+            job_desc_q_dump(completion_queue_array[context_id]);
+        }
+        gossip_end;
 
     gossip_ldebug(GOSSIP_JOB_DEBUG, "Calling completion_query_context\n");
     ret = completion_query_context(out_id_array_p,
@@ -4478,7 +4490,11 @@ int job_testcontext(job_id_t *out_id_array_p,
                   "completion_query_context return inout_count_p %d\n",
                   *inout_count_p);
 
-    job_desc_q_dump(completion_queue_array[context_id]);
+        gossip_if(GOSSIP_SM_JOBQ_DEBUG)
+        {
+            job_desc_q_dump(completion_queue_array[context_id]);
+        }
+        gossip_end;
 
     gen_mutex_unlock(&completion_mutex);
     /* return here on error or completion */
@@ -5091,7 +5107,7 @@ static int completion_query_context(job_id_t *out_id_array_p,
     {
         assert(query);
 
-        gossip_ldebug(GOSSIP_JOB_DEBUG, "found job on q\n");
+        gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG, "found job on q\n");
 
         if (returned_user_ptr_array)
         {
@@ -5118,7 +5134,7 @@ static int completion_query_context(job_id_t *out_id_array_p,
         }
         else
         {
-            gossip_ldebug(GOSSIP_JOB_DEBUG, "dealloc_job_desc(%p)\n",
+            gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG, "dealloc_job_desc(%p)\n",
                           query);
             dealloc_job_desc(query);
             query = NULL;

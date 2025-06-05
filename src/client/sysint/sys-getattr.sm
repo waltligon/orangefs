@@ -339,11 +339,10 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     PVFS_object_attr *attr = NULL;
     PINT_smcb *smcb = v_p;
     PINT_smcb *parent_smcb = smcb->parent_smcb;
-    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
+    PINT_client_sm *psm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "(%p)\n", sm_p);
-
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "---------- OBJECT GETATTR COMP_FN\n");
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                   "(%p) ----- OBJECT GETATTR COMP_FN\n", psm_p);
 
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
@@ -357,11 +356,12 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      * then we can make a copy of the retrieved attribute for later
      * caching.
      */
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "Copy to sm_p->getattr.attr from resp\n");
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Copy to psm_p->getattr.attr from resp\n");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, resp_p->u.getattr.attr.mask);
 
-    PINT_copy_object_attr(&sm_p->getattr.attr, &resp_p->u.getattr.attr);
+    PINT_copy_object_attr(&psm_p->getattr.attr, &resp_p->u.getattr.attr);
 
-    attr = &sm_p->getattr.attr;  /* returned atributes */
+    attr = &psm_p->getattr.attr;  /* returned atributes */
 
     /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
      * a -PVFS_error will be triggered if the
@@ -370,22 +370,22 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      * can avoid issuing an operation to the server since the server will 
      * just pass an error back anyway.
      */
-    if(sm_p->getattr.ref_type && sm_p->getattr.ref_type != attr->objtype)
+    if(psm_p->getattr.ref_type && psm_p->getattr.ref_type != attr->objtype)
     {
         int ret;
         gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "ref_type = %d objtype = %d\n",
-                       sm_p->getattr.ref_type, attr->objtype);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "Object type mismatch.\n Possibly "
-                     "saving network roundtrip by returning an error\n");
+                       psm_p->getattr.ref_type, attr->objtype);
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                       "Object type mismatch.\n Possibly "
+                       "saving network roundtrip by returning an error\n");
 
-        if (sm_p->getattr.ref_type == PVFS_TYPE_DIRECTORY)
+        if (psm_p->getattr.ref_type == PVFS_TYPE_DIRECTORY)
         {
             ret = -PVFS_ENOTDIR;
         }
         else
         {
-            assert(sm_p->getattr.ref_type == PVFS_TYPE_METAFILE);
+            assert(psm_p->getattr.ref_type == PVFS_TYPE_METAFILE);
             ret = ((attr->objtype == PVFS_TYPE_DIRECTORY) ?
                    -PVFS_EISDIR : -PVFS_EBADF);
         }
@@ -400,8 +400,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     switch (attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "METAFILE\n");
-            if (sm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "METAFILE\n");
+            if (psm_p->msgarray_op.msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DIST)
             {
                 /* if we requested distribution attrs, did the distribution 
@@ -440,9 +440,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 assert(attr->u.meta.dfile_array &&
                        (attr->u.meta.dfile_count > 0));
 
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                             "getattr_object_getattr_comp_fn: "
-                             "%d datafiles.\n", attr->u.meta.dfile_count);
+                gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                               "getattr_object_getattr_comp_fn: "
+                               "%d datafiles.\n", attr->u.meta.dfile_count);
                 
                 /* if we need the size, that should be the only time we're 
                  * going to have to do a full data file fetch. 
@@ -470,7 +470,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                      * to jump to the datafile_getattr state, which
                      * will retrieve the datafile sizes for us.
                      */
-                    if (sm_p->getattr.req_attrmask & PVFS_ATTR_LATEST)
+                    if (psm_p->getattr.req_attrmask & PVFS_ATTR_LATEST)
                     {
                         return GETATTR_NEED_DATAFILE_ATTRS;
                     }
@@ -484,12 +484,12 @@ static int getattr_object_getattr_comp_fn(void *v_p,
             int tmp_i;
             unsigned char *c GCC_UNUSED;
 
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "DIRECTORY\n");
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "DIRECTORY\n");
 
-            if (gossip_debug_enabled(GOSSIP_GETATTR_DEBUG))
+            gossip_if(GOSSIP_GETATTR_DEBUG)
             {
                 /* dirent_count will be collected later */
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
+                gossip_adebug(
                     "getattr comp_fn [%p] "
                     "dfile_count(hint) = %d "
                     "dfile_sid_count(hint) = %d "
@@ -503,7 +503,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
                 if(1 /* && attr->mask & PVFS_ATTR_DISTDIR_ATTR */)
                 {
-                    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                    gossip_adebug(
                            "sys-getattr: dist-dir-attr "
                            "with tree_height=%d, dirdata_count=%d, "
                            "sid_count=%d, bitmap_size=%d, "
@@ -517,8 +517,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                            attr->u.dir.dist_dir_attr.branch_level);
 
                     /* gossip bitmap */
-                    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "sys-getattr: dist_dir_bitmap:\n");
+                    gossip_adebug("sys-getattr: dist_dir_bitmap:\n");
 
                     for(tmp_i = attr->u.dir.dist_dir_attr.bitmap_size - 1;
                         tmp_i >= 0;
@@ -533,60 +532,63 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                     gossip_debug(GOSSIP_GETATTR_DEBUG, "\n");
 
                     /* gossip dirdata handles */
-                    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "sys-getattr: dirdata_handles:\n");
+                    gossip_adebug("sys-getattr: dirdata_handles:\n");
                     for (dirent_file_count_i = 0;
                          dirent_file_count_i < 
                                      attr->u.dir.dist_dir_attr.dirdata_count;
                          dirent_file_count_i++)
                     {
-                        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                                "    dirdata_handle[%d] = %s\n",
-                                dirent_file_count_i,
-                                PVFS_OID_str(&attr->u.dir.dirdata_handles[
+                        gossip_adebug("    dirdata_handle[%d] = %s\n",
+                                   dirent_file_count_i,
+                                   PVFS_OID_str(&attr->u.dir.dirdata_handles[
                                                         dirent_file_count_i]));
                     }
                     /* gossip dirdata sids */
-                    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "sys-getattr: dirdata_sids:\n");
+                    gossip_adebug("sys-getattr: dirdata_sids:\n");
                     for (dirent_sid_count_i = 0;
                          dirent_sid_count_i < 
                                      attr->u.dir.dist_dir_attr.sid_count;
                          dirent_sid_count_i++)
                     {
-                        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                                "    dirdata_sid[%d] = %s\n",
-                                dirent_sid_count_i,
-                                PVFS_SID_str(&attr->u.dir.dirdata_sids[
+                        gossip_adebug("    dirdata_sid[%d] = %s\n",
+                                   dirent_sid_count_i,
+                                   PVFS_SID_str(&attr->u.dir.dirdata_sids[
                                                         dirent_sid_count_i]));
                     }
                 }
 
                 /* need to gather dirdata attr */
-                if (sm_p->getattr.req_attrmask & PVFS_ATTR_LATEST)
+                /* I don't think this should be here
+                 * I think the getattr can get the dirent count
+                 * on its own and return it with everything else
+                 * by passing this flag
+                 */
+                /*
+                if (psm_p->getattr.req_attrmask & PVFS_ATTR_LATEST)
                 {
-                    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            "  !!! need to contact dirdata to gather "
-                            "dirent_count and timestamps!\n");
+                    gossip_adebug("  !!! need to contact dirdata to gather "
+                               "dirent_count and timestamps!\n");
 
                     return GETATTR_NEED_DIRDATA_ATTRS;
 
                 }
+                */
             } /* if (gossip_enabled()) */
+            gossip_end;
 
             return 0;
         }
         case PVFS_TYPE_SYMLINK:
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "SYMLINK\n");
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "SYMLINK\n");
             return 0;
         case PVFS_TYPE_DATAFILE:
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "DATAFILE\n");
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "DATAFILE\n");
             return 0;
         case PVFS_TYPE_DIRDATA:
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "DIRDATA\n");
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "DIRDATA\n");
             return 0;
         case PVFS_TYPE_INTERNAL:
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "INTERNAL\n");
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "INTERNAL\n");
             return 0;
         default:
             gossip_err("error: getattr_object_getattr_comp_fn: "
@@ -1222,7 +1224,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     PINT_sm_msgpair_state *msg_p;
     PVFS_capability capability;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "sm_p (%p)\n", sm_p);
 
     js_p->error_code = 0;
 
@@ -1269,13 +1271,13 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
      * not the getattr call which should use GOSSIP_GETATTR_DEBUG, or
      * the combination (bitwise OR) of the two.
      */
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.req_attrmask);
+    PINT_attrmask_print(GOSSIP_ATTRMASK_DEBUG, sm_p->getattr.req_attrmask);
     sm_p->getattr.req_attrmask |= PVFS_ATTR_COMMON_ALL
                                | PVFS_ATTR_META_ALL
                                | PVFS_ATTR_DISTDIR_ATTR
                                | PVFS_ATTR_DIR_ALL
                                | PVFS_ATTR_CAPABILITY;
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.req_attrmask);
+    PINT_attrmask_print(GOSSIP_ATTRMASK_DEBUG, sm_p->getattr.req_attrmask);
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Fill in GETATTR request\n");
     /* setup the msgpair to do a getattr operation */
@@ -1301,14 +1303,17 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = getattr_object_getattr_comp_fn;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: fs_id: %d\n",
-                                       __func__, object_ref.fs_id);
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: handle: %s\n", __func__,
-                                       PVFS_OID_str(&object_ref.handle));
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: sid_count: %d\n",
-                                       __func__, object_ref.sid_count);
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: sid_array: %s\n", __func__,
-                                       PVFS_SID_str(&object_ref.sid_array[0]));
+    gossip_if(GOSSIP_GETATTR_DEBUG)
+    {
+        gossip_log("%s: fs_id: %d\n", __func__, object_ref.fs_id);
+        gossip_log("%s: handle: %s\n", __func__,
+                   PVFS_OID_str(&object_ref.handle));
+        gossip_log("%s: sid_count: %d\n",
+                   __func__, object_ref.sid_count);
+        gossip_log("%s: sid_array: %s\n", __func__,
+                   PVFS_SID_str(&object_ref.sid_array[0]));
+    }
+    gossip_end;
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
@@ -1317,8 +1322,10 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
         js_p->error_code = ret;
     }
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: exiting state action\n", __func__);
+    /* push empty frame for MPA */
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "exiting state action\n");
     return SM_ACTION_COMPLETE;
 }
 

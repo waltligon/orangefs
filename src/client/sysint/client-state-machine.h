@@ -702,6 +702,17 @@ typedef struct
     int32_t          dirdata_index; /* input parameter */
 } PINT_sm_readdir_state;
 
+/* There is potential confusion of op, and op_id which are totally
+ * different things.  The op_id (here sys_op_id) is a unique number
+ * given to each job invocation used to track the job - primarily
+ * to see if a job is done.  An "op" is a number used to indicate
+ * which request we are running, and thus which state machine
+ * to run.  The SMCB has a field for the op, as does the server's
+ * frame (s_op) but the client frame (sm_p) does not.  On the
+ * client when a new request is started the op is passed as an
+ * argument used to select the right SM.  Confusion comes as the
+ * op numerical values are different on the client and the server.
+ */
 typedef struct PINT_client_sm
 {
     /* this code removed and corresponding fields added to the generic
@@ -846,6 +857,8 @@ const char *PINT_client_get_name_str(int op_type);
 
 /* used with post call to tell the system what state machine to use
  * when processing a new PINT_client_sm structure.
+ * These aree nominally "op" values on the client.  The server
+ * values are different.
  */
 enum
 {

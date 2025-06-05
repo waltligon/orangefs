@@ -521,7 +521,7 @@ int client_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *js_p)
   completes.
 
   If the posted operation completes immediately, post will return 0,
-  and set the op_id to -1
+  and set the op_id to -1 -- why didn't we use the existing protocol?
 */
 
 /** Adds a state machine into the list of machines that are being
@@ -537,8 +537,9 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
     int pvfs_sys_op = PINT_smcb_op(smcb);
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_client_state_machine_post\n"
-                 "------------------------------------------------------------\n");
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "sm_p (%p), smcb->op %d pvfs_sys_op %d\n"
+                 "------------------------------------------------------------\n",
+                 sm_p, smcb->op, pvfs_sys_op);
 
     /* this checks sm_p and indirectly smcb */
     if (!sm_p)
@@ -547,7 +548,7 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
     }
 
     PVFS_hint_add_internal(&sm_p->hints,
-                           PINT_HINT_OP_ID,
+                           PINT_HINT_OP_ID, /* BAD HINT NAME! This is op, not op_id */
                            sizeof(pvfs_sys_op),
                            &pvfs_sys_op);
 
@@ -561,21 +562,21 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
                      PINT_HINT_GET_HANDLE(sm_p->hints),
                      pvfs_sys_op);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_client_state_machine_post smcb %p, op: %s\n",
-                 smcb, PINT_client_get_name_str(smcb->op));
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "smcb->op: %s\n",
+                   PINT_client_get_name_str(smcb->op));
 
     CLIENT_SM_ASSERT_INITIALIZED();
 
-    /* V3 weird place for this check, moved it up */
-#if 0
+    /* this makes no sense - if smcb is NULL this function would
+     * crash near the beginning.  So this if always fails and
+     * the hint is never "given back"
+     */
     if (!smcb)
     {
         /* give back the hint added above */
         PVFS_hint_free( &sm_p->hints );
         return ret;
     }
-#endif
 
     memset(&js, 0, sizeof(js));
 
@@ -616,12 +617,11 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
         /* free the smcb and any other extra data allocated there */
         PINT_sys_release_smcb(smcb);
 
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "Posted %s (%llu) (ran to termination)(%d)\n",
-                     PINT_client_get_name_str(pvfs_sys_op),
-                     llu((op_id ? *op_id : -1)),
-                     js.error_code);
-
+        gossip_lsdebug(GOSSIP_CLIENT_DEBUG,
+                       "Posted %s (%llu) (ran to termination)(%d)\n",
+                       PINT_client_get_name_str(pvfs_sys_op),
+                       llu((op_id ? *op_id : -1)),
+                       js.error_code);
     }
     else
     {
@@ -633,12 +633,10 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
             *op_id = sm_p->sys_op_id;
         }
 
-        gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "Posted %s (%lld) "
-                    "(waiting for test)(%d)\n",
-                    PINT_client_get_name_str(pvfs_sys_op),
-                    lld((op_id ? *op_id : -1)),
-                    ret);
+        gossip_lsdebug(GOSSIP_CLIENT_DEBUG,
+                       "Posted %s op_id %lld (waiting for test)\n",
+                       PINT_client_get_name_str(pvfs_sys_op),
+                       lld((op_id ? *op_id : -1)));
     }
     gen_mutex_unlock(&test_mutex);
     return js.error_code;
@@ -838,13 +836,12 @@ PVFS_error PINT_client_state_machine_test(PVFS_sys_op_id op_id,
 {
     int i = 0, job_count = 0;
     PVFS_error ret = -PVFS_EINVAL;
-    PINT_smcb *smcb, *tmp_smcb = NULL;
+    PINT_smcb *smcb = NULL, *tmp_smcb = NULL;
     PINT_client_sm *sm_p = NULL;
     job_id_t job_id_array[MAX_RETURNED_JOBS];
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *smcb_p_array[MAX_RETURNED_JOBS] = {NULL};
 
-    gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, "id %lld\n", lld(op_id));
 
     gen_mutex_lock(&test_mutex);
 
@@ -865,6 +862,12 @@ PVFS_error PINT_client_state_machine_test(PVFS_sys_op_id op_id,
         return ret;
     }
 
+    gossip_ldebug(GOSSIP_SM_TEST_DEBUG,
+                  "(%p) testing for op_id %lld\n", smcb, lld(op_id));
+
+    /* quick out - if smcb is done, don't run everything
+     * else but just return
+     */
     if (PINT_smcb_complete(smcb))
     {
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -873,15 +876,25 @@ PVFS_error PINT_client_state_machine_test(PVFS_sys_op_id op_id,
         return 0;
     }
 
+    /* we don't actually test this job specifically, but run
+     * everything that can run, and then check if the smcb
+     * has completed
+     */
+    gossip_ldebug(GOSSIP_SM_TEST_DEBUG,
+                  "(%p) Running everything else\n", smcb);
+
     ret = job_testcontext(job_id_array,
                           &job_count, /* in/out parameter */
                           smcb_p_array,
                           job_status_array,
-                          10,
+                          10, /* timeout in ms */
                           pint_client_sm_context);
+    /* FIXME - I don't think assert is appropriate here */
     assert(ret > -1);
 
     /* do as much as we can on every job that has completed */
+    gossip_ldebug(GOSSIP_SM_TEST_DEBUG,
+                  "(%p) Running %d jobs\n", smcb, job_count);
     for(i = 0; i < job_count; i++)
     {
         tmp_smcb = (PINT_smcb *)smcb_p_array[i];
@@ -889,27 +902,50 @@ PVFS_error PINT_client_state_machine_test(PVFS_sys_op_id op_id,
 
         if (PINT_smcb_invalid_op(tmp_smcb))
         {
-            gossip_err("Invalid sm control block op %d\n",
-                       PINT_smcb_op(tmp_smcb));
+            gossip_err("Invalid sm control block op %d smcb (%p)\n",
+                       PINT_smcb_op(tmp_smcb), tmp_smcb);
             continue;
         }
-        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "sm control op %d\n",
-                      PINT_smcb_op(tmp_smcb));
+        gossip_ldebug(GOSSIP_SM_TEST_DEBUG, "testing for smcb (%p) op %d\n",
+                      tmp_smcb, PINT_smcb_op(tmp_smcb));
 
-        if (!PINT_smcb_complete(tmp_smcb))
+        while (!PINT_smcb_complete(tmp_smcb))
         {
+            gossip_ldebug(GOSSIP_SM_TEST_DEBUG,
+                          "Continuing smcb (%p) SM\n", tmp_smcb);
             ret = PINT_state_machine_continue(tmp_smcb, &job_status_array[i]);
 
+#if 0
             if (ret != SM_ACTION_DEFERRED &&
                     ret != SM_ACTION_TERMINATE); /* ret == 0 */
             {
                 continue;
             }
-        }
-    }
+#endif
+            if (ret == SM_ACTION_TERMINATE)
+            {
+                gossip_ldebug(GOSSIP_SM_TEST_DEBUG,
+                              "SM (%p) terminating\n", tmp_smcb);
+                break;
+            }
+            if (ret == SM_ACTION_DEFERRED)
+            {
+                gossip_ldebug(GOSSIP_SM_TEST_DEBUG,
+                              "SM (%p) deferred\n", tmp_smcb);
+                break;
+            }
+            gossip_ldebug(GOSSIP_SM_TEST_DEBUG,
+                          "SM (%p) ret = %d state completed\n", tmp_smcb, ret);
+        } /* while */
+        gossip_ldebug(GOSSIP_SM_TEST_DEBUG,
+                      "SM (%p) SM completed\n", tmp_smcb);
+    } /* for */
 
+    /* check the target SM and see if it's completed yet */
     if (PINT_smcb_complete(smcb))
     {
+        gossip_ldebug(GOSSIP_SM_TEST_DEBUG,
+                      "Target SM (%p) complete\n", smcb);
         sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
         *error_code = sm_p->error_code;
     }
@@ -1139,11 +1175,10 @@ PVFS_error PINT_client_wait_internal(PVFS_sys_op_id op_id,
 
         do
         {
-            /*
-            gossip_debug(GOSSIP_CLIENT_DEBUG,
-              "%s: PVFS_i%s_%s calling test()\n",
-              __func__, in_class_str, in_op_str);
-            */
+            gossip_lsdebug(GOSSIP_SM_TEST_DEBUG,
+                           "PVFS_i%s_%s calling test()\n",
+                           in_class_str, in_op_str);
+
             ret = PINT_client_state_machine_test(op_id, out_error);
 
         } while (!PINT_smcb_complete(smcb) && (ret == 0));

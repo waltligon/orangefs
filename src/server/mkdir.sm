@@ -186,7 +186,7 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     int ret;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
     /* This is the first true state action of the mkdir SM so
      * increment the counter for mkdir requests
@@ -290,9 +290,9 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
         }
     }
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " attrs to write: [owner = %d, "
-                 "group = %d, perms = %o]\n", dir_attr->owner, dir_attr->group,
-                 dir_attr->perms);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "attrs to write: [owner = %d, "
+                   "group = %d, perms = %o]\n", dir_attr->owner,
+                   dir_attr->group, dir_attr->perms);
 
     /* set up the dist-dir-state portion of the attributes
      * pointed to by dir_attr attributes in the mkdir request
@@ -432,13 +432,13 @@ static PINT_sm_action mkdir_create(struct PINT_smcb *smcb, job_status_s *js_p)
     int ret;
     job_id_t i;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " creating dspace on coll_id %d\n",
-                 s_op->u.mkdir.fs_id);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "creating dspace on coll_id %d\n",
+                   s_op->u.mkdir.fs_id);
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " directory handle will be %s\n",
-                 PVFS_OID_str(&s_op->u.mkdir.handle));
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "directory handle will be %s\n",
+                   PVFS_OID_str(&s_op->u.mkdir.handle));
 
     ret = job_trove_dspace_create(s_op->u.mkdir.fs_id,
                                   s_op->u.mkdir.handle,
@@ -474,12 +474,12 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
     job_id_t j_id;
     PVFS_ds_attributes *ds_attr = NULL;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, " s+op(%p)\n", s_op);
 
     ds_attr = (&s_op->ds_attr);
     PVFS_ds_init_time(ds_attr); /* this determines the time of dir creation */
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " writing directory attributes (ds):\n\t\t"
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "writing directory attributes (ds):\n\t\t"
                  "object type     %d\n\t\t"
                  "uid             %d\n\t\t"
                  "gid             %d\n\t\t"
@@ -535,7 +535,7 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
      * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
     int keyval_count = 3;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
     /* free saved capability */
 /*
@@ -802,7 +802,7 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     int i = 0;
     int j = 0;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Start s_op (%p)\n", s_op);
 
     /* dirdata_index is apparently NOT an index but is the NUMBER of dirdata's so we
      * convert it into an index in i so we can loop from N-1 .. 0 over the dirdata's
@@ -812,24 +812,29 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     i = s_op->u.mkdir.dirdata_index - 1;
     j = s_op->u.mkdir.rmt_dirdata_index - 1;
 
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Initial i %d j %d\n", i, j);
+
     /* find dirdata on this server and create it */
     for (; i >= 0; i--)
     {
+        gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Testing dirdata %d\n", i);
         /* test for local */
         if (PINT_cached_config_server_local(
                         &s_op->req->u.mkdir.dirdata_sid_array[i]))
         {
-            /* equals so go create it - we will loop back to this state with
+            /* local so go create it - we will loop back to this state with
              * dirdata_index suitably adjustd and continue our search
              */
-            gossip_debug(GOSSIP_MKDIR_DEBUG, "Local DIRDATA to create i = %d\n", i);
+            gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
+                           "Local DIRDATA to create i = %d\n", i);
             break;
         }
         else
         {
             /* this is a remote dirdata, so we need to set it up for later
              */
-            gossip_debug(GOSSIP_MKDIR_DEBUG, "Remote DIRDATA to create i = %d\n", i);
+            gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
+                           "Remote DIRDATA to create i = %d\n", i);
             s_op->u.mkdir.rmt_dirdata_array[j++] = i;
         }
     }
@@ -837,10 +842,11 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     s_op->u.mkdir.dirdata_index = i;
     s_op->u.mkdir.rmt_dirdata_index = j;
 
-    /* if i is zero there are no more dirdata to test/create */
+    /* if i is (less than?) zero there are no more dirdata to test/create */
     if (i < 0)
     {
-        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "error code: 1 is SM branch control\n");
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                       "setting return (error) code: 1: SM branch control\n");
         js_p->error_code = STATE_DIRDATA_DONE;
         return SM_ACTION_COMPLETE;
     }
@@ -870,10 +876,10 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
                sizeof(PVFS_SID) * s_op->req->u.mkdir.newdir_sid_count);
     }
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " creating local dirdata dspace on coll_id %d\n",
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Creating local dirdata dspace on coll_id %d\n",
                  s_op->u.mkdir.fs_id);
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " dirdata handle will be %s\n",
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Dirdata handle will be %s\n",
                  PVFS_OID_str(&s_op->req->u.mkdir.dirdata_handles[i]));
 
     ret = job_trove_dspace_create(s_op->u.mkdir.fs_id,
@@ -906,7 +912,7 @@ static PINT_sm_action mkdir_dirdata_attribs(struct PINT_smcb *smcb,
     int ret = -1;
     job_id_t j_id;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
     i = s_op->u.mkdir.dirdata_index;
     PVFS_ds_attributes *ds_attr = NULL;
@@ -927,9 +933,9 @@ static PINT_sm_action mkdir_dirdata_attribs(struct PINT_smcb *smcb,
      * should be identical to the dir
      */
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " setting dirdata version to "
-                 "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
-                 llu(PINT_util_mkversion_time(ds_attr->mtime)));
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, " setting dirdata version to "
+                   "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
+                   llu(PINT_util_mkversion_time(ds_attr->mtime)));
 
     ret = job_trove_dspace_setattr(s_op->u.mkdir.fs_id,
                                    s_op->req->u.mkdir.dirdata_handles[i],
@@ -966,7 +972,7 @@ static PINT_sm_action mkdir_dirdata_keyvals(struct PINT_smcb *smcb,
     job_id_t j_id;
     int k = 0;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
     /* total 3 static keyvals every dirdata has:
      * PVFS_DIRDATA_BITMAP, PVFS_DIRDATA_HANDLES, PARENT */
@@ -1023,7 +1029,7 @@ static PINT_sm_action mkdir_dirdata_keyvals(struct PINT_smcb *smcb,
     i = s_op->u.mkdir.dirdata_index;
     pattr->u.dir.dist_dir_attr.server_no = i;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG,
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
             "  writing dist-dir-struct keyvals for dirdata: %s "
             "\t with server_no=%d and branch_level=%d \n",
             PVFS_OID_str(&s_op->req->u.mkdir.dirdata_handles[i]),
@@ -1064,14 +1070,15 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
     PVFS_capability capability;
     PVFS_object_attr *pattr = NULL;;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
-    /* we are bypassing this stepfor now - might try to add it back using
+    /* we are bypassing this step for now - might try to add it back using
      * a PJMP to prevent delaying the end of the request but for now we
      * assume remote dirdatas are created on demand at the server when a
      * request accesses them.
      */
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "error code: 1 is SM branch control\n");
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                   "setting return (error) code: 1 is SM branch control\n");
     js_p->error_code = STATE_DIRDATA_DONE;
     return SM_ACTION_COMPLETE;
 
@@ -1108,9 +1115,13 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
         msg_p->fs_id = s_op->req->u.mkdir.fs_id;
         /* this picks the remote handles - computed earlier */
         msg_p->handle = s_op->req->u.mkdir.dirdata_handles[h];
-        msg_p->sid_array = &s_op->req->u.mkdir.newdir_sid_array[h * s_op->req->u.mkdir.newdir_sid_count];
+        msg_p->sid_array = &s_op->req->u.mkdir.newdir_sid_array[
+                                 h * s_op->req->u.mkdir.newdir_sid_count];
         msg_p->sid_count = s_op->req->u.mkdir.newdir_sid_count;
 
+        /* setattr on a new remote dirdata will create the dirdata on
+         * the remote server
+         */
         PINT_SERVREQ_SETATTR_FILL(msg_p->req,
                                   PVFS_REQ_DIRDATA, /* sub_op req type */
                                   capability,
@@ -1174,11 +1185,12 @@ static PINT_sm_action mkdir_setup_getattr_request(
     int ret = 0;
     PVFS_capability capability;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
     getattr_op = calloc(1, sizeof(*getattr_op));
     if ( !getattr_op )
     {
+        gossip_lerr("calloc failed!!!!!\n");
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -1186,6 +1198,8 @@ static PINT_sm_action mkdir_setup_getattr_request(
     PINT_null_capability(&capability);
 
     getattr_op->req = &getattr_op->decoded.stub_dec.req;        
+
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Filling in getattr req\n");
 
     PINT_SERVREQ_GETATTR_FILL(*getattr_op->req,
                               PVFS_REQ_OTHER,
@@ -1202,7 +1216,10 @@ static PINT_sm_action mkdir_setup_getattr_request(
 
     getattr_op->prelude_mask |= PRELUDE_NO_SCHEDULE;
 
+    /* pushing the getattr on top of the mkdir
+     */
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+
     if ( ret < 0 )
     {
         gossip_err("%s:Error pushing getattr frame onto mkdir stack:ret(%d)\n",
@@ -1234,7 +1251,7 @@ static PINT_sm_action mkdir_setup_response(struct PINT_smcb *smcb,
     int ret;
     PVFS_object_attr *resp_attr;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
     getattr_op = PINT_sm_pop_frame(smcb,
                              &task_id,
@@ -1299,7 +1316,7 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
     PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TMKDIR, &s_op->start_time);
     mkdir_free(s_op);

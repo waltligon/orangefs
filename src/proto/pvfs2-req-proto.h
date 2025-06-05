@@ -1665,48 +1665,48 @@ static inline void defree_PVFS_servreq_mkdir(struct PVFS_servreq_mkdir *x)
       (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
       (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)))
 
-#define PINT_SERVREQ_MKDIR_FILL(__req,                      \
-                                __cap,                      \
-                                __cred,                     \
-                                __attr,                     \
-                                __fs_id,                    \
-                                __newdir_handle,            \
-                                __newdir_sid_count,         \
-                                __newdir_sid_array,         \
-                                __parent_handle,            \
-                                __parent_sids,              \
-                                __dirdata_count,            \
-                                __dirdata_handles,          \
-                                __dirdata_sid_count,        \
-                                __dirdata_sid_array,        \
-                                __dist_dir_servers_initial, \
-                                __dist_dir_split_size,      \
-                                __hints)                    \
-do {                                                        \
-    memset(&(__req), 0, sizeof(__req));                     \
-    (__req).op = PVFS_SERV_MKDIR;                           \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                    \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;                   \
-    (__req).ctrl.sub = PVFS_REQ_OTHER;                      \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));             \
-    (__req).u.mkdir.credential = (__cred);                  \
-    (__req).u.mkdir.fs_id = (__fs_id);                      \
-    (__req).u.mkdir.newdir_handle = (__newdir_handle);      \
-    (__req).u.mkdir.newdir_sid_count = (__newdir_sid_count);\
-    (__req).u.mkdir.newdir_sid_array = (__newdir_sid_array);\
-    (__req).u.mkdir.parent = (__parent_handle);             \
-    (__req).u.mkdir.parent_sid_array = (__parent_sids);     \
-    (__req).u.mkdir.dirdata_count = (__dirdata_count);      \
-    (__req).u.mkdir.dirdata_handles = (__dirdata_handles);  \
-    (__req).u.mkdir.dirdata_sid_count = (__dirdata_sid_count); \
-    (__req).u.mkdir.dirdata_sid_array = (__dirdata_sid_array); \
-    (__req).u.mkdir.dist_dir_servers_initial =              \
-            (__dist_dir_servers_initial);                   \
-    (__req).u.mkdir.dist_dir_split_size =                   \
-            (__dist_dir_split_size);                        \
-    (__attr).objtype = PVFS_TYPE_DIRECTORY;                 \
-    (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                  \
-    PINT_copy_object_attr(&(__req).u.mkdir.attr, &(__attr));\
+#define PINT_SERVREQ_MKDIR_FILL(__req,                                  \
+                                __cap,                                  \
+                                __cred,                                 \
+                                __attr,                                 \
+                                __fs_id,                                \
+                                __newdir_handle,                        \
+                                __newdir_sid_count,                     \
+                                __newdir_sid_array,                     \
+                                __parent_handle,                        \
+                                __parent_sids,                          \
+                                __dirdata_count,                        \
+                                __dirdata_handles,                      \
+                                __dirdata_sid_count,                    \
+                                __dirdata_sid_array,                    \
+                                __dist_dir_servers_initial,             \
+                                __dist_dir_split_size,                  \
+                                __hints)                                \
+do {                                                                    \
+    memset(&(__req), 0, sizeof(__req));                                 \
+    (__req).op = PVFS_SERV_MKDIR;                                       \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                                \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;                               \
+    (__req).ctrl.sub = PVFS_REQ_OTHER;                                  \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                         \
+    (__req).u.mkdir.credential = (__cred);                              \
+    (__req).u.mkdir.fs_id = (__fs_id);                                  \
+    (__req).u.mkdir.newdir_handle = (__newdir_handle);                  \
+    (__req).u.mkdir.newdir_sid_count = (__newdir_sid_count);            \
+    (__req).u.mkdir.newdir_sid_array = (__newdir_sid_array);            \
+    (__req).u.mkdir.parent = (__parent_handle);                         \
+    (__req).u.mkdir.parent_sid_array = (__parent_sids);                 \
+    (__req).u.mkdir.dirdata_count = (__dirdata_count);                  \
+    (__req).u.mkdir.dirdata_handles = (__dirdata_handles);              \
+    (__req).u.mkdir.dirdata_sid_count = (__dirdata_sid_count);          \
+    (__req).u.mkdir.dirdata_sid_array = (__dirdata_sid_array);          \
+    (__req).u.mkdir.dist_dir_servers_initial =                          \
+            (__dist_dir_servers_initial);                               \
+    (__req).u.mkdir.dist_dir_split_size =                               \
+            (__dist_dir_split_size);                                    \
+    (__attr).objtype = PVFS_TYPE_DIRECTORY;                             \
+    (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                              \
+    PINT_copy_object_attr(&(__req).u.mkdir.attr, &(__attr));            \
 } while (0)
 
     /* calling a convert in a fill macro is bad form - it prevents
@@ -1718,6 +1718,9 @@ do {                                                        \
      * PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);          \
      */
 
+/* Only returns a capability?  Should we return attributes?
+ * Full attrib or only dspace?
+ */
 struct PVFS_servresp_mkdir
 {
     PVFS_capability capability;
