@@ -151,7 +151,7 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: req_sched\n", s_op,
+                 "s_op (%p) %s (prelude sm) state: prelude_setup\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
     gossip_lsdebug(GOSSIP_MIRROR_DEBUG,
                  "Executing pvfs2_prelude_sm:prelude_setup...\n");
