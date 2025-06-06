@@ -13,6 +13,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "quicklist.h"
 #include "job-desc-queue.h"
 #include "gossip.h"
 #include "id-generator.h"
@@ -33,7 +34,7 @@ typedef enum job_type job_type_t;
  *
  * returns pointer to structure on success, NULL on failure
  */
-struct job_desc *alloc_job_desc(int type)
+struct job_desc *alloc_job_desc(enum job_type jtype)
 {
     struct job_desc *jd = NULL;
 
@@ -46,11 +47,7 @@ struct job_desc *alloc_job_desc(int type)
 
     id_gen_safe_register(&(jd->job_id), jd);
 
-#ifdef WIN32
-    jd->type = (job_type_t) type;
-#else
-    jd->type = type;
-#endif
+    jd->type = jtype;
 
     return (jd);
 };
@@ -127,6 +124,7 @@ void job_desc_q_add(job_desc_q_p jdqp,
     if (jdqp)
     {
         assert(desc);
+        gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG, "adding (%p)-(%p)\n", desc, desc->job_user_ptr);
 
         /* note that we are adding to tail to preserve fifo order */
         qlist_add_tail(&(desc->job_desc_q_link), jdqp);
@@ -141,7 +139,8 @@ void job_desc_q_add(job_desc_q_p jdqp,
  */
 void job_desc_q_remove(struct job_desc *desc)
 {
-    assert(desc);
+    assert(desc);  
+    gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG, "removing (%p)-(%p)\n", desc, desc->job_user_ptr);
     qlist_del(&(desc->job_desc_q_link));
 }
 
@@ -180,50 +179,87 @@ struct job_desc *job_desc_q_shownext(job_desc_q_p jdqp)
  */
 void job_desc_q_dump(job_desc_q_p jdqp)
 {
-    struct qlist_head *tmp_link = NULL;
-    struct job_desc *tmp_entry = NULL;
+    job_desc_q_p iterator;
+    job_desc_q_p scratch;
+    struct job_desc *tmp_job_desc = NULL;
 
-    gossip_err("job_desc_q_dump():\n");
-    gossip_err("------------------\n");
-
-    /* iterate all the way through the queue */
-    qlist_for_each(tmp_link, jdqp)
+    gossip_if(GOSSIP_JOB_DEBUG)
     {
-	tmp_entry = qlist_entry(tmp_link, struct job_desc,
-				job_desc_q_link);
-	gossip_err("  job id: %ld.\n", (long) tmp_entry->job_id);
-	switch (tmp_entry->type)
-	{
-	case JOB_BMI:
-	    gossip_err("    type: JOB_BMI.\n");
-	    gossip_err("    bmi_id: %ld.\n", (long) tmp_entry->u.bmi.id);
-	    break;
-	case JOB_BMI_UNEXP:
-	    gossip_err("    type: JOB_BMI_UNEXP.\n");
-	    break;
-	case JOB_TROVE:
-	    gossip_err("    type: JOB_TROVE.\n");
-	    break;
-	case JOB_FLOW:
-	    gossip_err("    type: JOB_FLOW.\n");
-	    break;
-	case JOB_REQ_SCHED:
-	    gossip_err("    type: JOB_REQ_SCHED.\n");
-	    break;
-	case JOB_DEV_UNEXP:
-	    gossip_err("    type: JOB_DEV_UNEXP.\n");
-	    break;
-	case JOB_REQ_SCHED_TIMER:
-	    gossip_err("    type: JOB_REQ_SCHED_TIMER.\n");
-	    break;
-	case JOB_NULL:
-	    gossip_err("    type: JOB_NULL.\n");
-	    break;
-	}
+        gossip_log("job_desc_q_dump():\n");
+        gossip_log("------------------\n");
+
+        /* iterate all the way through the queue */
+        qlist_for_each_safe(iterator, scratch, jdqp)
+        {
+            tmp_job_desc = qlist_entry(iterator, struct job_desc,
+                            job_desc_q_link);
+	    gossip_log("  job id: %ld.\n", (long) tmp_job_desc->job_id);
+	    switch (tmp_job_desc->type)
+	    {
+	    case JOB_BMI:
+	        gossip_log("    type: JOB_BMI.\n");
+	        gossip_log("    bmi_id: %ld.\n", (long) tmp_job_desc->u.bmi.id);
+	        break;
+	    case JOB_BMI_UNEXP:
+	        gossip_log("    type: JOB_BMI_UNEXP.\n");
+	        break;
+	    case JOB_TROVE:
+	        gossip_log("    type: JOB_TROVE.\n");
+	        break;
+	    case JOB_FLOW:
+	        gossip_log("    type: JOB_FLOW.\n");
+	        break;
+	    case JOB_REQ_SCHED:
+	        gossip_log("    type: JOB_REQ_SCHED.\n");
+	        break;
+	    case JOB_DEV_UNEXP:
+	        gossip_log("    type: JOB_DEV_UNEXP.\n");
+	        break;
+	    case JOB_REQ_SCHED_TIMER:
+	        gossip_log("    type: JOB_REQ_SCHED_TIMER.\n");
+	        break;
+	    case JOB_NULL:
+    	        gossip_log("    type: JOB_NULL.\n");
+	        break;
+	    }
+            gossip_log("     user ptr:(%p)\n", tmp_job_desc->job_user_ptr);
+        }
     }
+    gossip_end;
 
     return;
 }
+
+/* job_desc_q_clear()
+ *
+ * removes jobs from completion queue that have a
+ * particular SMCB - used during termination
+ *
+ * no return value
+ */
+void job_desc_q_clear(job_desc_q_p jdqp, void *target)
+{
+    job_desc_q_p iterator;
+    job_desc_q_p scratch;
+    struct job_desc *tmp_job_desc = NULL;
+
+    gossip_ldebug(GOSSIP_JOB_DEBUG,
+                  "removing (%p) from job desc q\n", target);
+
+    /* iterate all the way through the queue */
+    qlist_for_each_safe(iterator, scratch, jdqp)
+    {
+        tmp_job_desc = qlist_entry(iterator, struct job_desc,
+                        job_desc_q_link);
+        if (tmp_job_desc->job_user_ptr == target)
+        {
+            gossip_ldebug(GOSSIP_JOB_DEBUG, "job_desc_removed\n");
+            job_desc_q_remove(tmp_job_desc);
+            free(tmp_job_desc);
+        }
+    }
+}
+
 
 /*
  * Local variables:

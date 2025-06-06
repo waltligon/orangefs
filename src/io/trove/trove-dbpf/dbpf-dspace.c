@@ -123,7 +123,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     PINT_event_type event_type;
     PINT_event_id event_id = 0;
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_create handle: %s\n",
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_create handle: %s\n",
                  PVFS_OID_str(&handle));
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -200,7 +200,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         PVFS_OID_gen(&new_handle);
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "new_handle is %s\n ",
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "new_handle is %s\n ",
                  PVFS_OID_str(&new_handle));
     /*
       if we got a zero handle, we're either completely out of handles
@@ -258,7 +258,7 @@ static int dbpf_dspace_create_list(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_create_list\n");
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_create_list\n");
 
     ret = dbpf_op_init_queued_or_immediate(&op,
                                            &q_op_p,
@@ -400,7 +400,7 @@ static int dbpf_dspace_remove_list(TROVE_coll_id coll_id,
         return -TROVE_ENOMEM;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_remove_list\n");
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_remove_list\n");
 
     dbpf_queued_op_init(q_op_p,
                         DSPACE_REMOVE_LIST,
@@ -435,7 +435,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p = NULL;
     int ret;
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_remove handle: %s\n",
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_remove handle: %s\n",
                  PVFS_OID_str(&handle));
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -492,7 +492,7 @@ static int remove_one_handle(TROVE_object_ref ref,
     }
     else
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
                      "removed dataspace with handle %s\n",
                      PVFS_OID_str(&ref.handle));
     }
@@ -806,12 +806,12 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
                              sizeof dummy_handle);
     if (ret == TROVE_ENOENT)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");
+        gossip_ldebug(GOSSIP_TROVE_DEBUG, "iterate -- notfound\n");
         goto return_ok;
     }
     else if (ret != 0)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
                      "iterate -- some other failure @ recno\n");
         ret = -ret;
         goto return_error;
@@ -933,7 +933,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     PINT_event_id event_id = 0;
     PINT_event_type event_type;
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_getattr handle: %s\n",
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_getattr handle: %s\n",
                  PVFS_OID_str(&handle));
 
     /* fast path cache hit; skips queueing */
@@ -941,7 +941,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     if (dbpf_attr_cache_ds_attr_fetch_cached_data(ref, ds_attr_p) == 0)
     {
 #if 0
-        gossip_debug(
+        gossip_ldebug(
             GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved "
             "attributes from CACHE for key %llu\n  uid = %d, mode = %d, "
             "type = %d, dfile_count = %d, dist_size = %d\n",
@@ -949,24 +949,24 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
             (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
             (int)ds_attr_p->dist_size);
 #endif
-        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr fast "
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr fast "
                      "path attr cache hit on %s\n", PVFS_OID_str(&handle));
         if(ds_attr_p->type == PVFS_TYPE_METAFILE)
         {
-            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+            gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
                          "(dfile_count=%d, dist_size=%d)",
                          ds_attr_p->u.metafile.dfile_count,
                          ds_attr_p->u.metafile.dist_size);
         }
         else if(ds_attr_p->type == PVFS_TYPE_DATAFILE)
         {
-            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+            gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
                          "(bstream_size=%lld)\n",
                          lld(ds_attr_p->u.datafile.b_size));
         }
         else if(ds_attr_p->type == PVFS_TYPE_DIRDATA)
         {
-            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
+            gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
                          "(dir_count=%llu)\n",
                          llu(ds_attr_p->u.dirdata.dirent_count));
         }
@@ -1049,7 +1049,7 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
         if (dbpf_attr_cache_ds_attr_fetch_cached_data(ref, &ds_attr_p[i]) == 0)
         {
 #if 0
-            gossip_debug(
+            gossip_ldebug(
                 GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved "
                 "attributes from CACHE for key %llu\n  uid = %d, mode = %d, "
                 "type = %d, dfile_count = %d, dist_size = %d\n",
@@ -1057,7 +1057,7 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
                 (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
                 (int)ds_attr_p->dist_size);
 #endif
-            gossip_debug(GOSSIP_TROVE_DEBUG,
+            gossip_ldebug(GOSSIP_TROVE_DEBUG,
                          "dspace_getattr_list fast path attr cache hit on %s, "
                          "uid=%d, mode=%d, type=%d\n",
                          PVFS_OID_str(&handle_array[i]),
@@ -1067,20 +1067,20 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
 
             if(ds_attr_p[i].type == PVFS_TYPE_METAFILE)
             {
-                gossip_debug(GOSSIP_TROVE_DEBUG,
+                gossip_ldebug(GOSSIP_TROVE_DEBUG,
                              "\tdfile_count = %d, dist_size = %d\n",
                              ds_attr_p[i].u.metafile.dfile_count,
                              ds_attr_p[i].u.metafile.dist_size);
             }
             else if(ds_attr_p[i].type == PVFS_TYPE_DATAFILE)
             {
-                gossip_debug(GOSSIP_TROVE_DEBUG,
+                gossip_ldebug(GOSSIP_TROVE_DEBUG,
                              "\tbstream_size = %llu\n",
                              llu(ds_attr_p[i].u.datafile.b_size));
             }
             else if(ds_attr_p[i].type == PVFS_TYPE_DIRDATA)
             {
-                gossip_debug(GOSSIP_TROVE_DEBUG,
+                gossip_ldebug(GOSSIP_TROVE_DEBUG,
                              "\tcount = %llu\n",
                              llu(ds_attr_p[i].u.dirdata.dirent_count));
             }
@@ -1102,7 +1102,7 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
     /* All handles hit in the cache, return */
     if (cache_hits == nhandles) 
     {
-        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr_list serviced entirely from attr cache.\n");
+        gossip_ldebug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr_list serviced entirely from attr cache.\n");
         return 1;
     }
 
@@ -1117,7 +1117,7 @@ static int dbpf_dspace_getattr_list(TROVE_coll_id coll_id,
         return -TROVE_ENOMEM;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_getattr_list\n");
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_getattr_list\n");
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -1158,7 +1158,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     PINT_event_id event_id = 0;
     PINT_event_type event_type;
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_setattr handle: %s\n",
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "trove: dbpf_dspace_setattr handle: %s\n",
                  PVFS_OID_str(&handle));
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -1232,6 +1232,8 @@ int dbpf_dspace_attr_set(struct dbpf_collection *coll_p,
         gossip_err("TROVE:DBPF: dspace dbpf_db_put setattr");
         return -ret;
     }
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "updated ds_attr in dspace: "
+                  "dirdata.dirent_count %ld\n", attr->u.dirdata.dirent_count);
 
     /* now that the disk is updated, update the cache if necessary */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
@@ -1283,8 +1285,9 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
         return -ret;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
-                 "from DISK for key %s\n\tuid = %d, mode = %d, type = %d\n",
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
+                 "from DISK for key %s\n\tuid %d, mode %d, type %d\n",
+                
                  PVFS_OID_str(&ref.handle),
                  (int)attr->uid,
                  (int)attr->mode,
@@ -1292,21 +1295,28 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
 
     if(attr->type == PVFS_TYPE_METAFILE)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
-                     "\tdfile_count = %d, dist_size = %d\n",
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
+                     "\tdfile_count %d, dist_size %d\n",
                      attr->u.metafile.dfile_count,
                      attr->u.metafile.dist_size);
     }
     else if(attr->type == PVFS_TYPE_DATAFILE)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
-                     "\tbstream_size = %llu\n",
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
+                     "\tbstream_size %llu\n",
                      llu(attr->u.datafile.b_size));
+    }
+    else if(attr->type == PVFS_TYPE_DIRECTORY)
+    {
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
+                     "\tdirent_count %ld, dirdata_count %d\n",
+                     attr->u.directory.dirent_count,
+                     attr->u.directory.dirdata_count);
     }
     else if(attr->type == PVFS_TYPE_DIRDATA)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
-                     "\tcount = %llu\n",
+        gossip_ldebug(GOSSIP_TROVE_DEBUG,
+                     "\tdirent_count %llu\n",
                      llu(attr->u.dirdata.dirent_count));
     }
 
@@ -1321,7 +1331,7 @@ int dbpf_dspace_attr_get(struct dbpf_collection *coll_p,
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL;
-    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id, 0, NULL};
 
     ret = dbpf_dspace_attr_get(op_p->coll_p, ref, op_p->u.d_getattr.attr_p);
     if(ret < 0)
@@ -1329,7 +1339,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         return(ret);
     }
 
-    return 1;
+    return 1;    /* 1? Why 1? I would think this was 0 */
 }
 
 static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
@@ -1344,7 +1354,7 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
             /* we already serviced this one from the cache at post time;
              * skip to the next element
              */
-            gossip_debug(GOSSIP_TROVE_DEBUG, 
+            gossip_ldebug(GOSSIP_TROVE_DEBUG, 
                 "dbpf_dspace_getattr_list_op_svc() skipping "
                 "element %d resolved from cache.\n", i);
             continue;
@@ -1376,7 +1386,7 @@ static int dbpf_dspace_cancel(TROVE_coll_id coll_id,
     dbpf_queued_op_t *cur_op = NULL;
 #endif
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called for "
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called for "
                  "id %llu.\n", llu(id));
 
 #ifdef __PVFS2_TROVE_THREADED__
@@ -1409,7 +1419,7 @@ static int dbpf_dspace_cancel(TROVE_coll_id coll_id,
         }
         else
         {
-            gossip_debug(GOSSIP_TROVE_DEBUG,
+            gossip_ldebug(GOSSIP_TROVE_DEBUG,
                          "Trove cancellation is not supported "
                          "for this operation type; ignoring.\n");
             return(0);
@@ -1422,13 +1432,13 @@ static int dbpf_dspace_cancel(TROVE_coll_id coll_id,
     state = cur_op->op.state;
     gen_mutex_unlock(&cur_op->mutex);
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "got cur_op %p\n", cur_op);
+    gossip_ldebug(GOSSIP_TROVE_DEBUG, "got cur_op %p\n", cur_op);
 
     switch(state)
     {
         case OP_QUEUED:
             {
-                gossip_debug(GOSSIP_TROVE_DEBUG,
+                gossip_ldebug(GOSSIP_TROVE_DEBUG,
                              "op %p is queued: handling\n", cur_op);
 
                 /* dequeue and complete the op in canceled state */
@@ -1440,19 +1450,19 @@ static int dbpf_dspace_cancel(TROVE_coll_id coll_id,
                 /* this is a macro defined in dbpf-thread.h */
                 dbpf_queued_op_complete(cur_op, OP_CANCELED);
 
-                gossip_debug(GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
+                gossip_ldebug(GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
                 ret = 0;
             }
             break;
         case OP_IN_SERVICE:
-            gossip_debug(GOSSIP_TROVE_DEBUG, "op is in service: ignoring "
+            gossip_ldebug(GOSSIP_TROVE_DEBUG, "op is in service: ignoring "
                          "operation type %d\n", cur_op->op.type);
             ret = 0;
             break;
         case OP_COMPLETED:
         case OP_CANCELED:
             /* easy cancelation case; do nothing */
-            gossip_debug(GOSSIP_TROVE_DEBUG, "op is completed: ignoring\n");
+            gossip_ldebug(GOSSIP_TROVE_DEBUG, "op is completed: ignoring\n");
             ret = 0;
             break;
         default:
@@ -1618,7 +1628,7 @@ op_not_completed:
     }
 
     dbpf_queued_op_put(cur_op, 0);
-    gossip_debug(GOSSIP_TROVE_DEBUG,
+    gossip_ldebug(GOSSIP_TROVE_DEBUG,
                  "dbpf_dspace_test returning no progress.\n");
     usleep((max_idle_time_ms * 1000));
     return 0;
@@ -1926,7 +1936,7 @@ static int dbpf_dspace_create_store_handle(struct dbpf_collection* coll_p,
     ret = dbpf_db_get(coll_p->ds_db, &key, &data);
     if (ret == 0)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG, "handle (%s) already exists.\n",
+        gossip_ldebug(GOSSIP_TROVE_DEBUG, "handle (%s) already exists.\n",
                      PVFS_OID_str(&new_handle));
         return(-TROVE_EEXIST);
     }

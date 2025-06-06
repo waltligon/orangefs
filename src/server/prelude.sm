@@ -148,16 +148,25 @@ nested machine pvfs2_prelude_sm
 static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret;
+    PVFS_credential *cred = NULL;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: prelude_setup\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
-    gossip_lsdebug(GOSSIP_MIRROR_DEBUG,
-                 "Executing pvfs2_prelude_sm:prelude_setup...\n");
-    gossip_lsdebug(GOSSIP_MIRROR_DEBUG,
-                 "\tbase frame:%d\tframe count:%d\n"
-                 ,smcb->base_frame,smcb->frame_count);
+                   "s_op (%p) %s (prelude sm)\n", s_op,
+                   PINT_map_server_op_to_string(s_op->req->op));
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "\tbase frame:%d\tframe count:%d\n",
+                   smcb->base_frame, smcb->frame_count);
+
+    PINT_server_req_get_credential(s_op->req, &cred);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "cred ptr (%p)\n", cred);
+    /* some requests don't have a credential */
+    if (cred)
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "copying credentials to s_op\n");
+        DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG, cred);
+        COPY_PVFS_CREDENTIAL(&s_op->orig_cred, cred);
+    }
 
     /* gets the target fs_id and handle from the request and copies
      * them in the s_op
@@ -173,15 +182,15 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     /** gets the target's attrs from the request and copies into the s_op **/
     /* ret = PINT_server_req_get_attr(s_op->req, &s_op->attr); */
 
-    /* There is a valied NULL return for some OPs */
+    /* There is a valid NULL return for some OPs */
 
     s_op->access_type = PINT_server_req_get_access_type(s_op->req);
     s_op->sched_policy = PINT_server_req_get_sched_policy(s_op->req);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "Prelude gets fs_id = %d "
-                 "handle = %s\n access = %d sched = %d\n", 
-                 s_op->target_fs_id, PVFS_OID_str(&s_op->target_handle),
-                 s_op->access_type, s_op->sched_policy);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Prelude gets fs_id = %d "
+                   "handle = %s access = %d sched = %d\n", 
+                   s_op->target_fs_id, PVFS_OID_str(&s_op->target_handle),
+                   s_op->access_type, s_op->sched_policy);
 
     /* FIXME!!add the user to the uid mgmt system */
     /* TODO: not currently supported w/new security system */
@@ -219,13 +228,8 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
                  "s_op (%p) %s (prelude sm) state: req_sched\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "Executing pvfs2_prelude_work_sm:prelude_req_sched\n");
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                  "\tbase_frame:%d\tframe_count:%d\n",
                  smcb->base_frame,smcb->frame_count);
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: req_sched\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
 
@@ -255,8 +259,8 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
     }
     else
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, 
-                     "%s: no job posted to scheduler\n", __func__);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "job NOT posted to scheduler due to flag\n");
         return SM_ACTION_COMPLETE;;
     }
     return ret;
@@ -277,8 +281,8 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+                   "s_op (%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
+                   PINT_map_server_op_to_string(s_op->req->op));
 
     /* if the handle is 0, that indicates that the request does not
      * operate on a specific handle, so there is nothing we can do
@@ -287,7 +291,7 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     if (!PVFS_OID_cmp(&s_op->target_handle, &PVFS_HANDLE_NULL))
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                     "Null handle - prelude bypass getattr\n");
+                       "Null handle - prelude bypass getattr\n");
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -296,7 +300,7 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     if (s_op->req->op == PVFS_SERV_MKDIR || s_op->req->op == PVFS_SERV_CREATE)
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                     "Creating new object - prelude bypass getattr\n");
+                       "Creating new object - prelude bypass getattr\n");
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -306,8 +310,9 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
      */
     memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
-                 "for handle %s\n", PVFS_OID_str(&s_op->target_handle));
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "About to retrieve attributes for local handle %s\n",
+                   PVFS_OID_str(&s_op->target_handle));
 
     ret = job_trove_dspace_getattr(s_op->target_fs_id,
                                    s_op->target_handle,
@@ -335,7 +340,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     DECLARE_PROFILER(profiler);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: prelude_validate\n", s_op,
+                 "s_op (%p) %s (prelude sm)\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
 
     /* Profile validate operation */
@@ -392,7 +397,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
         /* */
 
-        create_object = 1;    /* default to create unless zereo'd below */
+        create_object = 1;    /* default to create unless zero'd below */
         js_p->error_code = 0; /* Clear ENOENT */
         switch (s_op->req->op)
         {
@@ -527,15 +532,17 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                             s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.server_no;
 #endif
         }
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                     "prelude: validate: create_object is %d\n", create_object);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "prelude: validate: create_object is %d\n", create_object);
     } /* endif object not found */
     else
     {
         /* Translate the dspace attributes read from db into object attributes */
-        PVFS_ds_attr_to_object_attr(&s_op->ds_attr, &s_op->attr);
+        PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
         s_op->target_object_attr = &s_op->attr;
     }
+
+    //DEBUG_attr_mask(s_op->attr.mask);
 
     /* Remaining logic deals with new or existing object. */
 
@@ -549,11 +556,17 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    /* keeping this one to see the state of cap field after getattr
+     */
     PINT_debug_capability(&s_op->req->capability, "Received");
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
         /*
+         * Is this the place to do this?  seems like this should be done
+         * before the request gets going - checked in the same place
+         * capabilities are checked.
+         *
          * if we are exporting a volume readonly, disallow any operation 
          * that modifies the state of the file-system.
          */
@@ -567,6 +580,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     }
 
     PINT_server_req_get_credential(s_op->req, &cred);
+    /* keeping this one to see the state of cred field after getattr
+     */
+    DEBUG_PVFS_CREDENTIAL(GOSSIP_SECURITY_DEBUG, cred);
     if (cred != NULL)
     {
 #ifdef ENABLE_CREDCACHE
@@ -587,7 +603,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 #endif
         if (!ret)
         {
-            char sig_buf[16];
+            char sig_buf[16] __attribute__ ((unused));
 
             gossip_lsdebug(GOSSIP_SECURITY_DEBUG, 
                          "Credential (%s) from %s failed verification.\n",
@@ -607,6 +623,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             goto complete;
         }
     }
+    gossip_lsdebug(GOSSIP_SECURITY_DEBUG, "cred passed signature verification\n");
 
     if ((s_op->target_fs_id != PVFS_FS_ID_NULL) && (cred != NULL))
     {
@@ -625,8 +642,14 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
         /* Translate the uid and gid's in case we need to do some squashing 
          * based on the export and the client address
+         *
+         * Again, is halfway through a getattr the right place?  Maybe
+         * so if the user has requested capability.  Still, my gut feeling
+         * is the credential should be left unmodified, and a call to gen
+         * the capability should take all of this into consideration.
          */
         /* TODO: testing */
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling translate_ids\n");
         if (translate_ids(s_op->target_fs_id,
                           uid, 
                           group_array[0],
@@ -634,6 +657,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                           &translated_gid,
                           s_op->addr) == 1)
         {
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "modyfying the credential\n");
             /* TODO: not applicable to certificates */
             /* modify the credential. doesn't support secondary groups */
             cred->userid = translated_uid;
@@ -674,6 +698,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "checking capability\n");
     /* check capability cache for non-null capabilities */
 #ifdef ENABLE_CAPCACHE
     capcache_hit = 1;
@@ -706,7 +731,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     }
     else
     {
-        char sig_buf[16]; 
+        char sig_buf[16] __attribute__ ((unused)); 
 
         gossip_lsdebug(GOSSIP_SECURITY_DEBUG, 
                      "Capability (%s) from %s failed verification.\n",
@@ -744,6 +769,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 complete:
 
     FINISH_PROFILER("pv2", profiler, 1);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "State Action Complete\n");
      
     /* if everything has checked out so far except the
      * dspace record is missing, then create the dspace record

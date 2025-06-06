@@ -402,11 +402,11 @@ void defree_PVFS_sys_layout(struct PVFS_sys_layout_s *x);
 typedef enum
 {
     PVFS_TYPE_NONE =              0,
-    PVFS_TYPE_METAFILE =    (1 << 0),
-    PVFS_TYPE_DATAFILE =    (1 << 1),
-    PVFS_TYPE_DIRECTORY =   (1 << 2),
-    PVFS_TYPE_SYMLINK =     (1 << 3),
-    PVFS_TYPE_DIRDATA =     (1 << 4),
+    PVFS_TYPE_METAFILE =    (1 << 0), /* 1 */
+    PVFS_TYPE_DATAFILE =    (1 << 1), /* 2 */
+    PVFS_TYPE_DIRECTORY =   (1 << 2), /* 4 */
+    PVFS_TYPE_SYMLINK =     (1 << 3), /* 8 */
+    PVFS_TYPE_DIRDATA =     (1 << 4), /* 16 */
     PVFS_TYPE_INTERNAL =    (1 << 5)   /* for the server's private use */
 } PVFS_ds_type;
 #define PVFS_DS_TYPE_COUNT      7      /* total number of DS types defined in
@@ -612,7 +612,7 @@ typedef struct
 #define PVFS_ATTR_SYS_NODISTDIR_ATTR ~(PVFS_ATTR_SYS_DISTDIR_ATTR)
 
 #define PVFS_ATTR_SYS_ALL_NOHINT \
-                 (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOHINT)
+                 (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_LATEST & PVFS_ATTR_SYS_NOHINT)
 
 #define PVFS_ATTR_SYS_ALL_NOSIZE \
                  (PVFS_ATTR_SYS_ALL & PVFS_ATTR_SYS_NOSIZE)
@@ -1585,6 +1585,51 @@ endecode_fields_3a2a1_struct (
  * For all new code use PVFS_credential.
  */
 typedef PVFS_credential PVFS_credentials;
+
+#define DEBUG_PVFS_CREDENTIAL(mask,cred) \
+do { \
+    if (cred) { \
+        gossip_ldebug((mask), "Debug PVFS Credential\n"); \
+        gossip_ldebug((mask), "userid:       %d\n", (cred)->userid); \
+        gossip_ldebug((mask), "num_groups:   %d\n", (cred)->num_groups);   \
+        gossip_ldebug((mask), "group_array (%p):\n", (cred)->group_array);  \
+        if((cred)->group_array && (cred)->num_groups > 0) { \
+            int g; \
+            for(g = 0; g < (cred)->num_groups; g++) { \
+                gossip_ldebug((mask), "    group %d\n", (cred)->group_array[g]); \
+            } \
+        }  \
+        if((cred)->issuer) { \
+            gossip_ldebug((mask), "issuer:  %s\n", (cred)->issuer); \
+        } \
+        gossip_ldebug((mask), "sig_size:     %d\n", (cred)->sig_size);  \
+    } else { \
+        gossip_ldebug((mask), "Credential pointer is NULL\n"); \
+    } \
+} while(0)
+
+#define COPY_PVFS_CREDENTIAL(dst,src) \
+do { \
+    if (!src || !dst) \
+    {   gossip_lerr("invalid credential pointers input\n"); \
+        break; \
+    } \
+    memcpy((dst),(src),sizeof(struct PVFS_credential)); \
+    if ((src)->group_array && (src)->num_groups > 0) \
+    { \
+        (dst)->group_array = malloc((src)->num_groups * sizeof(PVFS_gid)); \
+        memcpy((dst)->group_array,(src)->group_array, \
+                (src)->num_groups * sizeof(PVFS_gid)); \
+    } else { \
+        (dst)->group_array = NULL; \
+    } \
+    if ((src)->issuer) \
+    {    \
+        (dst)->issuer = strdup((src)->issuer); \
+    } else { \
+        (dst)->issuer = NULL; \
+    } \
+}while(0)
 
 /*The following two limits pertain to the readdirplus request.  They are
  * exposed here for user programs that want to use the readdirplus count.

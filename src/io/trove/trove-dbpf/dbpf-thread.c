@@ -84,17 +84,19 @@ void *dbpf_thread_function(void *ptr)
     struct timeval base;
     struct timespec wait_time;
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function started\n");
+    gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread started\n");
 
     PINT_event_thread_start("TROVE-DBPF");
     while(dbpf_thread_running)
     {
+        gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread running - check queue\n");
         /* check if we any have ops to service in our work queue */
         gen_mutex_lock(&dbpf_op_queue_mutex);
         op_queued_empty = qlist_empty(&dbpf_op_queue);
 
         if (!op_queued_empty)
         {
+            gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread running - found op\n");
             gen_mutex_unlock(&dbpf_op_queue_mutex);
             dbpf_do_one_work_cycle(&out_count);
 #ifndef __PVFS2_TROVE_AIO_THREADED__
@@ -121,6 +123,7 @@ void *dbpf_thread_function(void *ptr)
         }
         else
         {
+            gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread running - no op found\n");
             /* compute how long to wait */
             gettimeofday(&base, NULL);
             wait_time.tv_sec = base.tv_sec +
@@ -133,20 +136,24 @@ void *dbpf_thread_function(void *ptr)
                 wait_time.tv_sec++;
             }
 
+            gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread sleeping for %d seconds\n",
+                          TROVE_DEFAULT_TEST_TIMEOUT / 1000);
+
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
                                          &dbpf_op_queue_mutex,
                                          &wait_time);
             if( ret == EINVAL || ret == EPERM )
             {
                 /* an error other than timeout occured */
-                gossip_debug(GOSSIP_TROVE_DEBUG, "%s: pthread_cond_timedwait "
-                             "returned an error\n", __func__);
+                gossip_ldebug(GOSSIP_THREADS_DEBUG,
+                              "pthread_cond_timedwait returned an error\n");
             }
             gen_mutex_unlock(&dbpf_op_queue_mutex);
         }
+        gossip_ldebug(GOSSIP_THREADS_DEBUG, "thread running - looping\n");
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function ending\n");
+    gossip_ldebug(GOSSIP_THREADS_DEBUG, "dbpf_thread_function ending\n");
     PINT_event_thread_stop();
 #endif
     return ptr;
@@ -183,7 +190,8 @@ int dbpf_do_one_work_cycle(int *out_count)
             if(DBPF_OP_IS_KEYVAL(cur_op->op.type)) 
             {
                 --synccount;
-                gossip_debug(GOSSIP_TROVE_DEBUG, "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount);
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "[DBPF THREAD]: [KEYVAL -1]: %d\n", synccount);
             }
 
             cur_op->op.state = OP_IN_SERVICE;
@@ -198,16 +206,28 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
 
         /* otherwise, service the current operation now */
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: STARTING TROVE "
-                     "SERVICE ROUTINE (%s)\n",
+        gossip_ldebug(GOSSIP_TROVE_OP_DEBUG,
+                      "[DBPF THREAD]: STARTING TROVE SERVICE ROUTINE (%s)\n",
                      dbpf_op_type_to_str(cur_op->op.type));
 
         ret = cur_op->op.svc_fn(&(cur_op->op));
 
-        gossip_debug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: FINISHED TROVE "
-                     "SERVICE ROUTINE (%s) (ret: %d)\n",
-                     dbpf_op_type_to_str(cur_op->op.type),
-                     ret);
+        {
+            char emsg[256];
+            if (ret < 0)
+            {
+                PVFS_strerror_r(ret, emsg, 256);
+            }
+            else
+            {
+                strcpy(emsg, "Op Complete");
+            }
+
+            gossip_ldebug(GOSSIP_TROVE_OP_DEBUG,"[DBPF THREAD]: FINISHED TROVE "
+                         "SERVICE ROUTINE %s ret: %d (%s)\n",
+                         dbpf_op_type_to_str(cur_op->op.type),
+                         ret, emsg);
+        }
         if (ret == DBPF_OP_COMPLETE || ret < 0)
         {
             /* Some dbpf calls may return non-fatal errors
@@ -217,9 +237,10 @@ int dbpf_do_one_work_cycle(int *out_count)
              * and move _all_ the ready-to-be-synced operations to the
              * completion queue.
              */
-            ret = dbpf_sync_coalesce(cur_op, (ret == 1 ? 0 : ret), out_count);
+            ret = dbpf_sync_coalesce(cur_op, (ret == DBPF_OP_COMPLETE ? 0 : ret), out_count);
             if(ret < 0)
             {
+                gossip_lerr("Apparent trove sync_coalesce error %d\n", ret);
                 return ret; /* not sure how to recover from failure here */
             }
         }
@@ -229,6 +250,7 @@ int dbpf_do_one_work_cycle(int *out_count)
              * and just return.  Make sure the return code is negative
              * here though.
              */
+            gossip_lerr("Apparent trove service op error %d\n", ret);
             return (ret < 0) ? ret : -ret;
         }
         else

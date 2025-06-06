@@ -249,6 +249,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     struct PINT_server_op *remote_op_frame = NULL;
     struct server_configuration_s *server_config_p = NULL;
     struct PINT_server_req_ctrl req_ctrl;
+    struct PVFS_credential *cred;
     int ret = -PVFS_EINVAL;
     int remote_op_cnt = 0;
     int remote_op = 0;
@@ -256,9 +257,9 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Running Setup\n");
 
     server_config_p = PINT_server_config_mgr_get_config();
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
-                  "server_config_p->host_index = %d\n",
-                  server_config_p->host_index);
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, /* is this right? shoudn't host index be a dfile attrib? */
+                   "server_config_p->host_index = %d\n",
+                   server_config_p->host_index);
 
     /* If op was cancelled, kill the SM */
     if (s_op->op_cancelled)
@@ -274,6 +275,9 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                       &s_op->decoded,
                       s_op->unexp_bmi_buff.addr,
                       s_op->unexp_bmi_buff.size);
+
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Client addr %ld tag %d (from s_op unexp_bmi_buff %p)\n",
+                   s_op->unexp_bmi_buff.addr, s_op->unexp_bmi_buff.tag, s_op);
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, 
                    "After req decode enc_type is %d\n", s_op->decoded.enc_type);
@@ -304,9 +308,27 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
      * we can switch properly.
      */
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Set up req and op\n");
+    if (s_op->req)
+    {   /* don't leave hanging memory */
+        free(s_op->req);
+    }
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     smcb->op = s_op->req->op;
     s_op->op = s_op->req->op;
+
+    /* Save addr, tag, for easy access 
+     */
+    s_op->addr = s_op->unexp_bmi_buff.addr;
+    s_op->tag = s_op->unexp_bmi_buff.tag;
+
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Client addr %ld tag %d (from s_op %p)\n",
+                   s_op->addr, s_op->tag, s_op);
+
+    PINT_server_req_get_credential(s_op->req, &cred);
+    DEBUG_PVFS_CREDENTIAL(GOSSIP_UNEXP_DEBUG, cred);
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
+                   "s_op (%p) s_op->req (%p) s_op->op %d s_op->req->op %d\n",
+                   s_op, s_op->req, s_op->op, s_op->req->op);
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
                    "Received a request with op = %d (%s)\n", s_op->op,
@@ -314,7 +336,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
 
     if (s_op->op < 2 || s_op->op > PVFS_SERV_NUM_OPS)
     {
-        PVFS_perror_gossip("Error: Bad request op", ret);
+        PVFS_perror_gossip("Error: Bad request op", ret);  /* what to do */
     }
 
     PVFS_hint_add(&s_op->req->hints,
@@ -336,6 +358,9 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
+                   "Created new frame for local op (%p) after PJMP\n",
+                   local_op_frame);
 
     /* this is the original request so we copy the frame from the
      * original and push it onto the framestack
@@ -343,6 +368,9 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     memcpy(local_op_frame, s_op, sizeof(struct PINT_server_op));
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Pushing local op frame\n");
     s_op->num_pjmp_frames = 1;
+
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Client addr %ld tag %d (from local_op_frame %p)\n",
+                   local_op_frame->addr, local_op_frame->tag, local_op_frame);
 
     ret = PINT_sm_push_frame(smcb, PJMP_LOCAL, local_op_frame);
 
@@ -354,7 +382,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     /* Replicate and Tree are very similar so we share a lot of code */
     if ((s_op->req->ctrl.mode == PVFS_REQ_REPLICATE ||
          s_op->req->ctrl.mode == PVFS_REQ_TREE) &&
-        s_op->req->ctrl.type == PVFS_REQ_PRIMARY)
+         s_op->req->ctrl.type == PVFS_REQ_PRIMARY)
     {
         /* This is a writing operation that must be replicated
          * and this is the original (primary) copy
@@ -414,6 +442,9 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
+                       "Created new frame for remote op (%p) after PJMP\n",
+                       remote_op_frame);
         /* these are used to synchronize end of message with op */
         remote_op_frame->join = local_op_frame->join;
 
@@ -480,6 +511,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     else if (s_op->req->ctrl.mode == PVFS_REQ_TREE &&
              s_op->req->ctrl.type == PVFS_REQ_PRIMARY)
     {
+        gossip_debug(GOSSIP_UNEXP_DEBUG, "TREE and PRIMARY\n");
         /* The request has a list of handles and we need to copy
          * the request out to these.  We must determine the number
          * of copies to make.  The configuration tells us how many ways
@@ -505,7 +537,6 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
     int task_id;
     PVFS_error tmp_err = 0;
     int remaining = 0;
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "s_op->num_pjmp_frames = %d\n",
                   s_op->num_pjmp_frames);
@@ -630,7 +661,7 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
 
     if(s_op->req)
     {
-        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "op:%d client:%d, reqid:%d, rank:%d\n",
+        gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "op %d hints:client %d, reqid %d, rank %d\n",
                      s_op->req->op,
                      PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                      PINT_HINT_GET_REQUEST_ID(s_op->req->hints),

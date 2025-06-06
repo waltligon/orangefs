@@ -188,9 +188,12 @@ void PVFS_util_gen_mntent_release(struct PVFS_sys_mntent* mntent)
  */
 int PVFS_util_gen_credential_defaults(PVFS_credential *cred)
 {
-    return PVFS_util_gen_credential(NULL, NULL,
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "generating credential with defaults\n");
+    return PVFS_util_gen_credential(NULL,
+                                    NULL,
                                     PVFS2_DEFAULT_CREDENTIAL_TIMEOUT,
-                                    NULL, NULL,
+                                    NULL,
+                                    NULL,
                                     cred);
 }
 
@@ -218,7 +221,7 @@ void debug_gencred(char *args[])
         strcat(str, " ");
     }
     
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "Executing pvfs2-gencred: %s\n", str);
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "Executing pvfs2-gencred: %s\n", str);
 
     free(str);
 }
@@ -246,6 +249,7 @@ int PVFS_util_gen_credential(const char *user,
     int filedes[2], errordes[2];
     int ret;
 
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "getting credentials\n");
     if (!keypath && getenv("PVFS2KEY_FILE"))
     {
         keypath = getenv("PVFS2KEY_FILE");
@@ -275,6 +279,7 @@ int PVFS_util_gen_credential(const char *user,
         return -PVFS_errno_to_error(errno);
     }
 
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "forking\n");
     pid = fork();
     if (pid == 0)
     {
@@ -290,14 +295,20 @@ int PVFS_util_gen_credential(const char *user,
 
         *ptr++ = BINDIR"/pvfs2-gencred";
 
+        /* if user, group, etc. are NULL, then we do not
+         * pass a user argument and the external program
+         * will find and fill in the value
+         */
         if (user)
         {
+            gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "user flag supplied\n");
             *ptr++ = "-u";
             *ptr++ = (char *) user;
         }
 
         if (group)
         {
+            gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "group flag supplied\n");
             *ptr++ = "-g";
             *ptr++ = (char *) group;
         }
@@ -305,6 +316,7 @@ int PVFS_util_gen_credential(const char *user,
         if (timeout != 0 && 
             timeout != PVFS2_DEFAULT_CREDENTIAL_TIMEOUT)
         {
+            gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "timeout supplied\n");
             snprintf(timearg, sizeof(timearg), "%u", timeout);
             *ptr++ = "-t";
             *ptr++ = timearg;
@@ -312,12 +324,14 @@ int PVFS_util_gen_credential(const char *user,
 
         if (keypath)
         {
+            gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "keypath supplied\n");
             *ptr++ = "-k";
             *ptr++ = (char *) keypath;
         }
 #ifdef ENABLE_SECURITY_CERT
         if (certpath)
         {
+            gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "certpath supplied\n");
             *ptr++ = "-c";
             *ptr++ = (char *) certpath;
         }
@@ -348,6 +362,7 @@ int PVFS_util_gen_credential(const char *user,
         close(filedes[1]);
 
         /* read credential */
+        gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "reading credential\n");
         do
         {
             do
@@ -365,6 +380,7 @@ int PVFS_util_gen_credential(const char *user,
         {
             int rc;
 
+            gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "decoding credential\n");
             waitpid(pid, &rc, 0);
             if (WIFEXITED(rc) && !WEXITSTATUS(rc))
             {
@@ -416,6 +432,10 @@ int PVFS_util_gen_credential(const char *user,
             }
         }
     }
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "finished with credential\n");
+    /* We should have a credential debug call here so we can see
+     * the actual value generated
+     */
 
     close(filedes[0]);
     close(errordes[0]);
@@ -457,6 +477,7 @@ static int PINT_is_idnum(const char *str)
     char *pstr, *endptr;
     unsigned long id;
 
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "validating credential\n");
     /* NULL or blank values */
     if (str == NULL || *str == '\0')
     {
@@ -504,6 +525,7 @@ int PINT_gen_unsigned_credential(const char *user,
 
     bufsize = 8192;
 
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "generating unsigned credential\n");
     pwdbuf = (char *) malloc(bufsize);
     if (pwdbuf == NULL)
     {
@@ -652,9 +674,12 @@ pvfs2_util_gen_cred:
  * This function generates an unsigned credential for use when
  * robust security is disabled.
  */
-int PVFS_util_gen_credential(const char *user, const char *group,
-    unsigned int timeout, const char *keypath, const char *certpath,
-    PVFS_credential *cred)
+int PVFS_util_gen_credential(const char *user,
+                             const char *group,
+                             unsigned int timeout,
+                             const char *keypath,
+                             const char *certpath,
+                             PVFS_credential *cred)
 {
     if (cred == NULL)
     {
@@ -664,6 +689,7 @@ int PVFS_util_gen_credential(const char *user, const char *group,
 
     memset(cred, 0, sizeof(*cred));
 
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "calling unsigned credential\n");
     return PINT_gen_unsigned_credential(user, group, timeout, cred);
 }
 #endif /* ENABLE_SECURITY_MODE */
@@ -679,6 +705,7 @@ int PVFS_util_refresh_credential(PVFS_credential *cred)
 {
     int ret;
 
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "refresh credential\n");
     /* check if the credential is about to expire */
     if (PINT_util_get_current_time() <= 
         cred->timeout - PINT_REFRESH_CREDENTIAL_TIME)

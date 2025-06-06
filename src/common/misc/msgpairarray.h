@@ -181,23 +181,44 @@ typedef struct PINT_sm_msgarray_op
     PINT_mpa_join *join;
 } PINT_sm_msgarray_op;
 
+/*
+ * Freeing a "pointer" you know nothing about is bad Ju-Ju!
+ * In this case it should be OK, except its not.  It needs an
+ * Error message at minimum because a properly set up MPA system
+ * should not have this issue, but this can cause memory errors that
+ * are very hard to find.  For now I'm going to take out the free
+ * and assume a little mem loss is better than a screwed up heap.
+ * I'm going to try to write a new routine part of our memory code
+ * that can see if the pointer looks like it is safe to free. And
+ * of course, I'll try to fix the problem that caused this.
+ * Didn't have to write a new routine, I already did.  We'll see
+ */
 #define PINT_msgpair_init(op)                                     \
     do {                                                          \
         memset(&(op)->msgpair, 0, sizeof(PINT_sm_msgpair_state)); \
         if((op)->msgarray != &(op)->msgpair)                      \
         {                                                         \
-            free((op)->msgarray);                                 \
+            if (PINT_check_malloc((op)->msgarray))                \
+            {                                                     \
+                free((op)->msgarray);                             \
+            }                                                     \
+            else                                                  \
+            {                                                     \
+                gossip_ldebug(GOSSIP_MSGPAIR_DEBUG,               \
+                      "PINT_msgpair_init wants to free a bad pointer\n");\
+            }                                                     \
             (op)->msgarray = NULL;                                \
         }                                                         \
         (op)->count = 1;                                          \
         (op)->msgarray = &(op)->msgpair;                          \
     } while(0)
 
+#if 0
+/*----------------------------------------------------------------*/
 /* This does not appear to be used any more - it is pre-mpa_op
  * It should be deleted after a suitable confirmation period
  * WBL
  */
-#if 0
 #define PINT_init_msgpair(__sm_p, __msg_p)                           \
 do {                                                                 \
     __msg_p = &__sm_p->msgpair;                                      \
@@ -211,6 +232,7 @@ do {                                                                 \
     __sm_p->msgarray_count = 1;                                      \
 } while(0)
 #endif
+/*----------------------------------------------------------------*/
 
 #define foreach_msgpair(__msgarray_op, __msg_p, __i)          \
     for(__i = 0, __msg_p = &((__msgarray_op)->msgarray[__i]); \

@@ -182,8 +182,10 @@ static int server_parse_config(struct server_configuration_s *config,
 
     if (config)
     {
+        /* assert?  or return an error? */
         assert(fs_config_buf);
 
+        /* WBL re-write this loop during cleanup */
         while(1)
         {
             assert(template_index > -1);

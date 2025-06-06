@@ -10,6 +10,7 @@
 /* This file defines PINT_attrmask_print(), a useful debugging tool for
  * printing the contents of attrmasks.  Prints with gossip and only if
  * the provided PVFS_debug_mask is provided (must be set in gossip)
+ * This should probably move into src/proto/pvfs2-attr.h
  */
 
 #include "gossip.h"
@@ -49,6 +50,7 @@ static inline void PINT_attr_dump_object_type(PVFS_debug_mask gossip_mask,
     }
 }
 
+#if 0
 /* helper function for debugging */
 static inline void PINT_attrmask_print(PVFS_debug_mask debug,
                                        uint64_t attrmask)
@@ -60,7 +62,6 @@ static inline void PINT_attrmask_print(PVFS_debug_mask debug,
 
 DEBUG_attr_mask(attrmask);
 
-#if 0
     gossip_debug(debug, "mask = 0x%x:\n", attrmask);
     if (attrmask & PVFS_ATTR_COMMON_UID) gossip_debug(debug, "\tPVFS_ATTR_COMMON_UID\n");
     if (attrmask & PVFS_ATTR_COMMON_GID) gossip_debug(debug, "\tPVFS_ATTR_COMMON_GID\n");
@@ -79,8 +80,8 @@ DEBUG_attr_mask(attrmask);
     if (attrmask & PVFS_ATTR_DIR_HINT) gossip_debug(debug, "\tPVFS_ATTR_DIR_HINT\n");
     if (attrmask & PVFS_ATTR_DISTDIR_ATTR) gossip_debug(debug, "\tPVFS_ATTR_DISTDIR_ATTR\n");
     if (attrmask & PVFS_ATTR_CAPABILITY) gossip_debug(debug, "\tPVFS_ATTR_CAPABILITY\n");
-#endif
 }
+#endif
 
 /*
  * Local variables:

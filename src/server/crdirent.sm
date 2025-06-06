@@ -41,8 +41,8 @@ enum
     SPLIT_REQUIRED = 131,
     SPLIT_FATAL_ERROR,
     NOTIFY_DIRDATA,
-    LOCAL_METAHANDLE,
-    REMOTE_METAHANDLE,
+    LOCAL_DIR,
+    REMOTE_DIR,
     REMOVE_ENTRIES_REQUIRED
 };
 
@@ -75,35 +75,40 @@ nested machine pvfs2_crdirent_work_sm
     state write_dirent
     {
         run crdirent_write_dirent;
-        success => setup_read_parent_dir_attrs;
+        success => update_dirdata_attr;
         default => return;
     }
 
-    /*
-    state update_directory_attr
+    state update_dirdata_attr
     {
-        run crdirent_update_directory_attr;
-        success => setup_read_parent_dir_attrs;
-        default => return;
-    }
-    */
-
-    /* read parent dir apps so that CTIME and dirent_count can be updated */
-    state setup_read_parent_dir_attrs
-    {
-        run crdirent_setup_read_parent_dir_attrs;
-        REMOTE_METAHANDLE => complete_remote_read_parent_dir_attrs_xfer_msgpair;
-        success => complete_read_local_parent_dir_attrs;
+        run crdirent_update_dirdata_attr;
+        REMOTE_DIR => remote_dir_update;
+        success => read_local_parent_dir;
         default => return;
     }
 
-    state complete_read_local_parent_dir_attrs
+    /* read parent dir attrs so that CTIME and dirent_count can be updated */
+    state read_local_parent_dir
     {
-        run crdirent_complete_read_local_parent_dir_attrs;
+        run crdirent_read_local_parent_dir;
+        success => update_local_parent_dir;
+        default => return;
+    }
+
+    state update_local_parent_dir
+    {
+        run crdirent_update_local_parent_dir;
         default => check_for_split;
     }
 
-    state complete_remote_read_parent_dir_attrs_xfer_msgpair
+    state remote_dir_update
+    {
+        run crdirent_remote_dir_update;
+        success => remote_dir_update_msgpair;
+        default => return;
+    }
+
+    state remote_dir_update_msgpair
     {
         jump pvfs2_msgpairarray_sm;
         success => check_for_split;
@@ -115,19 +120,19 @@ nested machine pvfs2_crdirent_work_sm
     {
         run crdirent_check_for_split;
         SPLIT_REQUIRED => do_split;
-        default => update_dirdata_attr;
+        default => return;
     }
 
     state do_split
     {
         /* state machine in dirent-split.sm */
         jump pvfs2_dirdata_split_sm;
-        default => update_dirdata_attr;
+        default => final_update_dirdata_attr;
     }
 
-    state update_dirdata_attr
+    state final_update_dirdata_attr
     {
-        run crdirent_update_dirdata_attr;
+        run crdirent_final_update_dirdata_attr;
         default => return;
     }
 }
@@ -199,75 +204,13 @@ static PINT_sm_action crdirent_setup_op(struct PINT_smcb *smcb,
     
     return ret;
 }
-
-/* crdirent_get_dist_dir_attr()
- * 
- * Retrieve basic distributed directory attributes for this dirent handle
- */
-/* V3 distributed dir attributes are now part of the ds_attr struct and
- * are read during prelude so this lookup is obsolete
- */
-static PINT_sm_action crdirent_get_dist_dir_attr(struct PINT_smcb *smcb,
-                                                 job_status_s *js_p)
-{   
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    int ret = -PVFS_EINVAL;
-    job_id_t j_id;
-    
-    /*
-      first we translate the dirdata dspace attributes into a more convenient
-      server use-able format.  i.e. a PVFS_object_attr
-    */
-    PVFS_objecct_attr_from_ds_attr(&s_op->u.crdirent.dirdata_attr,
-                                   &s_op->u.crdirent.dirdata_ds_attr);
-    s_op->u.crdirent.dirdata_attr.mask = PVFS_ATTR_COMMON_ALL;
-    /* Must erase ATIME or it will be reset to the current time below,
-     * which should not be done when creating a directory entry per
-     * POSIX. */
-    s_op->u.crdirent.dirdata_attr.mask &= ~PVFS_ATTR_COMMON_ATIME;
-
-    /* set up key and value structures for reading the dist_dir_attr */
-    s_op->key.buffer = Trove_Common_Keys[DIST_DIR_ATTR_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIST_DIR_ATTR_KEY].size;
-    if(s_op->free_val)
-    {   
-        free(s_op->val.buffer);
-    }
-    
-    s_op->val.buffer = &s_op->attr.u.dirdata.dist_dir_attr;
-    s_op->val.buffer_sz = sizeof(PVFS_dist_dir_attr);
-    s_op->free_val = 0;
-    
-    js_p->error_code = 0;
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "  trying to read dist_dir_attr (coll_id = %d, "
-                 "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
-                 s_op->req->u.crdirent.fs_id,
-                 PVFS_OID_str(&s_op->u.crdirent.dirent_handle),
-                 (char *)s_op->key.buffer, s_op->key.buffer_sz,
-                 s_op->val.buffer, s_op->val.buffer_sz);
-    
-    ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
-                                s_op->u.crdirent.dirent_handle,
-                                &s_op->key,
-                                &s_op->val,
-                                0,
-                                NULL,
-                                smcb,
-                                0,
-                                js_p,
-                                &j_id,
-                                server_job_context,
-                                s_op->req->hints);
-    
-    return ret;
-}
 #endif
 
 /* crdirent_get_bitmap_and_dirdata_handles()
  * 
- * Retrieve the rest of the distributed directory attributes for this
- * dirent handle.  If we created a new object, it should already have
+ * Retrieve the bitmap and dirdata handles for the dirdata
+ * object.
+ * If we created a new object, it should already have
  * these, so we need to test for that.
  * V3 - size is now read with ds_attr by prelude
  */
@@ -279,6 +222,10 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr_p = NULL;
     job_id_t j_id;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "ENTERED crdirent new %s parent %s\n",
+                   PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle),
+                   PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_SERVER_DEBUG,
                       "crdirent entry: %s points to %s\n", 
@@ -304,7 +251,6 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
      * all of the dirdata are created (not sure how) so for now I'm
      * leaving this here.
      */
-    /* if(s_op->u.crdirent.new_target_object) */
     if(s_op->new_target_object) /* set in prelude */
     {
         js_p->error_code = 0;
@@ -312,16 +258,18 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     }
 
     /* this is either the attr just read by prelude
+     * or the attrs of the new dirdata object.
      */
     attr_p = &s_op->attr;
 
     assert(attr_p->u.dirdata.dist_dir_attr.dirdata_count > 0 &&
            attr_p->u.dirdata.dist_dir_attr.bitmap_size > 0);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "crdirent: get dist-dir-attr for dirdata handle %s "
-            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
-            "split_size=%d, server_no=%d and branch_level=%d\n",
+    /* dump dirdata related attribs */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+            "target dirdata handle %s "
+            "with tree_height %d, dirdata_count %d, bitmap_size %d, "
+            "split_size %d, server_no %d and branch_level %d dirent_count %d\n",
             PVFS_OID_str(&s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                           s_op->req->u.crdirent.dd_server_index]),
             attr_p->u.dirdata.dist_dir_attr.tree_height,
@@ -329,7 +277,8 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
             attr_p->u.dirdata.dist_dir_attr.bitmap_size,
             attr_p->u.dirdata.dist_dir_attr.split_size,
             attr_p->u.dirdata.dist_dir_attr.server_no,
-            attr_p->u.dirdata.dist_dir_attr.branch_level);
+            attr_p->u.dirdata.dist_dir_attr.branch_level,
+            attr_p->u.dirdata.dirent_count);
 
     /* allocate space for bitmap and dirdata handles */
     attr_p->u.dirdata.dist_dir_bitmap =
@@ -453,7 +402,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
     int i = 0;
-    unsigned char *c = NULL;
+    unsigned char *c __attribute__ ((unused)) = NULL;
     PVFS_object_attr *attr_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
@@ -469,7 +418,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     attr_p = &s_op->attr;
 
     /* gossip bitmap, since jump from get_bitmap_and_dirdata_handles */
-    gossip_debug(GOSSIP_SERVER_DEBUG, "crdirent: dist_dir_bitmap as:\n");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "bitmap:\n");
 
     for(i = attr_p->u.dirdata.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {       
@@ -480,7 +429,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     }           
     gossip_debug(GOSSIP_SERVER_DEBUG, "\n");
     
-    gossip_debug(GOSSIP_SERVER_DEBUG, "\t getattr: dirdata handles\n");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "dirdata handles:\n");
             
     for(i = 0; i < attr_p->u.dirdata.dist_dir_attr.dirdata_count; i++)
     {
@@ -498,8 +447,8 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "  got crdirent for %s (with handle %s) in %s\n",
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                 "dirent: %s (with handle %s) in %s\n",
                  s_op->req->u.crdirent.name,
                  PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle),
                  PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
@@ -538,8 +487,8 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     /* make sure the entry belongs to this dirdata bucket */
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(s_op->req->u.crdirent.name);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "crdirent: encrypt dirent %s into hash value %llu.\n",
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                 "encrypt dirent %s into hash value %llu.\n",
                  s_op->req->u.crdirent.name, llu(dirdata_hash));
 
     dirdata_server_index = PINT_find_dist_dir_bucket(
@@ -547,23 +496,22 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
                                            &attr_p->u.dirdata.dist_dir_attr,
                                            attr_p->u.dirdata.dist_dir_bitmap);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "crdirent: selecting bucket No.%d from dist_dir_bitmap.\n",
-                 dirdata_server_index);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "selecting bucket No.%d from dist_dir_bitmap.\n",
+                   dirdata_server_index);
 
     if(dirdata_server_index != attr_p->u.dirdata.dist_dir_attr.server_no)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "crdirent: error: "
-                     "WRONG dirdata object for the dirent! Returning error.\n");
+        gossip_lerr("error: WRONG dirdata object for dirent! Returning error.\n");
 
         js_p->error_code = -PVFS_EAGAIN;
         return SM_ACTION_COMPLETE;
     }
     else
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "crdirent: Correct dirdata object!\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "Correct dirdata object!\n");
+                       
     }
 
     js_p->error_code = 0;
@@ -601,11 +549,7 @@ static PINT_sm_action crdirent_write_dirent(struct PINT_smcb *smcb,
     job_id_t j_id;
     TROVE_ds_flags keyval_flags;
 
-    /* DUMB ASSERT */
-    /*
-    assert(PVFS_OID_cmp(&s_op->req->u.crdirent.dirdata_handle,
-                        &PVFS_HANDLE_NULL));
-     */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Writing dirent\n");
 
     js_p->error_code = 0;
 
@@ -637,12 +581,12 @@ static PINT_sm_action crdirent_write_dirent(struct PINT_smcb *smcb,
     s_op->val.buffer_sz = OSASZ(1, s_op->req->u.crdirent.new_ref.sid_count);
     s_op->val.buffer = s_op->u.crdirent.keyval_temp_store;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "writing new directory entry "
                  "for %s (handle = %s)\n",
                  s_op->req->u.crdirent.name,
                  PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle));
 
-    gossip_debug(GOSSIP_SERVER_DEBUG," to dirdata dspace %s\n",
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG," to dirdata keyval %s\n",
                  PVFS_OID_str(&s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                                s_op->req->u.crdirent.dd_server_index]));
 
@@ -677,7 +621,15 @@ static PINT_sm_action crdirent_write_dirent(struct PINT_smcb *smcb,
     /* We also want to keep track of the keyval entries added on this
      * handle, which allows us to get the size of the directory later
      */
-    keyval_flags |= TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY;
+    /*keyval_flags |= TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY;*/
+    keyval_flags |= TROVE_KEYVAL_DIRECTORY_ENTRY;
+
+
+
+    /* nothing to do with writing the dirent take this out
+     * do this in the statee where we update the dirdata attrs
+    s_op->attr.u.dirdata.dirent_count += 1;
+    */
 
     ret = job_trove_keyval_write(s_op->req->u.crdirent.parent_ref.fs_id,
                                  s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
@@ -696,74 +648,55 @@ static PINT_sm_action crdirent_write_dirent(struct PINT_smcb *smcb,
     return ret;
 }
 
-/* What in the world is this?  The name says it is updating a "directory" attr
- * but we don't have a directory attribute here, only a dirdata.  We will need
- * to update the dirdata, but it isn't a good time since we don't know if we
- * must split or now, nor have we even incremented the dirent count and I
- * really don''t know what this UID/GID stuff is about!  This was already 
- * modified too update the dirdata attr, but I'm thinking we lose it
- * altogether for lack of need.
+/* We already have the attrs for the dirdata, just update dirent_count and ctime/mtime
+ * and write it back
+ *
+ * This function checks to see if the DIR for the new dirent is local,
+ * and if so initiates an update (by reading) otherwise, reads remotely.  Later state
+ * writes back the update.
  */
-#if 0
-static PINT_sm_action crdirent_update_directory_attr(struct PINT_smcb *smcb,
-                                                     job_status_s *js_p)
+static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
     job_id_t j_id;
-    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
     PVFS_object_attr *dirdata_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
-    PVFS_uid uid;
-    PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
-    uint32_t num_groups;
 
-    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-    dirdata_attr = &s_op->u.crdirent.dirdata_attr;
-
-    /* I don't know why this UID/GID stuff is an issue.  My solution is to make
-     * sure that these fields sre corect when an object is made, not when it is
-     * used.  Obviously a scrubber could check this stuff.
+    /* convenience pointers for attrs
      */
-    /* map owner/group from credential if necessary */
-    /* This should always be true due to crdirent_get_dist_dir_attr. */
-    if (dirdata_attr->mask & (PVFS_ATTR_COMMON_UID|PVFS_ATTR_COMMON_GID) &&
-        (dirdata_attr->owner == PVFS_UID_MAX || dirdata_attr->group == PVFS_GID_MAX))
-    {
-        js_p->error_code = PINT_map_credential(&s_op->req->u.crdirent.credential,
-                                               &uid,
-                                               &num_groups,
-                                               group_array);
+    dirdata_attr = &s_op->attr;
+    ds_attr = &(s_op->ds_attr);
 
-        if (js_p->error_code != 0)
-        {
-            gossip_err("%s: could not map credential: %d\n", __func__,
-                         js_p->error_code);
-            return SM_ACTION_COMPLETE;
-        }
+    dirdata_attr->objtype = PVFS_TYPE_DIRDATA;
 
-        /* map owner from credential */
-        if ((dirdata_attr->mask & PVFS_ATTR_COMMON_UID) &&
-            dirdata_attr->owner == PVFS_UID_MAX)
-        {
-            dirdata_attr->owner = uid;
-        }
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "update timestamp, type is %d\n ", ds_attr->type);
+    dirdata_attr->ctime = dirdata_attr->mtime = PINT_util_get_current_time();
 
-        /* map primary group from credential */
-        if ((dirdata_attr->mask & PVFS_ATTR_COMMON_GID) &&
-            dirdata_attr->group == PVFS_GID_MAX)
-        {
-            dirdata_attr->group = group_array[0];
-        }
-    }
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Old dirdata dirent_count %d\n",
+                   dirdata_attr->u.dirdata.dirent_count);
 
-    PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dirdata_attr);
-    ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
-    PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
+    dirdata_attr->u.dirdata.dirent_count += 1;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New dirdata dirent_count %d\n",
+                   dirdata_attr->u.dirdata.dirent_count);
+
+    dirdata_attr->mask |= PVFS_ATTR_DIRDATA_DIRENT_COUNT;
+
+    /*PVFS_object_attr_to_ds_attr(dirdata_attr, ds_attr);*/
+    PVFS_ds_attr_from_object_attr(ds_attr, dirdata_attr);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to update dirdata %s dirent_count %ld\n",
+                   PVFS_OID_str(&s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
+                                             s_op->req->u.crdirent.dd_server_index]),
+                   ds_attr->u.dirdata.dirent_count);
+                   
 
     /* update timestamps for the dirdata handle. */
-    ret = job_trove_dspace_setattr(s_op->req->u.crdirent.fs_id, 
-                                   s_op->req->u.crdirent.dirdata_handle,
+    ret = job_trove_dspace_setattr(s_op->req->u.crdirent.parent_ref.fs_id,
+                                   s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
+                                             s_op->req->u.crdirent.dd_server_index],
                                    ds_attr,
                                    TROVE_SYNC,
                                    smcb, 
@@ -772,12 +705,22 @@ static PINT_sm_action crdirent_update_directory_attr(struct PINT_smcb *smcb,
                                    &j_id, 
                                    server_job_context, 
                                    s_op->req->hints);
+    if (ret < 0)
+    {
+        gossip_lerr("post of dspace_setattr failed\n");
+        return ret;
+    }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, " crdirent: update timestamp, type is %d\n ",
-                     ds_attr->type);
+    /* decide if parent is local or not */
+    if(!PINT_cached_config_server_local(&s_op->req->u.crdirent.parent_ref.sid_array[0]))
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Remote DIR entry\n");
+        js_p->error_code = REMOTE_DIR;
+    }
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Local DIR entry\n");
     return ret;
 }
-#endif
 
 /*
  * This state assumes we need to update the CTIME of the DIR who's dirent we just
@@ -787,72 +730,132 @@ static PINT_sm_action crdirent_update_directory_attr(struct PINT_smcb *smcb,
  * but faster at create time.  For the moment we we update the DIR.
  *
  * CRDIRENT creates a directory entry, which is contained by a DIRDATA, which is a
- * sub object to a DIR.  By creating a directory entry this directory (DIR) has been
- * changed and thus its CTIME and dirent_countmust be updated.  
+ * sub object to a DIR.  By creating a directory entry this directory (DIR) contents
+ * and metadata have been thus its CTIME, MTIME and dirent_count must be updated.  
  * The reference to DIR is passed to the CRDIRENT as the parent_ref.
- *
- * This function checks to see if the metaobject (DIR) for the new dirent is local,
- * and if so initiates an update (by reading) otherwise, reads remotely.  Later state
- * writes back the update.
- * 
- * Is this already done by client?  Yes, but we have removed that.
- * Seems more efficient here.
  */
 /* I HATE the use of metdahandle - this is the handle to a DIRECTORY, not a metafile.
  * Yes the DIRECTORY object is the "metadata" of the directory, but it gets confusing
  * so use DIR for directories and META for files.
  */
-static PINT_sm_action crdirent_setup_read_parent_dir_attrs(struct PINT_smcb *smcb,
-                                                           job_status_s *js_p)
+static PINT_sm_action crdirent_read_local_parent_dir(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
+    job_id_t tmp_id;
 
     /* check the result of dirent write to keyval */
     if (js_p->error_code != 0)
     {
         return SM_ACTION_COMPLETE;
     }
-    /* write if dirent succeeded so increment dirent_count */
-    /* note this only counts dirents in THIS dirdata */
-    s_op->attr.u.dirdata.dirent_count += 1;
+    /* Need to retrieve dspace attributes for the parent directory object.
+     * We will then update the timestamp info. */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
+                 "for parent directory handle %s\n",
+                 PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
 
-    /* Determine whether the parent dir handle is on the local server. */
-    if (PINT_cached_config_server_local(&s_op->req->u.crdirent.parent_ref.sid_array[0]))
+    memset(&(s_op->u.crdirent.parent_dir_ds_attr),
+           0,
+           sizeof(PVFS_ds_attributes));
+
+    ret = job_trove_dspace_getattr(s_op->req->u.crdirent.parent_ref.fs_id,
+                                   s_op->req->u.crdirent.parent_ref.handle,
+                                   smcb,
+                                   &(s_op->u.crdirent.parent_dir_ds_attr),
+                                   0,
+                                   js_p,
+                                   &tmp_id,
+                                   server_job_context,
+                                   s_op->req->hints);
+    return ret;
+}
+
+ /* This function writes back the local parent dir's attrs
+  * The previous function wrote back the dirdata attrs.
+  * There are copies of some of the attribs like time stamps
+  * and dirent_count in both the dir and the dirdata.
+  * These aere for future performance tuning so we'll do it
+  * as long as it doesnt really cost us.
+  */
+static PINT_sm_action crdirent_update_local_parent_dir(struct PINT_smcb *smcb,
+                                                       job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    job_id_t j_id;
+    int ret = -1;
+    PVFS_object_attr *dir_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "writing back local dir updates\n");
+
+    /* convenience pointers to referring to attrs
+     */
+    ds_attr = &(s_op->u.crdirent.parent_dir_ds_attr);
+    dir_attr =&(s_op->u.crdirent.parent_dir_attr);
+
+    /* just read ds_attr for parent
+     * convert it to object attr
+     */
+    PVFS_object_attr_from_ds_attr(dir_attr, ds_attr);
+
+    dir_attr->ctime = PINT_util_get_current_time();
+    dir_attr->mtime = s_op->u.crdirent.parent_dir_attr.ctime;
+    /* CTIME and MTIME flags should already be set, but just in case
+     * we make sure they are known to be part of the attribs.
+     * When we add an item to a dir it is modified, and its attribes
+     * are changed thus setting both mtime and ctime
+     */
+    dir_attr->mask |= (PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME |
+                       PVFS_ATTR_DIR_DIRENT_COUNT);
+
+    /* update dirent_count on parent dir - not same as dirdata */
+    dir_attr->u.dir.dirent_count += 1;
+
+    /* now convert object attrs back to ds attrs
+     * for writing to storage
+     */
+    PVFS_ds_attr_from_object_attr(ds_attr, dir_attr);
+
+    /* the parent (dir) of the current object (dirdata) is in parent_ref
+     */
+    ret = job_trove_dspace_setattr(s_op->req->u.crdirent.parent_ref.fs_id,
+                                   s_op->req->u.crdirent.parent_ref.handle,
+                                   ds_attr,
+                                   TROVE_SYNC,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &j_id,
+                                   server_job_context,
+                                   s_op->req->hints);
+    if (ret < 0)
     {
-        /* local */
-        job_id_t tmp_id;
-
-        /* Need to retrieve dspace attributes for the parent directory object.
-         * We will then update the timestamp info. */
-        gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
-                     "for parent directory handle %s\n",
-                     PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
-
-        memset(&(s_op->u.crdirent.parent_dir_ds_attr),
-               0,
-               sizeof(PVFS_ds_attributes));
-
-        ret = job_trove_dspace_getattr(s_op->req->u.crdirent.parent_ref.fs_id,
-                                       s_op->req->u.crdirent.parent_ref.handle,
-                                       smcb,
-                                       &(s_op->u.crdirent.parent_dir_ds_attr),
-                                       0,
-                                       js_p,
-                                       &tmp_id,
-                                       server_job_context,
-                                       s_op->req->hints);
-
+        gossip_lerr("post of dspace_setattr failed\n");
         return ret;
     }
-    else
+    return ret;
+}
+
+/* UPDATE REMOTE */
+static PINT_sm_action crdirent_remote_dir_update(struct PINT_smcb *smcb,
+                                                 job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
     {
         /* remote */
-        gossip_debug(GOSSIP_SERVER_DEBUG, "About to send setattr "
-                     "request for directory metadata handle %s\n",
+        /* Here update the parent directory.  We don't have its attribs,
+         * but we can update the two times and the dirent_count with a
+         * setenv request.  Still not clear about local values versus
+         * remote values, for now We are updating both.
+         */
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to send setattr "
+                     "request for directory handle %s\n",
                      PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
         /* if we get an error somewhere we will not take this jump */
-        js_p->error_code = REMOTE_METAHANDLE;
+        js_p->error_code = REMOTE_DIR;
 
         PINT_sm_msgpair_state *msg_p = NULL;
         PVFS_handle *capability_handles = NULL;
@@ -888,13 +891,20 @@ static PINT_sm_action crdirent_setup_read_parent_dir_attrs(struct PINT_smcb *smc
         }
         /* The only thing we need to change is CTIME, so all we have to
          * do is set that flag in the representation of the attributes
-         * we want to change. */
+         * we want to change. we do update the dirent_count too
+         */
         memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
         tmp_attr.mask = PVFS_ATTR_COMMON_CTIME; /* set time to remote server time */
+
         /* update dirent_count on DIR which sums all dirdata for this dir */
+        /* does s_op->req->u.crdirent.parent_attr.u.dir.dirent_count exist?
+         * was this a crdirent req or some other req that called crdirent
+         */
+#if 0
         tmp_attr.u.dir.dirent_count = 
             s_op->req->u.crdirent.parent_attr.u.dir.dirent_count + 1;
         tmp_attr.mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+#endif
 
         /* Capability was initialized earlier. */
         PINT_SERVREQ_SETATTR_FILL(msg_p->req,
@@ -918,9 +928,8 @@ static PINT_sm_action crdirent_setup_read_parent_dir_attrs(struct PINT_smcb *smc
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
 
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "setting timestamps for directory handle %s\n"
-                     "               SID %s\n",
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                     "setting timestamps for directory handle %s SID %s\n",
                      PVFS_OID_str(&msg_p->handle),
                      PVFS_SID_str(&s_op->req->u.crdirent.parent_ref.sid_array[0])
                      );
@@ -940,74 +949,6 @@ static PINT_sm_action crdirent_setup_read_parent_dir_attrs(struct PINT_smcb *smc
     }
 
    return ret;
-}
-
-/* Like the last function, this function is part of the system for
- * updating the metadata (DIR) timestamp because we are adding a dirent
- * to it - which is a "change" CTIME.  I think the handle used may be
- * wrong, in any event I'm not clear on it.  WBL
- * THis function writes back the new_ref's dspace if it is local to this node.
- */
-/* and it should be dir handle, not parent_dir - meta implies file */
-static PINT_sm_action crdirent_complete_read_local_parent_dir_attrs(struct PINT_smcb *smcb,
-                                                                    job_status_s *js_p)
-{
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    job_id_t j_id;
-    int ret = -1;
-
-    /* PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
-     */
-    PVFS_ds_attributes *ds_attr = NULL;
-
-    PVFS_ds_attr_to_object_attr(&s_op->u.crdirent.parent_dir_ds_attr,
-                                &s_op->u.crdirent.parent_dir_attr);
-
-    /* WHAT????? What the hell is going on here???? 
-     * Why are we re-writing an objects attribute mask?
-     */
-    /* s_op->u.crdirent.parent_dir_attr.mask = PVFS_ATTR_COMMON_ALL |
-                                            PVFS_ATTR_META_ALL;
-     */
-
-    /* The only thing we need to change is CTIME, so all we have to
-     * do is set that flag in the representation of the attributes
-     * we want to change. */
-    /* memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-    tmp_attr.mask = PVFS_ATTR_COMMON_CTIME;
-     */
-
-    /* This is a crappy way to do this - Much better to have a function
-     * that simply processes the time attributes and doesn.t mess with owner,
-     * group, etc.  This old function should go!!!
-     */
-    /* PVFS_object_attr_overwrite_setable(&s_op->u.crdirent.parent_dir_attr,
-                                       tmp_attr_ptr);
-     */
-
-    /* following mask flag of "CTIME" does not look att this */
-    /* s_op->u.crdirent.parent_dir_attr.ctime = PINT_util_get_current_time(); */
-    s_op->u.crdirent.parent_dir_attr.mask |= (PVFS_ATTR_COMMON_CTIME |
-                                              PVFS_ATTR_DIR_DIRENT_COUNT);
-    /* update dirent_count on parent dir - not same as dirdata */
-    s_op->u.crdirent.parent_dir_attr.u.dir.dirent_count++;
-    ds_attr = &(s_op->u.crdirent.parent_dir_ds_attr);
-    PVFS_object_attr_to_ds_attr(&s_op->u.crdirent.parent_dir_attr, ds_attr);
-
-    /* the parent (dir) of the current object (dirdata) is in parent_ref
-     */
-    ret = job_trove_dspace_setattr(s_op->req->u.crdirent.parent_ref.fs_id,
-                                   s_op->req->u.crdirent.parent_ref.handle,
-                                   ds_attr,
-                                   TROVE_SYNC,
-                                   smcb,
-                                   0,
-                                   js_p,
-                                   &j_id,
-                                   server_job_context,
-                                   s_op->req->hints);
-
-    return ret;
 }
 
 #if 0
@@ -1045,7 +986,7 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PVFS_object_attr *attr_p = NULL;
-    unsigned char *c = NULL;
+    unsigned char *c __attribute__ ((unused)) = NULL;
 
     PINT_ACCESS_DEBUG(s_op,
                       GOSSIP_ACCESS_DEBUG,
@@ -1056,8 +997,8 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
     /* dirent count is in attrs */
     if (js_p->error_code != 0)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "write of new dirent failed.\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "write of new dirent failed.\n");
         PVFS_perror_gossip("retrieval of dirent count failed",
                            js_p->error_code);
         return SM_ACTION_COMPLETE;
@@ -1067,7 +1008,7 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
     /* write of dirent succeeded, so increment dirent_count */
     /* s_op->attr.u.dirdata.dirent_count++; */
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, " dirent count = %d "
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, " dirent count = %d "
                  "split_size =%d, branch_level = %d\n",
                  /* s_op->u.crdirent.keyval_handle_info.count, */
                  s_op->attr.u.dirdata.dirent_count,
@@ -1086,7 +1027,7 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
         if (s_op->u.crdirent.split_node < 0)
         {
             /* No new node can be found. No need to split. */
-            gossip_debug(GOSSIP_SERVER_DEBUG,
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                          " No new node found for split.\n");
             return SM_ACTION_COMPLETE;
         }
@@ -1098,12 +1039,12 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
          */
         PINT_copy_object_attr(&s_op->u.crdirent.saved_attr, &s_op->attr);
 
-        gossip_debug(GOSSIP_SERVER_DEBUG,
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                      " split to node %d, new branch_level = %d\n",
                      s_op->u.crdirent.split_node,
                      s_op->attr.u.dirdata.dist_dir_attr.branch_level);
-                     gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "crdirent: new dist_dir_bitmap as:\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                     "new dist_dir_bitmap as:\n");
 
         attr_p = &s_op->attr;
         for(i = attr_p->u.dirdata.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
@@ -1119,13 +1060,13 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
 }
 
 /*
- * Function: crdirent_update_dirdata_attr
+ * Function: crdirent_final_update_dirdata_attr
  *
- * Write dirdata metadata to dspace, with updated time stamps and dirent
- * count and anything else modified after the crdirent and split if
+ * Write dirdata metadata to dspace, with updated time stamps
+ * and anything else modified after the crdirent and split if
  * there is one
  */
-static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
+static PINT_sm_action crdirent_final_update_dirdata_attr(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1134,21 +1075,28 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Updating dirdata Attrs\n");
+
     /* dirdata attributes are in s_op->attr
      * Set Ctime and Mtime
      * If we had a split assume tree_height was updated
      * If we had a split then in the next state write back the bitmap
      */
 
-    /* This contains the attrs read from the dirdata object */
+    /* This contains the attrs translated from the dirdata object ds_attrs
+     * read from trove disk or cache */
     dspace_attr = &s_op->attr;
 
-    /* This is a buffer for the ds_attrs */
-    ds_attr = &(s_op->u.crdirent.dirdata_ds_attr);
+    /* This is a buffer for the dirdata ds_attrs should be valid */
+    ds_attr = &(s_op->ds_attr);
     memset(ds_attr, 0, sizeof(PVFS_ds_attributes));
 
     /* do these need to be updated, or only if no a new object? */
-    dspace_attr->ctime = time(NULL);
+    /* we updated these before, but now we did a split so */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "update timestamp, type is %d\n ",
+                 ds_attr->type);
+
+    dspace_attr->ctime = PINT_util_get_current_time();
     dspace_attr->mtime = dspace_attr->ctime;
 
     /* copy and convert format */
@@ -1169,10 +1117,11 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 " crdirent: update timestamp, type is %d\n ",
-                 ds_attr->type);
+    if (ret < 0)
+    {
+        gossip_lerr("post of dspace_setattr failed\n");
+        return ret;
+    }
     return ret;
 }
 

@@ -1305,7 +1305,7 @@ static PINT_sm_action lookup_check_perms(struct PINT_smcb *smcb,
     PVFS_uid uid;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     uint32_t op_mask, num_groups;
-    char mask_buf[16];
+    char mask_buf[16] __attribute__((unused));
     int ret;
 
     /* If we get here with an invalid fsid and handle, we have to
@@ -1454,7 +1454,7 @@ static PINT_sm_action lookup_check_acls(
     PVFS_uid uid;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     uint32_t op_mask, num_groups;
-    char mask_buf[16];
+    char mask_buf[16] __attribute__ ((unused));
     int ret;
 
     assert(a_p);

@@ -13,8 +13,10 @@
 #include "pvfs2-internal.h"
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
+#include "gossip.h"
 #include "pint-distribution.h"
 #include "pint-security.h"
+#include "gossip.h"
 
 #ifndef max
 #define max(a,b) ((a) < (b) ? (b) : (a))
@@ -204,6 +206,8 @@ typedef uint64_t PVFS_object_attrmask;
 
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT         (1UL << 24)  
+#define PVFS_ATTR_DIR_DIRENT_COUNT_INCR    (1UL << 58)   /* buff */
+#define PVFS_ATTR_DIR_DIRENT_COUNT_DECR    (1UL << 59)   /* buff */
 
 /* these attributes are for METAs, but they are set on the DIR to
  * create defaults
@@ -267,20 +271,22 @@ typedef uint64_t PVFS_object_attrmask;
  */
 
 /* internal attribute mask for distributed directory information */
-#define PVFS_ATTR_DIRDATA_DIRENT_COUNT   (1UL << 45)
+#define PVFS_ATTR_DIRDATA_DIRENT_COUNT        (1UL << 45)
+#define PVFS_ATTR_DIRDATA_DIRENT_COUNT_INCR   (1UL << 56) /* number of servers */
+#define PVFS_ATTR_DIRDATA_DIRENT_COUNT_DECR   (1UL << 57) /* number of servers */
 
 /* These are the same attributes shown abive under dir, but they are
  * also part of dirdata s they are repeated here but with a name change
  */
-#define PVFS_ATTR_DIRDATA_TREE_HEIGHT    (1UL << 46)
-#define PVFS_ATTR_DIRDATA_DIRDATA_MIN    (1UL << 47) /* min number of servers */
-#define PVFS_ATTR_DIRDATA_DIRDATA_MAX    (1UL << 48) /* max number of servers */
-#define PVFS_ATTR_DIRDATA_DIRDATA_COUNT  (1UL << 49) /* number of servers */
-#define PVFS_ATTR_DIRDATA_SID_COUNT      (1UL << 50)
-#define PVFS_ATTR_DIRDATA_BITMAP_SIZE    (1UL << 51)   /* buff */
-#define PVFS_ATTR_DIRDATA_SPLIT_SIZE     (1UL << 52)
-#define PVFS_ATTR_DIRDATA_SERVER_NO      (1UL << 53)
-#define PVFS_ATTR_DIRDATA_BRANCH_LEVEL   (1UL << 54)
+#define PVFS_ATTR_DIRDATA_TREE_HEIGHT         (1UL << 46)
+#define PVFS_ATTR_DIRDATA_DIRDATA_MIN         (1UL << 47) /* min number of servers */
+#define PVFS_ATTR_DIRDATA_DIRDATA_MAX         (1UL << 48) /* max number of servers */
+#define PVFS_ATTR_DIRDATA_DIRDATA_COUNT       (1UL << 49) /* number of servers */
+#define PVFS_ATTR_DIRDATA_SID_COUNT           (1UL << 50)
+#define PVFS_ATTR_DIRDATA_BITMAP_SIZE         (1UL << 51)   /* buff */
+#define PVFS_ATTR_DIRDATA_SPLIT_SIZE          (1UL << 52)
+#define PVFS_ATTR_DIRDATA_SERVER_NO           (1UL << 53)
+#define PVFS_ATTR_DIRDATA_BRANCH_LEVEL        (1UL << 54)
 
 #define PVFS_ATTR_DIRDATA_ALL \
     (PVFS_ATTR_DIRDATA_DIRENT_COUNT | \
@@ -322,6 +328,10 @@ typedef uint64_t PVFS_object_attrmask;
         PVFS_ATTR_META_DFILES  | PVFS_ATTR_META_MIRROR_DFILES | \
         PVFS_ATTR_META_UNSTUFFED)
 
+/***************************************
+ * Last mask value used is 59
+ ***************************************/
+
 /**************************************
  * Helper functions for attribute masks
  **************************************/
@@ -346,90 +356,101 @@ static inline int PVFS2_attr_all(uint64_t mask, uint64_t attr)
 }
 
 /**************************************
+ * Related Object Attr functions in other files
+ * PVFS_object_attr_overwrite_setable() in src/io/trove/pvfs-storage.h
+ * PVFS ... in src/common/misc/...
+ **************************************/
+
+/**************************************
  * Code for debugging attribute masks
  **************************************/
-static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask, 
-                                     char *fn,
-                                     int lno);
+static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask); 
 
-#define DEBUG_attr_mask(m)                             \
-        do {                                           \
-            __DEBUG_ATTR_MASK(m, __FILE__, __LINE__);  \
+#define DEBUG_attr_mask(m)                                         \
+        do {                                                       \
+            if(gossip_debug_enabled(GOSSIP_ATTRMASK_DEBUG))        \
+            {                                                      \
+                gossip_log("DEBUG_attr_mask called by %s"          \
+                      " in %s at line %d with mask (%p)\n",        \
+                       __func__, __FILE__, __LINE__, &(m));        \
+                __DEBUG_ATTR_MASK(m);                              \
+            }                                                      \
         } while (0)
 
-#define DATTRPRINT(fmt) printf(fmt);
+#define PINT_attrmask_print(debug_mask, m)                         \
+        do {                                                       \
+            if(gossip_debug_enabled(debug_mask))                   \
+            {                                                      \
+                gossip_log("PINT_attrmask_print called by %s"      \
+                      " in %s at line %d with mask (%p)\n",        \
+                       __func__, __FILE__, __LINE__, &(m));        \
+                __DEBUG_ATTR_MASK(m);                              \
+            }                                                      \
+        } while (0)
 
 #define MASKDEBUG(field,fmt) \
-        do { if ((mask & field) == field) DATTRPRINT(fmt) } while (0)
+        do { if ((mask & field) == field) gossip_log(fmt);} while (0)
 
-static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask,
-                                     char *filename,
-                                     int lineno)
+static inline void __DEBUG_ATTR_MASK(PVFS_object_attrmask mask)
 {
     /* for now we manually turn this on and off - should add a gossip flag */
-    #if 0
-
-    DATTRPRINT("DEBUG_attr_mask (src/proto/pvfs2-attr.h) ");
-    printf("Called from file %s line %d\n", filename, lineno);
-
-    MASKDEBUG(PVFS_ATTR_COMMON_UID,               "COMMON_UID\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_GID,               "COMMON_GID\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_PERM,              "COMMON_PERM\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_ATIME,             "COMMON_ATIME\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_CTIME,             "COMMON_CTIME\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_MTIME,             "COMMON_MTIME\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_NTIME,             "COMMON_NTIME\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_TYPE,              "COMMON_TYPE (OBJ)\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_ATIME_SET,         "COMMON_ATIME_SET\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_CTIME_SET,         "COMMON_CTIME_SET\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_MTIME_SET,         "COMMON_MTIME_SET\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_PARENT,            "COMMON_PARENT\n");
-    MASKDEBUG(PVFS_ATTR_COMMON_SID_COUNT,         "COMMON_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_META_DIST,                "META_DIST\n");
-    MASKDEBUG(PVFS_ATTR_META_DIST_SIZE,           "META_DIST_SIZE\n");
-/**/MASKDEBUG(PVFS_ATTR_META_DFILES,              "META_DFILES\n");
-    MASKDEBUG(PVFS_ATTR_META_DFILE_COUNT,         "META_DFILE_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_META_SID_COUNT,           "META_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_META_MIRROR_MODE,         "META_MIRROR\n");
-    MASKDEBUG(PVFS_ATTR_META_SIZE,                "META_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_META_FLAGS,               "META_FLAGS\n");
-    MASKDEBUG(PVFS_ATTR_DATA_SIZE,                "DATA_SIZE\n");
-/**/MASKDEBUG(PVFS_ATTR_SYMLNK_TARGET,            "SYMLINK_TARGET\n");
-    MASKDEBUG(PVFS_ATTR_DIR_DIRENT_COUNT,         "DIR_DIRENT_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_NAME_LEN,   "DIR_HINT_DIST_NAME_LEN\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN, "DIR_HINT_DIST_PARAMS_LEN\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DFILE_COUNT,     "DIR_HINT_DFILE_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_SID_COUNT,       "DIR_HINT_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_LAYOUT,          "DIR_HINT_LAYOUT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIRDATA_MIN,     "DIR_HINT_DIRDATA_MIN\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIRDATA_MAX,     "DIR_HINT_DIRDATA_MAX\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_SPLIT_SIZE,      "DIR_HINT_SPLIT_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT_DIR_LAYOUT,      "DIR_HINT_DIR_LAYOUT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_TREE_HEIGHT,          "DIR_TREE_HEIGHT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_MIN,          "DIR_DIRDATA_MIN\n");
-    MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_MAX,          "DIR_DIRDATA_MAX\n");
-    MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_COUNT,        "DIR_DIRDATA_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_SID_COUNT,            "DIR_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIR_BITMAP_SIZE,          "DIR_BITMAP_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIR_SPLIT_SIZE,           "DIR_SPLIT_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIR_SERVER_NO,            "DIR_SERVER_NO\n");
-    MASKDEBUG(PVFS_ATTR_DIR_BRANCH_LEVEL,         "DIR_BRANCH_LEVEL\n");
-/**/MASKDEBUG(PVFS_ATTR_DIR_DIRDATA,              "DIR_DIRDATA\n");
-    MASKDEBUG(PVFS_ATTR_DIR_HINT,                 "DIR_HINT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRENT_COUNT,     "DIRDATA_DIRENT_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_TREE_HEIGHT,      "DIRDATA_TREE_HEIGHT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_MIN,      "DIRDATA_DIRDATA_MIN\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_MAX,      "DIRDATA_DIRDATA_MAX\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_COUNT,    "DIRDATA_DIRDATA_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_SID_COUNT,        "DIRDATA_SID_COUNT\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_BITMAP_SIZE,      "DIRDATA_BItMAP_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_SPLIT_SIZE,       "DIRDATA_SPLIT_SIZE\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_SERVER_NO,        "DIRDATA_SERVER_NO\n");
-    MASKDEBUG(PVFS_ATTR_DIRDATA_BRANCH_LEVEL,     "DIRDATA_BRANCH_LEVEL\n");
-/**/MASKDEBUG(PVFS_ATTR_CAPABILITY,               "CAPABILITY\n");
-    MASKDEBUG(PVFS_ATTR_FASTEST,                  "FASTEST\n");
-    MASKDEBUG(PVFS_ATTR_LATEST,                   "LATEST\n");
-    #endif
+        MASKDEBUG(PVFS_ATTR_COMMON_UID,               "COMMON_UID\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_GID,               "COMMON_GID\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_PERM,              "COMMON_PERM\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_ATIME,             "COMMON_ATIME\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_CTIME,             "COMMON_CTIME\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_MTIME,             "COMMON_MTIME\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_NTIME,             "COMMON_NTIME\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_TYPE,              "COMMON_TYPE (OBJ)\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_ATIME_SET,         "COMMON_ATIME_SET\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_CTIME_SET,         "COMMON_CTIME_SET\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_MTIME_SET,         "COMMON_MTIME_SET\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_PARENT,            "COMMON_PARENT\n");
+        MASKDEBUG(PVFS_ATTR_COMMON_SID_COUNT,         "COMMON_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_META_DIST,                "META_DIST\n");
+        MASKDEBUG(PVFS_ATTR_META_DIST_SIZE,           "META_DIST_SIZE\n");
+    /**/MASKDEBUG(PVFS_ATTR_META_DFILES,              "META_DFILES\n");
+        MASKDEBUG(PVFS_ATTR_META_DFILE_COUNT,         "META_DFILE_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_META_SID_COUNT,           "META_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_META_MIRROR_MODE,         "META_MIRROR\n");
+        MASKDEBUG(PVFS_ATTR_META_SIZE,                "META_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_META_FLAGS,               "META_FLAGS\n");
+        MASKDEBUG(PVFS_ATTR_DATA_SIZE,                "DATA_SIZE\n");
+    /**/MASKDEBUG(PVFS_ATTR_SYMLNK_TARGET,            "SYMLINK_TARGET\n");
+        MASKDEBUG(PVFS_ATTR_DIR_DIRENT_COUNT,         "DIR_DIRENT_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_NAME_LEN,   "DIR_HINT_DIST_NAME_LEN\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIST_PARAMS_LEN, "DIR_HINT_DIST_PARAMS_LEN\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DFILE_COUNT,     "DIR_HINT_DFILE_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_SID_COUNT,       "DIR_HINT_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_LAYOUT,          "DIR_HINT_LAYOUT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIRDATA_MIN,     "DIR_HINT_DIRDATA_MIN\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIRDATA_MAX,     "DIR_HINT_DIRDATA_MAX\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_SPLIT_SIZE,      "DIR_HINT_SPLIT_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT_DIR_LAYOUT,      "DIR_HINT_DIR_LAYOUT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_TREE_HEIGHT,          "DIR_TREE_HEIGHT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_MIN,          "DIR_DIRDATA_MIN\n");
+        MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_MAX,          "DIR_DIRDATA_MAX\n");
+        MASKDEBUG(PVFS_ATTR_DIR_DIRDATA_COUNT,        "DIR_DIRDATA_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_SID_COUNT,            "DIR_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIR_BITMAP_SIZE,          "DIR_BITMAP_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIR_SPLIT_SIZE,           "DIR_SPLIT_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIR_SERVER_NO,            "DIR_SERVER_NO\n");
+        MASKDEBUG(PVFS_ATTR_DIR_BRANCH_LEVEL,         "DIR_BRANCH_LEVEL\n");
+    /**/MASKDEBUG(PVFS_ATTR_DIR_DIRDATA,              "DIR_DIRDATA\n");
+        MASKDEBUG(PVFS_ATTR_DIR_HINT,                 "DIR_HINT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_DIRENT_COUNT,     "DIRDATA_DIRENT_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_TREE_HEIGHT,      "DIRDATA_TREE_HEIGHT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_MIN,      "DIRDATA_DIRDATA_MIN\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_MAX,      "DIRDATA_DIRDATA_MAX\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_DIRDATA_COUNT,    "DIRDATA_DIRDATA_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_SID_COUNT,        "DIRDATA_SID_COUNT\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_BITMAP_SIZE,      "DIRDATA_BITMAP_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_SPLIT_SIZE,       "DIRDATA_SPLIT_SIZE\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_SERVER_NO,        "DIRDATA_SERVER_NO\n");
+        MASKDEBUG(PVFS_ATTR_DIRDATA_BRANCH_LEVEL,     "DIRDATA_BRANCH_LEVEL\n");
+    /**/MASKDEBUG(PVFS_ATTR_CAPABILITY,               "CAPABILITY\n");
+        MASKDEBUG(PVFS_ATTR_FASTEST,                  "FASTEST\n");
+        MASKDEBUG(PVFS_ATTR_LATEST,                   "LATEST\n");
 }
 
 #undef MASKDEBUG
@@ -704,7 +725,7 @@ endecode_fields_13(
         uint32_t, dir_split_size,
         PVFS_dirhint_layout, dir_layout);
 #endif
-
+/******* DIR Attributes Here! *******/
 /* attributes specific to directory objects */
 struct PVFS_directory_attr_s
 {

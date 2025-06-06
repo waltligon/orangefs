@@ -100,6 +100,12 @@ PVFS_DEBUG_MASK_DECL(GOSSIP_SETATTR_SECURITY_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_CONFIG_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_CREATE_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_GOSSIP_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_IDGEN_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_THREADS_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_SM_JOBQ_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_SM_FRMSTK_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_ATTRMASK_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_SM_TEST_DEBUG);
 
 /* NOTE you MUST add coresponding entries in
  * include/pvfs2-debug.h
@@ -226,6 +232,18 @@ const __keyword_mask_t s_keyword_mask_map[] =
     /* Debug the debugger, in particular some critial flags and such */
     { "gossip", {GOSSIP_GOSSIP_DEBUG_INIT} },
     /* Everything except the periodic events.  Useful for debugging */
+    { "idgen", {GOSSIP_IDGEN_DEBUG_INIT} },
+    /* debug subsystems using the id generator */
+    { "threads", {GOSSIP_THREADS_DEBUG_INIT} },
+    /* Dump the completion q and job list when needed */
+    { "jobq", {GOSSIP_SM_JOBQ_DEBUG_INIT} },
+    /* Dump the frame stack whenever a frame_get happens */
+    { "frmstk", {GOSSIP_SM_FRMSTK_DEBUG_INIT} },
+    /* Dump the frame stack whenever a frame_get happens */
+    { "attrmask", {GOSSIP_ATTRMASK_DEBUG_INIT} },
+    /* Debugging for periodic threads - generates a lot of  messages */
+    { "sm_test", {GOSSIP_SM_TEST_DEBUG_INIT} },
+    /* Prints debug for test calls */
     { "verbose", { __DEBUG_ALL_INIT } },
     /* No debug output */
     { "none", {GOSSIP_NO_DEBUG_INIT} },

@@ -293,7 +293,7 @@ do { \
 do { \
     char string[100]; \
     PVFS_to_string_##type(field, string); \
-    gossip_debug((mask), "\t" #field ": %s\n", string); \
+    gossip_lsdebug((mask), #field ": %s\n", string); \
 } while (0) 
 
 /* create *********************************************************/
@@ -1115,6 +1115,7 @@ endecode_fields_4a1a_struct(
     PVFS_SID, sid_array);
 #define extra_size_PVFS_servreq_tree_getattr \
     ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
+     (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_handle)) + \
      extra_size_PVFS_credential)
 
 #define PINT_SERVREQ_TREE_GETATTR_FILL(__req,                   \
@@ -1528,9 +1529,9 @@ struct PVFS_servreq_mkdir
     PVFS_fs_id fs_id;             /* file system */
     PVFS_credential credential;   /* user credential */
     PVFS_object_attr attr;        /* initial attributes */
-    PVFS_handle handle;           /* object being created */
-    int32_t sid_count;            /* for object being created */
-    PVFS_SID *sid_array;          /* sids for object being created */
+    PVFS_handle newdir_handle;    /* object being created */
+    int32_t newdir_sid_count;     /* for object being created */
+    PVFS_SID *newdir_sid_array;   /* sids for object being created */
     PVFS_handle *parent;          /* back pointer to handle parent*/
     PVFS_SID *parent_sid_array;   /* sids for back pointer */
     int32_t dirdata_count;        /* number of dirdata handles */
@@ -1546,9 +1547,9 @@ do { \
     if (gossip_isset(gossip_debug_mask, (mask))) \
     { \
         PVFS_debug_reqfield((mask), (req)->fs_id, PVFS_fs_id); \
-        PVFS_debug_reqfield((mask), &(req)->handle, PVFS_handle); \
-        PVFS_debug_reqfield((mask), (req)->sid_count, int32_t); \
-        PVFS_debug_reqfield((mask), (req)->sid_array, PVFS_SID); \
+        PVFS_debug_reqfield((mask), &(req)->newdir_handle, PVFS_handle); \
+        PVFS_debug_reqfield((mask), (req)->newdir_sid_count, int32_t); \
+        PVFS_debug_reqfield((mask), (req)->newdir_sid_array, PVFS_SID); \
         PVFS_debug_reqfield((mask), (req)->parent, PVFS_handle); \
         PVFS_debug_reqfield((mask), (req)->parent_sid_array, PVFS_SID); \
         PVFS_debug_reqfield((mask), (req)->dirdata_count, int32_t); \
@@ -1569,18 +1570,18 @@ static inline void encode_PVFS_servreq_mkdir(char **pptr,
     encode_PVFS_credential((pptr), &(x)->credential);
     encode_PVFS_object_attr((pptr), &(x)->attr);
     encode_PVFS_fs_id((pptr), &(x)->fs_id);
-    encode_int32_t((pptr), &(x)->sid_count);
+    encode_int32_t((pptr), &(x)->newdir_sid_count);
     encode_uint32_t((pptr), &(x)->dirdata_count);                      
     encode_int32_t((pptr), &(x)->dirdata_sid_count);                  
-    encode_PVFS_handle((pptr), &(x)->handle);
-    for (i = 0; i < (x)->sid_count; i++)
+    encode_PVFS_handle((pptr), &(x)->newdir_handle);
+    for (i = 0; i < (x)->newdir_sid_count; i++)
     {
-        encode_PVFS_SID((pptr), &(x)->sid_array[i]);
+        encode_PVFS_SID((pptr), &(x)->newdir_sid_array[i]);
     }
     if ((x)->parent && !PVFS_OID_is_null((x)->parent))
     {
         encode_PVFS_handle((pptr), (x)->parent);
-        for (i = 0; i < (x)->sid_count; i++)
+        for (i = 0; i < (x)->newdir_sid_count; i++)
         {
             encode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);
         }
@@ -1608,31 +1609,31 @@ static inline void decode_PVFS_servreq_mkdir(char **pptr,
     decode_PVFS_credential((pptr), &(x)->credential);
     decode_PVFS_object_attr((pptr), &(x)->attr);
     decode_PVFS_fs_id((pptr), &(x)->fs_id);
-    decode_int32_t((pptr), &(x)->sid_count);
+    decode_int32_t((pptr), &(x)->newdir_sid_count);
     decode_uint32_t((pptr), &(x)->dirdata_count);
     decode_int32_t((pptr), &(x)->dirdata_sid_count);
-    (x)->sid_array = decode_malloc(
-                  SASZ((x)->sid_count) +
-                  OSASZ(1,(x)->sid_count) +
+    (x)->newdir_sid_array = decode_malloc(
+                  SASZ((x)->newdir_sid_count) +
+                  OSASZ(1,(x)->newdir_sid_count) +
                   OSASZ((x)->dirdata_count,(x)->dirdata_sid_count));
 
-    (x)->parent = (PVFS_handle *)((x)->sid_array + (x)->sid_count);
+    (x)->parent = (PVFS_handle *)((x)->newdir_sid_array + (x)->newdir_sid_count);
     (x)->parent_sid_array = (PVFS_SID *)((x)->parent + 1);
     (x)->dirdata_handles = (PVFS_handle *)((x)->parent_sid_array +
-                                            (x)->sid_count);
+                                            (x)->newdir_sid_count);
 
     (x)->dirdata_sid_array = (PVFS_SID *)((x)->dirdata_handles +
                                            (x)->dirdata_count);
 
-    decode_PVFS_handle((pptr), &(x)->handle);
-    for (i = 0; i < (x)->sid_count; i++)
+    decode_PVFS_handle((pptr), &(x)->newdir_handle);
+    for (i = 0; i < (x)->newdir_sid_count; i++)
     {
-        decode_PVFS_SID((pptr), &(x)->sid_array[i]);
+        decode_PVFS_SID((pptr), &(x)->newdir_sid_array[i]);
     }
     decode_PVFS_handle((pptr), (x)->parent);
     if (!PVFS_OID_is_null((x)->parent))
     {
-        for (i = 0; i < (x)->sid_count; i++)
+        for (i = 0; i < (x)->newdir_sid_count; i++)
         {
             decode_PVFS_SID((pptr), &(x)->parent_sid_array[i]);
         }
@@ -1653,7 +1654,7 @@ static inline void defree_PVFS_servreq_mkdir(struct PVFS_servreq_mkdir *x)
 {
     defree_PVFS_credential(&(x)->credential);
     defree_PVFS_object_attr(&(x)->attr);
-    decode_free((x)->sid_array);
+    decode_free((x)->newdir_sid_array);
 }
 #endif
 
@@ -1664,48 +1665,48 @@ static inline void defree_PVFS_servreq_mkdir(struct PVFS_servreq_mkdir *x)
       (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
       (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)))
 
-#define PINT_SERVREQ_MKDIR_FILL(__req,                     \
-                                __cap,                     \
-                                __cred,                    \
-                                __attr,                    \
-                                __fs_id,                   \
-                                __metadata_handle,         \
-                                __metadata_sid_count,      \
-                                __metadata_sid_array,      \
-                                __parent_handle,           \
-                                __parent_sids,             \
-                                __dirdata_count,           \
-                                __dirdata_handles,         \
-                                __dirdata_sid_count,       \
-                                __dirdata_sid_array,       \
-                                __dist_dir_servers_initial,\
-                                __dist_dir_split_size,     \
-                                __hints)                   \
-do {                                                       \
-    memset(&(__req), 0, sizeof(__req));                    \
-    (__req).op = PVFS_SERV_MKDIR;                          \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                   \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;                  \
-    (__req).ctrl.sub = PVFS_REQ_OTHER;                     \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));            \
-    (__req).u.mkdir.credential = (__cred);                 \
-    (__req).u.mkdir.fs_id = (__fs_id);                     \
-    (__req).u.mkdir.handle = (__metadata_handle);          \
-    (__req).u.mkdir.sid_count = (__metadata_sid_count);    \
-    (__req).u.mkdir.sid_array = (__metadata_sid_array);    \
-    (__req).u.mkdir.parent = (__parent_handle);            \
-    (__req).u.mkdir.parent_sid_array = (__parent_sids);    \
-    (__req).u.mkdir.dirdata_count = (__dirdata_count);     \
-    (__req).u.mkdir.dirdata_handles = (__dirdata_handles); \
-    (__req).u.mkdir.dirdata_sid_count = (__dirdata_sid_count); \
-    (__req).u.mkdir.dirdata_sid_array = (__dirdata_sid_array); \
-    (__req).u.mkdir.dist_dir_servers_initial =             \
-            (__dist_dir_servers_initial);                  \
-    (__req).u.mkdir.dist_dir_split_size =                  \
-            (__dist_dir_split_size);                       \
-    (__attr).objtype = PVFS_TYPE_DIRECTORY;                \
-    (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                 \
-    PINT_copy_object_attr(&(__req).u.mkdir.attr, &(__attr)); \
+#define PINT_SERVREQ_MKDIR_FILL(__req,                                  \
+                                __cap,                                  \
+                                __cred,                                 \
+                                __attr,                                 \
+                                __fs_id,                                \
+                                __newdir_handle,                        \
+                                __newdir_sid_count,                     \
+                                __newdir_sid_array,                     \
+                                __parent_handle,                        \
+                                __parent_sids,                          \
+                                __dirdata_count,                        \
+                                __dirdata_handles,                      \
+                                __dirdata_sid_count,                    \
+                                __dirdata_sid_array,                    \
+                                __dist_dir_servers_initial,             \
+                                __dist_dir_split_size,                  \
+                                __hints)                                \
+do {                                                                    \
+    memset(&(__req), 0, sizeof(__req));                                 \
+    (__req).op = PVFS_SERV_MKDIR;                                       \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                                \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;                               \
+    (__req).ctrl.sub = PVFS_REQ_OTHER;                                  \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                         \
+    (__req).u.mkdir.credential = (__cred);                              \
+    (__req).u.mkdir.fs_id = (__fs_id);                                  \
+    (__req).u.mkdir.newdir_handle = (__newdir_handle);                  \
+    (__req).u.mkdir.newdir_sid_count = (__newdir_sid_count);            \
+    (__req).u.mkdir.newdir_sid_array = (__newdir_sid_array);            \
+    (__req).u.mkdir.parent = (__parent_handle);                         \
+    (__req).u.mkdir.parent_sid_array = (__parent_sids);                 \
+    (__req).u.mkdir.dirdata_count = (__dirdata_count);                  \
+    (__req).u.mkdir.dirdata_handles = (__dirdata_handles);              \
+    (__req).u.mkdir.dirdata_sid_count = (__dirdata_sid_count);          \
+    (__req).u.mkdir.dirdata_sid_array = (__dirdata_sid_array);          \
+    (__req).u.mkdir.dist_dir_servers_initial =                          \
+            (__dist_dir_servers_initial);                               \
+    (__req).u.mkdir.dist_dir_split_size =                               \
+            (__dist_dir_split_size);                                    \
+    (__attr).objtype = PVFS_TYPE_DIRECTORY;                             \
+    (__attr).mask   |= PVFS_ATTR_SYS_TYPE;                              \
+    PINT_copy_object_attr(&(__req).u.mkdir.attr, &(__attr));            \
 } while (0)
 
     /* calling a convert in a fill macro is bad form - it prevents
@@ -1717,6 +1718,9 @@ do {                                                       \
      * PINT_CONVERT_ATTR(&(__req).u.mkdir.attr, &(__attr), 0);          \
      */
 
+/* Only returns a capability?  Should we return attributes?
+ * Full attrib or only dspace?
+ */
 struct PVFS_servresp_mkdir
 {
     PVFS_capability capability;
@@ -1851,7 +1855,7 @@ struct PVFS_servreq_rmdirent
 {
     char *entry;               /* name of entry to remove */
     PVFS_handle handle;        /* handle of dirdata */
-    PVFS_fs_id fs_id;          /* file system ID */
+    PVFS_object_ref parent;    /* fs_id, handle, and sids */
     int32_t sid_count;         /* reflexive - of dirdata */
     PVFS_SID *sid_array;       /* reflexive - of dirdata */
 };
@@ -1859,34 +1863,34 @@ endecode_fields_3a_struct(
     PVFS_servreq_rmdirent,
     string, entry,
     PVFS_handle, handle,
-    PVFS_fs_id, fs_id,
+    PVFS_object_ref, parent,
     int32_t, sid_count,
     PVFS_SID, sid_array);
 #define extra_size_PVFS_servreq_rmdirent \
                     (roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES + 1) + \
                      (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)))
 
-#define PINT_SERVREQ_RMDIRENT_FILL(__req,                \
-                                   __cap,                \
-                                   __fsid,               \
-                                   __handle,             \
-                                   __sid_count,          \
-                                   __sid_array,          \
-                                   __entry,              \
-                                   __hints)              \
-do {                                                     \
-    memset(&(__req), 0, sizeof(__req));                  \
-    (__req).op = PVFS_SERV_RMDIRENT;                     \
-    (__req).ctrl.mode = PVFS_REQ_SINGLE;                 \
-    (__req).ctrl.type = PVFS_REQ_PRIMARY;                \
-    (__req).ctrl.sub  = PVFS_REQ_DIRDATA;                \
-    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));          \
-    (__req).hints = (__hints);                           \
-    (__req).u.rmdirent.fs_id = (__fsid);                 \
-    (__req).u.rmdirent.handle = (__handle);              \
-    (__req).u.rmdirent.sid_count = (__sid_count);        \
-    (__req).u.rmdirent.sid_array = (__sid_array);        \
-    (__req).u.rmdirent.entry = (__entry);                \
+#define PINT_SERVREQ_RMDIRENT_FILL(__req,                         \
+                                   __cap,                         \
+                                   __parent,                      \
+                                   __handle,                      \
+                                   __sid_count,                   \
+                                   __sid_array,                   \
+                                   __entry,                       \
+                                   __hints)                       \
+do {                                                              \
+    memset(&(__req), 0, sizeof(__req));                           \
+    (__req).op = PVFS_SERV_RMDIRENT;                              \
+    (__req).ctrl.mode = PVFS_REQ_SINGLE;                          \
+    (__req).ctrl.type = PVFS_REQ_PRIMARY;                         \
+    (__req).ctrl.sub  = PVFS_REQ_DIRDATA;                         \
+    PVFS_REQ_COPY_CAPABILITY((__cap), (__req));                   \
+    (__req).hints = (__hints);                                    \
+    PVFS_object_ref_copy(&(__req).u.rmdirent.parent, &(__parent)); \
+    (__req).u.rmdirent.handle = (__handle);                       \
+    (__req).u.rmdirent.sid_count = (__sid_count);                 \
+    (__req).u.rmdirent.sid_array = (__sid_array);                 \
+    (__req).u.rmdirent.entry = (__entry);                         \
 } while (0);
 
 struct PVFS_servresp_rmdirent

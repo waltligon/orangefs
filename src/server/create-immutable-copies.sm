@@ -1683,7 +1683,8 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MIRROR_DEBUG, "\t%s\n",(char *)sm_p->key_a[i].buffer);
     gossip_debug(GOSSIP_MIRROR_DEBUG, "\tsize of buffer : %d\n",
                  sm_p->key_a[i].buffer_sz);
-    PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
+    PVFS_handle *myHandle __attribute__ ((unused))
+                        = (PVFS_handle *)sm_p->val_a[i].buffer;
     for (j = 0; j < (imm_p->dfile_count * imm_p->copies); j++)
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,
@@ -1695,7 +1696,7 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb,
     i++; 
     assert(i<key_count);
    
-    int *myCount = (int *)sm_p->val_a[i].buffer;
+    int *myCount __attribute__ ((unused)) = (int *)sm_p->val_a[i].buffer;
     sm_p->val_a[i].buffer_sz = sizeof(int);
     gossip_debug(GOSSIP_MIRROR_DEBUG, "\t%s:%d \tpointer:%p \tbuffer size:%d\n",
                                       (char *)sm_p->key_a[i].buffer,
@@ -1705,7 +1706,7 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb,
 
     i++; 
     assert(i<key_count);
-    PVFS_handle *myStatus = (PVFS_handle *)sm_p->val_a[i].buffer;
+    PVFS_handle *myStatus GCC_UNUSED = (PVFS_handle *)sm_p->val_a[i].buffer;
     for (j = 0; j < (imm_p->dfile_count * imm_p->copies); j++)
     {
         gossip_debug(GOSSIP_MIRROR_DEBUG,
@@ -1739,7 +1740,8 @@ static PINT_sm_action store_mirror_info (struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_MIRROR_DEBUG, "\t%s\n",(char *)sm_p->key_a[i].buffer);
     for (j=0; j<(imm_p->dfile_count * imm_p->copies); j++)
     {
-        PVFS_handle *myHandle = (PVFS_handle *)sm_p->val_a[i].buffer;
+        PVFS_handle *myHandle __attribute__ ((unused)) 
+                             = (PVFS_handle *)sm_p->val_a[i].buffer;
         gossip_debug(GOSSIP_MIRROR_DEBUG,"\t\thandle(%d):%s\n", j,
                      PVFS_OID_str(&myHandle[j]));
     }

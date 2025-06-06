@@ -68,6 +68,14 @@ do{                                                     \
         (dest)->objtype = (src)->objtype;               \
         (dest)->mask |= PVFS_ATTR_COMMON_TYPE;          \
     }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_FASTEST)            \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_FASTEST;              \
+    }                                                   \
+    if ((src)->mask & PVFS_ATTR_SYS_LATEST)             \
+    {                                                   \
+        (dest)->mask |= PVFS_ATTR_LATEST;               \
+    }                                                   \
     (dest)->mask |= (extra_amask);                      \
 }while(0)
 

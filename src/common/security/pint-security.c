@@ -922,6 +922,8 @@ int PINT_verify_credential(const PVFS_credential *cred)
 {
     struct server_configuration_s *config = PINT_server_config_mgr_get_config();
 
+    gossip_ldebug("verifying credential\n");
+
 #if 0
     char mdstr[2*SHA_DIGEST_LENGTH+1];
 #endif
@@ -1040,6 +1042,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
 
 #ifdef HAVE_OPENSSL_1_1
 //    if (EVP_PKEY_type(pubkey->type) == EVP_PKEY_RSA)
+    gossip_ldebug("getting keys\n");
     if ( EVP_PKEY_base_id(pubkey) == EVP_PKEY_RSA )
     {
         md = EVP_sha1();
@@ -1063,6 +1066,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
     }
 #endif
 
+    gossip_ldebug("verifying\n");
     EVP_MD_CTX_init(tmp_mdctx);
     ret = EVP_VerifyInit_ex(tmp_mdctx, md, NULL);
     ret &= EVP_VerifyUpdate(tmp_mdctx, &cred->userid, sizeof(PVFS_uid));
@@ -1083,6 +1087,7 @@ int PINT_verify_credential(const PVFS_credential *cred)
         ret = EVP_VerifyFinal(tmp_mdctx, cred->signature, cred->sig_size, pubkey);
     }
 
+    gossip_ldebug("done verifying ret = %d\n", ret);
     if (ret != 1)
     {
         PINT_security_error(__func__, -PVFS_ESECURITY);

@@ -90,6 +90,10 @@ static int completion_query_context(job_id_t *out_id_array_p,
                                   void **returned_user_ptr_array,
                                   job_status_s *out_status_array_p,
                                   job_context_id context_id);
+#if 0                                  
+static int debug_completion_queue(int *inout_count_p,
+                                  job_context_id context_id);
+#endif
 static void bmi_thread_mgr_callback(void *data, 
                                     PVFS_size actual_size,
                                     PVFS_error error_code);
@@ -727,7 +731,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
 
-   /*********************************************************
+        /*********************************************************
          * TODO: consider optimizations later, so that we avoid
          * disabling immediate completion.  See the mailing list thread
          * started here:
@@ -1039,9 +1043,12 @@ int job_req_sched_post(enum PVFS_server_op op,
     struct job_desc *jd = NULL;
     int ret = -1;
 
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Allocate Job Descriptor\n");
+
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
     {
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "failed malloc %d?\n", (int)jd->job_id);
         out_status_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
@@ -1049,6 +1056,14 @@ int job_req_sched_post(enum PVFS_server_op op,
     jd->u.req_sched.post_flag = 1;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "\n"
+                                       "\t\t\tjob_desc:\n"
+                                       "\t\t\tjob_id: %ld\n"
+                                       "\t\t\tuser_ptr: (%p)\n",
+                                       jd->job_id, jd->job_user_ptr);
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "scheduling %d\n", (int)jd->job_id);
 
     ret = PINT_req_sched_post(op,
                               fs_id,
@@ -1058,18 +1073,21 @@ int job_req_sched_post(enum PVFS_server_op op,
                               jd,
                               &(jd->u.req_sched.id));
 
+
     if (ret < 0)
     {
         /* error posting */
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "post error %d\n", (int)jd->u.req_sched.id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        return (1);
+        return (1); /* why 1? errors should be -1 */
     }
 
     if (ret == 1)
     {
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "immediate completion %d\n", (int)jd->u.req_sched.id);
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
@@ -1077,6 +1095,8 @@ int job_req_sched_post(enum PVFS_server_op op,
         /* don't delete the job desc until a matching release comes through */
         return (1);
     }
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "wait for completion %d\n", (int)jd->u.req_sched.id);
 
     /* if we hit this point, job did not immediately complete-
      * queue to test later
@@ -1220,6 +1240,7 @@ int job_req_sched_release(job_id_t in_completed_id,
     struct job_desc *match_jd = NULL;
     struct job_desc *jd = NULL;
     int ret = -1;
+    struct PINT_smcb *smcb GCC_UNUSED = user_ptr; /* for ls debug statements */
 
     jd = alloc_job_desc(JOB_REQ_SCHED);
     if (!jd)
@@ -1230,6 +1251,9 @@ int job_req_sched_release(job_id_t in_completed_id,
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "search for scheduler id %d\n",
+                  (int)in_completed_id);
 
     match_jd = id_gen_safe_lookup(in_completed_id);
     if (!match_jd)
@@ -1243,11 +1267,15 @@ int job_req_sched_release(job_id_t in_completed_id,
         return 1;
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "found, now releasing\n");
+
     ret = PINT_req_sched_release(match_jd->u.req_sched.id,
                                  jd,
                                  &(jd->u.req_sched.id));
 
     /* delete the old req sched job desc; it is no longer needed */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "dealloc_job_desc(%p)\n",
+                   match_jd);
     dealloc_job_desc(match_jd);
     match_jd = NULL;
 
@@ -2303,6 +2331,9 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     int ret = -1;
     struct job_desc *jd = NULL;
     void* user_ptr_internal GCC_UNUSED;
+    struct PINT_smcb *smcb GCC_UNUSED = (struct PINT_smcb *)user_ptr;
+
+    gossip_lsdebug(GOSSIP_JOB_DEBUG, "Reading dspace attribute\n");
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -4289,6 +4320,7 @@ int job_testsome(job_id_t *id_array,
  *
  * returns 0 on success, -errno on failure
  */
+/* JOB THREADED VERSION */
 int job_testcontext(job_id_t *out_id_array_p,
                     int *inout_count_p,
                     void **returned_user_ptr_array,
@@ -4299,12 +4331,15 @@ int job_testcontext(job_id_t *out_id_array_p,
     int ret = -1;
     struct timespec pthread_timeout;
     struct timeval start;
-    int original_count = *inout_count_p;
+    /*int original_count = *inout_count_p;*/
     int pthread_ret = -1;
+
+    gossip_ldebug(GOSSIP_JOB_DEBUG, "THREADED VERSION of Testcontext\n");
 
     /* use this as a chance to do a cheap test on the request
      * scheduler
      */
+    gossip_ldebug(GOSSIP_JOB_DEBUG, "Calling do_one_test_cycle_req_sched\n");
     if ((ret = do_one_test_cycle_req_sched()) < 0)
     {
         return (ret);
@@ -4331,14 +4366,34 @@ int job_testcontext(job_id_t *out_id_array_p,
     /* check for completed jobs */
     gen_mutex_lock(&completion_mutex);
     pthread_ret = 0;
+
+    gossip_ldebug(GOSSIP_JOB_DEBUG, "Calling completion_query_context\n");
+
+        gossip_if(GOSSIP_SM_JOBQ_DEBUG)
+        {
+            job_desc_q_dump(completion_queue_array[context_id]);
+        }
+        gossip_end;
+
     while(((ret = completion_query_context(
                              out_id_array_p,
                              inout_count_p,
                              returned_user_ptr_array,
-                             out_status_array_p, context_id)) == 0) &&
-                             ((pthread_ret == EINTR) || (pthread_ret == 0)))
+                             out_status_array_p,
+                             context_id)) == 0) &&
+                  ((pthread_ret == EINTR) || (pthread_ret == 0)))
     {
-        *inout_count_p = original_count;
+        gossip_ldebug(GOSSIP_JOB_DEBUG,
+                      "completion_query_context return inout_count_p %d\n",
+                      *inout_count_p);
+ 
+        gossip_if(GOSSIP_SM_JOBQ_DEBUG)
+        {
+            job_desc_q_dump(completion_queue_array[context_id]);
+        }
+        gossip_end;
+
+        /**inout_count_p = original_count;*/
 
         if(timeout_ms > 0)
         {
@@ -4357,6 +4412,7 @@ int job_testcontext(job_id_t *out_id_array_p,
                                             &completion_mutex);
         }
     }
+    gossip_ldebug(GOSSIP_JOB_DEBUG, "completion_query_context exits loop\n");
     gen_mutex_unlock(&completion_mutex);
 
     if(ret == 0)
@@ -4386,6 +4442,7 @@ int job_testcontext(job_id_t *out_id_array_p,
  *
  * returns 0 on success, -errno on failure
  */
+/* NOT JOB THREADED VERSION */
 int job_testcontext(job_id_t *out_id_array_p,
                     int *inout_count_p,
                     void **returned_user_ptr_array,
@@ -4399,9 +4456,11 @@ int job_testcontext(job_id_t *out_id_array_p,
     int original_count = *inout_count_p;
     int time_exhaust_flag = 0;
 
+    gossip_ldebug(GOSSIP_JOB_DEBUG, "NOT THREADED VERSION\n");
     /* use this as a chance to do a cheap test on the request
      * scheduler
      */
+    gossip_ldebug(GOSSIP_JOB_DEBUG, "Calling do_one_test_cycle_req_sched\n");
     if ((ret = do_one_test_cycle_req_sched()) < 0)
     {
         return (ret);
@@ -4411,12 +4470,31 @@ int job_testcontext(job_id_t *out_id_array_p,
      * has anything in it
      */
     gen_mutex_lock(&completion_mutex);
+
+        gossip_if(GOSSIP_SM_JOBQ_DEBUG)
+        {
+            job_desc_q_dump(completion_queue_array[context_id]);
+        }
+        gossip_end;
+
+    gossip_ldebug(GOSSIP_JOB_DEBUG, "Calling completion_query_context\n");
     ret = completion_query_context(out_id_array_p,
                                    inout_count_p,
                                    returned_user_ptr_array,
                                    out_status_array_p,
                                    context_id);
-      gen_mutex_unlock(&completion_mutex);
+
+    gossip_ldebug(GOSSIP_JOB_DEBUG,
+                  "completion_query_context return inout_count_p %d\n",
+                  *inout_count_p);
+
+        gossip_if(GOSSIP_SM_JOBQ_DEBUG)
+        {
+            job_desc_q_dump(completion_queue_array[context_id]);
+        }
+        gossip_end;
+
+    gen_mutex_unlock(&completion_mutex);
     /* return here on error or completion */
     if (ret < 0)
     {
@@ -4452,7 +4530,7 @@ int job_testcontext(job_id_t *out_id_array_p,
      */
     do
     {
-
+        gossip_ldebug(GOSSIP_JOB_DEBUG, "eating up timeout\n");
         if (timeout_ms)
         {
             do_one_work_cycle_all(10);
@@ -4469,6 +4547,10 @@ int job_testcontext(job_id_t *out_id_array_p,
                                        returned_user_ptr_array,
                                        out_status_array_p,
                                        context_id);
+
+        gossip_ldebug(GOSSIP_JOB_DEBUG,
+                      "completion_query_context(2) return inout_count_p %d\n",
+                      *inout_count_p);
 
         gen_mutex_unlock(&completion_mutex);
         /* return here on error or completion */
@@ -4734,7 +4816,7 @@ static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp)
  */
 static void dev_thread_mgr_unexp_handler(struct PINT_dev_unexp_info* unexp)
 {
-    struct job_desc* tmp_desc = NULL;
+    struct job_desc *tmp_desc = NULL;
 
     gen_mutex_lock(&dev_unexp_mutex);
 
@@ -4935,7 +5017,7 @@ static int completion_query_some(job_id_t * id_array,
     }
 
     /* don't do anything unless all of the target ops are done */
-    for(i=0; i<incount; i++)
+    for(i = 0; i < incount; i++)
     {
         tmp_desc = id_gen_safe_lookup(id_array[i]);
         if(tmp_desc && tmp_desc->completed_flag)
@@ -4950,7 +5032,7 @@ static int completion_query_some(job_id_t * id_array,
     }
 
     /* all target ops are complete; pull them out of completion queue */
-    for(i=0; i<incount; i++)
+    for(i = 0; i < incount; i++)
     {
         tmp_desc = id_gen_safe_lookup(id_array[i]);
         if(tmp_desc && tmp_desc->completed_flag)
@@ -4978,6 +5060,8 @@ static int completion_query_some(job_id_t * id_array,
             }
             else
             {
+                gossip_ldebug(GOSSIP_JOB_DEBUG, "dealloc_job_desc(%p)\n",
+                              tmp_desc);
                 dealloc_job_desc(tmp_desc);
                 tmp_desc = NULL;
             }
@@ -4997,6 +5081,8 @@ static int completion_query_some(job_id_t * id_array,
 /* completion_query_context()
  *
  * retrieves completed jobs from specified context
+ * puts them in the out_id_array, returned_user_ptr_array, and
+ * out_status_array, if present.
  * 
  * returns 1 if anything completed, 0 otherwise 
  */
@@ -5019,6 +5105,8 @@ static int completion_query_context(job_id_t *out_id_array_p,
     {
         assert(query);
 
+        gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG, "found job on q\n");
+
         if (returned_user_ptr_array)
         {
             fill_status(query,
@@ -5030,6 +5118,7 @@ static int completion_query_context(job_id_t *out_id_array_p,
             fill_status(query, NULL, &(out_status_array_p[*inout_count_p]));
         }
         out_id_array_p[*inout_count_p] = query->job_id;
+
         job_desc_q_remove(query);
         (*inout_count_p)++;
 
@@ -5043,6 +5132,8 @@ static int completion_query_context(job_id_t *out_id_array_p,
         }
         else
         {
+            gossip_ldebug(GOSSIP_SM_JOBQ_DEBUG, "dealloc_job_desc(%p)\n",
+                          query);
             dealloc_job_desc(query);
             query = NULL;
         }
@@ -5057,6 +5148,46 @@ static int completion_query_context(job_id_t *out_id_array_p,
         return (0);
     }
 }
+
+#if 0
+/* debug_completion_queue()
+ *
+ * dumps the completion queue
+ * 
+ * returns 1 if anything completed, 0 otherwise 
+ */
+static int debug_completion_queue(int *inout_count_p,
+                                  job_context_id context_id)
+{
+    struct job_desc *jd;
+    int incount = *inout_count_p;
+    *inout_count_p = 0;
+
+    if (completion_error)
+    {
+        return (completion_error);
+    }
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "\n");
+    while ((*inout_count_p < incount) &&
+           (jd = job_desc_q_shownext(completion_queue_array[context_id])))
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "%p\n", jd->job_user_ptr);
+        (*inout_count_p)++;
+        jd = NULL;
+    }
+
+    if((*inout_count_p) > 0)
+    {
+        *inout_count_p = incount;
+        return(1);
+    }
+    else
+    {
+        *inout_count_p = incount;
+        return (0);
+    }
+}
+#endif
 
 #ifndef __PVFS2_JOB_THREADED__
 /* do_one_work_cycle_all()
@@ -5158,6 +5289,18 @@ static void flow_callback(flow_descriptor* flow_d, int cancel_path)
     }
 
     return;
+}
+
+/* job_clear_context
+ *
+ * removes all references to a defunct smcb from the
+ * completion queue.  Really just a wrapper so server
+ * can call the lower level routine
+ *
+ */
+void job_clear_context(int context, void *target)
+{
+    job_desc_q_clear(completion_queue_array[context], target);
 }
 
 /*

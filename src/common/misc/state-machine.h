@@ -40,6 +40,9 @@
  * function.  See src/server/server-state-machine.c for examples.
  */
 
+/* these are state runtime control that directs each state in
+ * executing.  Most common are RUN, JUMP, PJMP and SWITCH
+ */
 enum PINT_state_code {
     SM_NONE   = 0,
     SM_NEXT   = 1,
@@ -98,18 +101,21 @@ typedef struct PINT_smcb
     struct PINT_state_stack_s state_stack[PINT_STATE_STACK_SIZE];
 
     struct qlist_head frames;  /* circular list of frames */
-    int base_frame;   /* index of current base frame */
-    int frame_count;  /* number of frames in list */
+    int base_frame;            /* index of current base frame */
+    int frame_count;           /* number of frames in list */
+    int pjmp_frame_count;      /* number of PJMP frames on the stack */
+    int children_running;      /* the number of child SMs running */
+                               /* different from pjmp_frame_count because */
+                               /* this decrements as tasks finish */
 
     /* usage specific routine to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int, int);
     /* state machine context and control variables */
-    int op; /* this field externally indicates type of state machine */
+    int op; /* this field externally indicates type of state machine/request */
     PVFS_id_gen_t op_id; /* unique ID for this operation */
     struct PINT_smcb *parent_smcb; /* points to parent smcb or NULL */
     int op_terminate; /* indicates SM is ready to terminate */
     int op_cancelled; /* indicates SM operation was cancelled */
-    int children_running; /* the number of child SMs running */
     int op_completed;  /* indicates SM operation was added to completion Q */
     /* add a lock here */
     job_context_id context; /* job context when waiting for children */
@@ -217,13 +223,21 @@ int PINT_state_machine_locate(struct PINT_smcb *, int);
 int PINT_state_machine_locate(struct PINT_smcb *, int) __attribute__((used));
 #endif
 int PINT_smcb_set_op(struct PINT_smcb *smcb, int op);
+
 int PINT_smcb_op(struct PINT_smcb *smcb);
+
 int PINT_smcb_immediate_completion(struct PINT_smcb *smcb);
+
 void PINT_smcb_set_complete(struct PINT_smcb *smcb);
+
 int PINT_smcb_invalid_op(struct PINT_smcb *smcb);
+
 int PINT_smcb_complete(struct PINT_smcb *smcb);
+
 void PINT_smcb_set_cancelled(struct PINT_smcb *smcb);
+
 int PINT_smcb_cancelled(struct PINT_smcb *smcb);
+
 int PINT_smcb_alloc(struct PINT_smcb **,
                     int,
                     int,
@@ -231,16 +245,41 @@ int PINT_smcb_alloc(struct PINT_smcb **,
                     int (*term_fn)(struct PINT_smcb *,
                     job_status_s *),
                     job_context_id context_id);
+
 void PINT_smcb_free(struct PINT_smcb *);
+
+struct PINT_frame_info_s *PINT_sm_frame_info(struct PINT_smcb *, int);
+
 void *PINT_sm_frame(struct PINT_smcb *, int);
+
+int PINT_sm_push_frame_info(struct PINT_smcb *smcb,
+                            int task_id,
+                            struct PINT_frame_info_s *frame_p);
+
 int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);
+
+int PINT_sm_push_frame_ref(struct PINT_smcb *smcb,
+                           int task_id,
+                           void *frame_p,
+                           int refcnt);
+
+int PINT_sm_push_dup_frame(struct PINT_smcb *smcb, int frame_size);
+
+struct PINT_frame_info_s *PINT_sm_pop_frame_info(struct PINT_smcb *smcb,
+                                                 int *task_id,
+                                                 int *error_code,
+                                                 int *remaining);
 void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
                         int *task_id,
                         int *error_code,
                         int *remaining);
 
+PINT_sm_action PINT_sm_pop_old_pjmp_frames(struct PINT_smcb *smcb, int child_count);
+
+
 /* This macro is used in calls to PINT_sm_frame() */
 #define PINT_FRAME_CURRENT 0
+#define PINT_FRAME_PARENT -1
 #define PINT_FRAME_TOP 1
 
 extern struct PINT_state_machine_s pvfs2_void_sm;

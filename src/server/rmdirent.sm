@@ -17,6 +17,12 @@
 #include "pint-util.h"
 #include "pint-security.h"
 #include "dist-dir-utils.h"
+#include "sid.h"
+
+enum
+{
+    REMOTE = 37
+};
 
 %%
 
@@ -56,7 +62,7 @@ machine pvfs2_rmdirent_sm
     state remove_directory_entry
     {
         run rmdirent_remove_directory_entry;
-        success => update_directory_attr;
+        success => update_dirdata_attr;
         default => remove_directory_entry_failure;
     }
 
@@ -66,9 +72,34 @@ machine pvfs2_rmdirent_sm
         default => setup_resp;
     }
 
-    state update_directory_attr
+    state update_dirdata_attr
     {
-        run rmdirent_update_directory_attr;
+        run rmdirent_update_dirdata_attr;
+        REMOTE => update_remote_parent_dir;
+        default => read_local_parent_dir;
+    }
+
+    state read_local_parent_dir
+    {
+        run rmdirent_read_local_parent_dir;
+        default => update_local_parent_dir;
+    }
+
+    state update_local_parent_dir
+    {
+        run rmdirent_update_local_parent_dir;
+        default => setup_resp;
+    }
+
+    state update_remote_parent_dir
+    {
+        run rmdirent_update_remote_parent_dir;
+        default => run_remote_request;
+    }
+
+    state run_remote_request
+    {
+        jump pvfs2_msgpairarray_sm;
         default => setup_resp;
     }
 
@@ -198,8 +229,8 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
     
     if(js_p->error_code == -TROVE_ENOENT)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-            "rmdirent: no DIST_DIR_ATTR key present in dirdata handle!!\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "no DIST_DIR_ATTR key present in dirdata handle!!\n");
         attr_p->u.dirdata.dist_dir_bitmap = NULL;
         attr_p->u.dirdata.dirdata_handles = NULL;
         return SM_ACTION_COMPLETE;
@@ -208,11 +239,13 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
     assert(attr_p->objtype == PVFS_TYPE_DIRDATA &&
            attr_p->u.dirdata.dist_dir_attr.dirdata_count > 0);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "rmdirent: get dist-dir-attr for dirdata handle %s "
-            "with tree_height=%d, dirdata_count=%d, bitmap_size=%d, "
-            "split_size=%d, server_no=%d and branch_level=%d\n",
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+            "get bitmap for dirdata handle %s "
+            "with dirent_count %d " 
+            "tree_height %d dirdata_count %d bitmap_size %d "
+            "split_size %d server_no %d and branch_level %d\n",
             PVFS_OID_str(&s_op->req->u.rmdirent.handle),
+            attr_p->u.dirdata.dirent_count,
             attr_p->u.dirdata.dist_dir_attr.tree_height,
             attr_p->u.dirdata.dist_dir_attr.dirdata_count,
             attr_p->u.dirdata.dist_dir_attr.bitmap_size,
@@ -248,15 +281,15 @@ static PINT_sm_action rmdirent_get_bitmap(struct PINT_smcb *smcb,
     s_op->free_val = 0; /* will be freed in PINT_free_object_attr */
 
     js_p->error_code = 0;
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "  trying to read dirdata bitmap (coll_id = %d, "
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                 "posting read of dirdata bitmap (coll_id = %d, "
                  "handle = %s, key = %s (%d), val_buf = %p (%d))\n",
-                 s_op->req->u.rmdirent.fs_id,
+                 s_op->req->u.rmdirent.parent.fs_id,
                  PVFS_OID_str(&s_op->req->u.rmdirent.handle),
                  (char *)s_op->key.buffer, s_op->key.buffer_sz,
                  s_op->val.buffer, s_op->val.buffer_sz);
 
-    ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
+    ret = job_trove_keyval_read(s_op->req->u.rmdirent.parent.fs_id,
                                 s_op->req->u.rmdirent.handle,
                                 &s_op->key,
                                 &s_op->val,
@@ -292,10 +325,10 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     attr_p = &s_op->attr;
     
     /* gossip bitmap, since jump from get_bitmap*/
-    gossip_debug(GOSSIP_SERVER_DEBUG, "rmdirent: dist_dir_bitmap as:\n");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "bitmap:\n");
     for(i = attr_p->u.dirdata.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {       
-        unsigned char *c = (unsigned char *)(attr_p->u.dirdata.dist_dir_bitmap + i);
+        unsigned char *c GCC_UNUSED = (unsigned char *)(attr_p->u.dirdata.dist_dir_bitmap + i);
         gossip_debug(GOSSIP_SERVER_DEBUG,
                 " i=%d : %02x %02x %02x %02x\n",
                 i, c[3], c[2], c[1], c[0]);
@@ -309,8 +342,8 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     
     /* find the hash value and the dist dir bucket */
     dirdata_hash = PINT_encrypt_dirdata(s_op->req->u.rmdirent.entry);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-        "rmdirent: encrypt dirent %s into hash value %llu.\n",
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+            "encrypt dirent %s into hash value %llu.\n",
             s_op->req->u.rmdirent.entry,
             llu(dirdata_hash));
             
@@ -318,14 +351,14 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
             dirdata_hash,
             &attr_p->u.dirdata.dist_dir_attr,
             attr_p->u.dirdata.dist_dir_bitmap);
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-        "rmdirent: selecting bucket No.%d from dist_dir_bitmap.\n",
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+            "selecting bucket %d from dist_dir_bitmap.\n",
             dirdata_server_index);
             
     if(dirdata_server_index != attr_p->u.dirdata.dist_dir_attr.server_no)
     {       
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-             "rmdirent: error: WRONG dirdata object for the dirent! Returning error.\n");    
+        gossip_lerr("error: WRONG dirdata object for the dirent! Returning error.\n");    
  
         /* return an error to tell the client to try again */
         js_p->error_code = -PVFS_EAGAIN;
@@ -333,15 +366,12 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     }   
     else
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                "rmdirent: Correct dirdata object!\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Correct dirdata object!\n");
     }           
     
     /* start removing entry */
-    PINT_ACCESS_DEBUG(s_op,
-                      GOSSIP_ACCESS_DEBUG,
-                      "rmdirent entry: %s\n",
-                      s_op->req->u.rmdirent.entry);
+    gossip_lsdebug(GOSSIP_ACCESS_DEBUG, "rmdirent entry: %s\n",
+                   s_op->req->u.rmdirent.entry);
         
     /* set up key and structure for keyval remove */
     s_op->key.buffer = s_op->req->u.rmdirent.entry;
@@ -349,7 +379,7 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
 
     /* keyval_remove returns the removed dirent */
     ret = PINT_cached_config_get_metadata_sid_count(
-                                         s_op->req->u.rmdirent.fs_id,
+                                         s_op->req->u.rmdirent.parent.fs_id,
                                          &(s_op->metasidcnt));
     
     if (s_op->metasidcnt < 1)
@@ -371,7 +401,7 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     s_op->u.rmdirent.entry_handle = malloc(s_op->val.buffer_sz);
     s_op->val.buffer = s_op->u.rmdirent.entry_handle;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "removing entry %s from dirdata "
                  "object (handle = %s)\n", s_op->req->u.rmdirent.entry,
                  PVFS_OID_str(&s_op->req->u.rmdirent.handle));
 
@@ -381,9 +411,17 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     /* Also keep track of the keyval entries removed on this handle.  Because
      * we're doing a remove, this should decrement the count.
      */
-    flags |= TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY;
+    /* flags |= TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY; */
+    /* we don't keep dirent counts (handle counts) in the keyval db
+     * any more, we keep them in the dspace as an object attr.  Thus we
+     * don't use these flags any more.  There is a dirent count in the
+     * directory meant only for quick access such as display not as an
+     * authoratative value.  We write this back in the next state.
+     */
 
-    ret = job_trove_keyval_remove(s_op->req->u.rmdirent.fs_id,
+    flags |= TROVE_KEYVAL_DIRECTORY_ENTRY; 
+
+    ret = job_trove_keyval_remove(s_op->req->u.rmdirent.parent.fs_id,
                                   s_op->req->u.rmdirent.handle,
                                   &s_op->key, 
                                   &s_op->val,
@@ -399,13 +437,10 @@ static int rmdirent_remove_directory_entry(struct PINT_smcb *smcb,
     return ret;
 }
 
-/* I don't understand the Chinease fire drill with the attribute buffers.
- * We are not changing any attributes here, only taking a blank buffer and
- * copying around before converting to DS attribs. Since that is all we
- * really need to do (convert) I'm taking out this overwrite stuff.  WBL
+/* This writes the attrs for the dirdata back to the DB
  */
-static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
-                                                     job_status_s *js_p)
+static PINT_sm_action rmdirent_update_dirdata_attr(struct PINT_smcb *smcb,
+                                                   job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -413,22 +448,29 @@ static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
-    /*
-    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
-    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-    */
+    dspace_attr = &s_op->attr;  /* this is dirdata local NOT parent dir */
+    ds_attr = &s_op->ds_attr;
 
-    dspace_attr = &s_op->attr;
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Old dirdata dirent_count %d\n",
+                   dspace_attr->u.dirdata.dirent_count);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "DSATTR dirdata dirent_count %ld\n",
+                   s_op->ds_attr.u.dirdata.dirent_count);
 
-    /*
-    PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
-    */
+    dspace_attr->u.dirdata.dirent_count -= 1;
 
-    ds_attr = &(s_op->u.rmdirent.dirdata_ds_attr);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New dirdata dirent_count %d\n",
+                   dspace_attr->u.dirdata.dirent_count);
+
+    dspace_attr->ctime = dspace_attr->mtime = PINT_util_get_current_time();
+
     PVFS_ds_attr_from_object_attr(ds_attr, dspace_attr);
 
-    /* setting dspace */
-    ret = job_trove_dspace_setattr(s_op->req->u.rmdirent.fs_id,
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to update dirdata %s dirent_count %ld\n",
+               PVFS_OID_str(&s_op->req->u.rmdirent.handle),
+               ds_attr->u.dirdata.dirent_count);
+
+    /* setting dirdata dspace attributes */
+    ret = job_trove_dspace_setattr(s_op->req->u.rmdirent.parent.fs_id,
                                    s_op->req->u.rmdirent.handle,
                                    ds_attr,
                                    TROVE_SYNC,
@@ -438,8 +480,174 @@ static PINT_sm_action rmdirent_update_directory_attr(struct PINT_smcb *smcb,
                                    &j_id,
                                    server_job_context,
                                    s_op->req->hints);
-
+    if (ret < 0)
+    {
+        gossip_lerr("post of dspace_setattr failed\n");
+        return ret;
+    }
+    /* decide if parent is local or not */
+    if(!PINT_cached_config_server_local(&s_op->req->u.rmdirent.parent.sid_array[0]))
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Remote DIR entry\n");
+        js_p->error_code = REMOTE;
+    }
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "local DIR entry\n");
     return ret;
+}
+
+/* Before we can update the dir we need to read the attributes for the dir which
+ * at this point we have decided are local
+ */
+static PINT_sm_action rmdirent_read_local_parent_dir(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    PVFS_ds_attributes *ds_attr = &s_op->u.rmdirent.dir_ds_attr;
+    job_id_t j_id;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Read attrs from local parent dspace\n");
+
+    ret = job_trove_dspace_getattr(s_op->req->u.rmdirent.parent.fs_id,
+                                   s_op->req->u.rmdirent.parent.handle,
+                                   smcb,
+                                   ds_attr,
+                                   0,
+                                   js_p,
+                                   &j_id,
+                                   server_job_context,
+                                   s_op->req->hints);
+    return ret;
+}
+
+/* now write back the attrs for the local dir
+ * we don't bother converting from/to DS attr, it is a simple change
+ */
+static PINT_sm_action rmdirent_update_local_parent_dir(struct PINT_smcb *smcb,
+                                                       job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -1;
+    PVFS_ds_attributes *ds_attr = NULL;
+    job_id_t j_id;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Write attrs to local parent dspace\n");
+
+    ds_attr = &(s_op->u.rmdirent.dir_ds_attr);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Old dir dirent_count %ld\n",
+                 ds_attr->u.directory.dirent_count);
+
+    ds_attr->u.directory.dirent_count -= 1;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "New dir dirent_count %ld\n",
+                 ds_attr->u.directory.dirent_count);
+
+    ds_attr->ctime = ds_attr->mtime = PINT_util_get_current_time();
+
+    /* setting dirdata dspace attributes */
+    ret = job_trove_dspace_setattr(s_op->req->u.rmdirent.parent.fs_id,
+                                   s_op->req->u.rmdirent.parent.handle,
+                                   ds_attr,
+                                   TROVE_SYNC | TROVE_KEYVAL_DIRECTORY_ENTRY,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &j_id,
+                                   server_job_context,
+                                   s_op->req->hints);
+    if (ret < 0)
+    {
+        gossip_lerr("post of dspace_setattr failed\n");
+        return ret;
+    }
+    return ret;
+}
+
+/* set up a remote request for MPA
+ */
+static PINT_sm_action rmdirent_update_remote_parent_dir(struct PINT_smcb *smcb,
+                                                        job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgpair;
+    PVFS_object_attr tmp_attr;
+    PVFS_handle *capability_handles = NULL;
+    int ret;
+
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->req->u.rmdirent.fs_id);
+
+    /* If we created a capability in crdirent_update_parent_dir_timestamp
+     * we need to clean it up first. */
+    PINT_cleanup_capability(&s_op->u.crdirent.capability);
+
+    /* This memory will be freed in either crdirent_cleanup or
+     * crdirent_find_split_entries by PINT_cleanup_capability. */
+    capability_handles = malloc(sizeof(PVFS_handle)); 
+    if (! capability_handles)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return SM_ACTION_COMPLETE;
+    }
+
+    capability_handles[0] = s_op->req->u.crdirent.parent_ref.handle;
+    ret = PINT_server_to_server_capability(&s_op->u.rmdirent.capability,
+                                           s_op->req->u.rmdirent.parent.fs_id,
+                                           1,
+                                           capability_handles);
+    if (ret != 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Write attrs to remote parent via setattr\n");
+
+    /* update dirent_count on DIR which sums all dirdata for this dir */
+    tmp_attr.mask = PVFS_ATTR_COMMON_CTIME; /* set time to remote server time */
+    tmp_attr.mask |= PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_DIRENT_COUNT_DECR;
+
+    /* Capability was initialized earlier. */
+    PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                              PVFS_REQ_NONE,  /* logically target must exist */
+                              s_op->u.rmdirent.capability,
+                              s_op->u.rmdirent.credential,
+                              s_op->req->u.rmdirent.parent.fs_id,
+                              s_op->req->u.rmdirent.parent.handle,
+                              s_op->req->u.rmdirent.parent.sid_count,
+                              s_op->req->u.rmdirent.parent.sid_array,
+                              tmp_attr,
+                              s_op->req->hints);
+
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
+    msg_p->fs_id = s_op->req->u.rmdirent.parent.fs_id;
+    msg_p->handle = s_op->req->u.rmdirent.parent.handle;
+    msg_p->sid_count = s_op->req->u.rmdirent.parent.sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = s_op->req->u.rmdirent.parent.sid_array;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "setting timestamps for directory handle %s SID %s\n",
+                   PVFS_OID_str(&msg_p->handle),
+                   PVFS_SID_str(&s_op->req->u.rmdirent.parent.sid_array[0]));
+
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr,
+                            &s_op->req->u.rmdirent.parent.sid_array[0]);
+    if (ret)
+    {
+        gossip_err("Failed to map dirdata server address\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* ready to submit the requests */
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    return SM_ACTION_COMPLETE;
 }
 
 /* Function: rmdirent_read_directory_entry_failure
@@ -467,7 +675,7 @@ static PINT_sm_action rmdirent_remove_directory_entry_failure(
             js_p->error_code = -PVFS_ENOENT;
             break;
         case -PVFS_EAGAIN:
-            gossip_debug(GOSSIP_SERVER_DEBUG, "mismatch dirdata!!\n");
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "mismatch dirdata!!\n");
             break;
         default:
             gossip_lerr("unexpected error %d\n", js_p->error_code);
@@ -492,13 +700,13 @@ static PINT_sm_action rmdirent_setup_resp(
         s_op->resp.u.rmdirent.sid_array =
                              (PVFS_SID *)&s_op->u.rmdirent.entry_handle[1];
 
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "  succeeded; returning handle %s in response\n",
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                     "succeeded; returning handle %s in response\n",
                      PVFS_OID_str(&s_op->resp.u.rmdirent.entry_handle));
     }
     else
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "  sending error response\n");
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "sending error response\n");
     }
 
     /* NOTE: we _intentionally_ leave the error_code field the way that
@@ -535,7 +743,15 @@ static int perm_rmdirent(PINT_server_op *s_op)
     return ret;
 }
 
-PINT_GET_OBJECT_REF_DEFINE(rmdirent);
+/* PINT_GET_OBJECT_REF_DEFINE(rmdirent); */
+static inline int PINT_get_object_ref_rmdirent(struct PVFS_server_req *req,
+                                               PVFS_fs_id *fs_id,
+                                               PVFS_handle *handle)
+{
+    *fs_id = req->u.rmdirent.parent.fs_id;
+    *handle = req->u.rmdirent.handle;
+    return 0;
+}
 
 struct PINT_server_req_params pvfs2_rmdirent_params =
 {

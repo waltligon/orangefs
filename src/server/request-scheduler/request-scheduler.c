@@ -358,6 +358,8 @@ int PINT_req_sched_post(enum PVFS_server_op op,
     struct qlist_head *iterator;
     int tmp_flag;
 
+
+
     if(sched_policy == PINT_SERVER_REQ_BYPASS)
     {
         if(access_type == PINT_SERVER_REQ_MODIFY && !PVFS_SERV_IS_MGMT_OP(op))
@@ -481,10 +483,9 @@ int PINT_req_sched_post(enum PVFS_server_op op,
             {
                 tmp_element->state = REQ_SCHEDULED;
                 ret = 1;
-                gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-                             "REQ SCHED allowing "
-                             "concurrent I/O, handle: %s\n",
-                             PVFS_OID_str(&handle));
+                gossip_ldebug(GOSSIP_REQ_SCHED_DEBUG,
+                              "Allowing concurrent I/O, handle: %s\n",
+                              PVFS_OID_str(&handle));
             }
             else
             {
@@ -517,10 +518,9 @@ int PINT_req_sched_post(enum PVFS_server_op op,
             {
                 tmp_element->state = REQ_SCHEDULED;
                 ret = 1;
-                gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-                             "REQ SCHED allowing "
-                             "concurrent read only, handle: %s\n",
-                             PVFS_OID_str(&handle));
+                gossip_ldebug(GOSSIP_REQ_SCHED_DEBUG,
+                              "Allowing concurrent read only, handle: %s\n",
+                              PVFS_OID_str(&handle));
             }
             else
             {
@@ -539,10 +539,9 @@ int PINT_req_sched_post(enum PVFS_server_op op,
              */
             tmp_element->state = REQ_SCHEDULED;
             tmp_element->access_type = PINT_SERVER_REQ_READONLY;
-            gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-                         "REQ SCHED allowing "
-                         "concurrent dirent op, handle: %s\n", 
-                         PVFS_OID_str(&handle));
+            gossip_ldebug(GOSSIP_REQ_SCHED_DEBUG,
+                          "Allowing concurrent dirent op, handle: %s\n", 
+                          PVFS_OID_str(&handle));
             ret = 1;
         }
 	else
@@ -557,17 +556,18 @@ int PINT_req_sched_post(enum PVFS_server_op op,
     qlist_add_tail(&(tmp_element->list_link), &(tmp_list->req_list));
 
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		 "REQ SCHED POSTING, handle: %s, queue_element: %p\n",
+		 "POSTING, handle: %s, queue_element: (%p)\n",
                  PVFS_OID_str(&handle),
                  tmp_element);
 
     if (ret == 1)
     {
-	gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED SCHEDULING, "
-                     "handle: %s, queue_element: %p\n",
-		     PVFS_OID_str(&handle),
-                     tmp_element);
+	gossip_ldebug(GOSSIP_REQ_SCHED_DEBUG, "SCHEDULING, "
+                      "handle: %s, queue_element: (%p)\n",
+	 	     PVFS_OID_str(&handle),
+                      tmp_element);
     }
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Posting %ld\n", *out_id);
     sched_count++;
     return (ret);
 }
@@ -667,6 +667,8 @@ int PINT_req_sched_unpost(req_sched_id in_id, void **returned_user_ptr)
     struct req_sched_element *tmp_element = NULL;
     struct req_sched_element *next_element = NULL;
     int next_ready_flag = 0;
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Unposting %ld\n", in_id);
 
     /* NOTE: we set the next_ready_flag to 1 if the next element in
      * the queue should be put in the ready list 

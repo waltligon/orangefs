@@ -166,6 +166,7 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
  * @ptr:	the &struct qlist_head pointer.
  * @type:	the type of the struct this is embedded in.
  * @member:	the name of the qlist_struct within the struct.
+ * Returns a pointer to the type of the structs on the list
  */
 #define qlist_entry(ptr, type, member) \
     ((type *)((char *)(ptr)-(unsigned long)((&((type *)0)->member))))
@@ -181,9 +182,9 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
 /**
  * list_for_each_safe - iterate over a list safe against 
  *     removal of list entry
- * @pos:  the &struct list_head to use as a loop counter.
- * @n:    another &struct list_head to use as temporary storage
- * @head: the head for your list.
+ * @pos:     the &struct list_head to use as a loop counter.
+ * @scratch: another &struct list_head to use as temporary storage
+ * @head:    the head for your list.
  */
 #define qlist_for_each_safe(pos, scratch, head) \
     for (pos = (head)->next, scratch = pos->next; pos != (head);\

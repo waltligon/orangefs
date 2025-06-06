@@ -288,16 +288,15 @@ int PINT_acache_get_cached_entry(
          * potentially some dynamic attributes.
          */
         PINT_perf_count(acache_pc, PERF_ACACHE_MISSES, 1, PINT_PERF_ADD);
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: miss: H=%s\n",
-                     __func__, PVFS_OID_str(&refn.handle));
+        gossip_ldebug(GOSSIP_ACACHE_DEBUG, "miss: H=%s\n",
+                      PVFS_OID_str(&refn.handle));
         tmp_payload = NULL;
         goto done;
     }
     else
     {
-        gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: hit acache payload and attr_status is okay\n",
-                   __func__);
+        gossip_ldebug(GOSSIP_ACACHE_DEBUG,
+                      "hit acache payload and attr_status is okay\n");
         tmp_payload = tmp_entry->payload;
 
         if(tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE)
@@ -311,17 +310,15 @@ int PINT_acache_get_cached_entry(
              */
             usecs_since_dynamic_attrs_update = PINT_util_get_timeval_diff(
                 &tmp_payload->dynamic_attrs_last_updated, &current_time);
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: usecs_since_dynamic_attrs_update = %d\n",
-                         __func__,
+            gossip_ldebug(GOSSIP_ACACHE_DEBUG,
+                         "usecs_since_dynamic_attrs_update = %d\n",
                          usecs_since_dynamic_attrs_update);
             /* TODO use client specified timeout instead of default */
             if(usecs_since_dynamic_attrs_update >
                (ACACHE_DEFAULT_DYNAMIC_TIMEOUT_MSECS * 1000))
             {
-                gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: dynamic attrs have timed out!\n",
-                             __func__);
+                gossip_ldebug(GOSSIP_ACACHE_DEBUG,
+                             "dynamic attrs have timed out!\n");
                 /* Strip the cached mask of the PVFS_ATTR_DATA_SIZE bitmask */
                 tmp_payload->attr.mask &= ~(PVFS_ATTR_DATA_SIZE);
             }
@@ -333,10 +330,8 @@ int PINT_acache_get_cached_entry(
                  */
                 assert(tmp_payload->attr.mask & PVFS_ATTR_DATA_SIZE);
 
-                gossip_debug(GOSSIP_ACACHE_DEBUG,
-                             "%s: dynamic attrs are still valid for %d "
-                             "usecs!\n",
-                             __func__,
+                gossip_ldebug(GOSSIP_ACACHE_DEBUG,
+                             "dynamic attrs are still valid for %d usecs!\n",
                              ACACHE_DEFAULT_DYNAMIC_TIMEOUT_MSECS * 1000
                                 - usecs_since_dynamic_attrs_update);
                 /* No need to modify the mask here since the bits are included
@@ -347,10 +342,7 @@ int PINT_acache_get_cached_entry(
                 {
                     *size = tmp_payload->size;
                     *size_status = 0;
-                    gossip_debug(GOSSIP_ACACHE_DEBUG,
-                                 "%s: size = %lld\n",
-                                 __func__,
-                                 lld(*size));
+                    gossip_debug(GOSSIP_ACACHE_DEBUG, "size = %lld\n", lld(*size));
                 }
             }
         }
@@ -504,6 +496,10 @@ int PINT_acache_update(
     /* copy attrs into payload, excluding capability and size_array */
     save_mask = attr->mask;
     /* Don't cache size_array (indicated by PVFS_ATTR_DIR_DIRENT_COUNT). */
+    /* this does not indicate a size array, its in the dir's copy of
+     * the number of dirents - which works like the fiel size but needs
+     * its own fields and flags.  I'm not sure where the "sise array" is
+     */
     attr->mask &= ~(PVFS_ATTR_CAPABILITY | PVFS_ATTR_DIR_DIRENT_COUNT);
     ret = PINT_copy_object_attr(&tmp_payload->attr, attr);
     attr->mask = save_mask;

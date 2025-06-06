@@ -18,6 +18,11 @@
 #include "pint-util.h"
 #include "dist-dir-utils.h"
 
+/* need to remove keyval read states dist_dir_attr
+ * keep bitmap if needed
+ * add state to write dspace back to db
+ */
+
 %%
 
 machine pvfs2_mgmt_remove_dirent_sm
@@ -25,16 +30,19 @@ machine pvfs2_mgmt_remove_dirent_sm
     state prelude
     {
         jump pvfs2_prelude_sm;
-        success => get_dist_dir_attr;
+        success => get_bitmap;
+        /*success => get_dist_dir_attr;*/
         default => final_response;
     }
 
+/*
     state get_dist_dir_attr
     {
         run mgmt_remove_dirent_get_dist_dir_attr;
         success => get_bitmap;
         default => final_response;
     }
+*/
 
     state get_bitmap
     {
@@ -46,6 +54,14 @@ machine pvfs2_mgmt_remove_dirent_sm
     state remove_dirent
     {
         run mgmt_remove_dirent;
+        default => update_dspace;
+        /*default => final_response;*/
+    }
+
+    /* new state */
+    state update_dspace
+    {
+        run mgmt_update_dspace;
         default => final_response;
     }
 
@@ -64,6 +80,7 @@ machine pvfs2_mgmt_remove_dirent_sm
 
 %%
 
+#if 0
 static PINT_sm_action mgmt_remove_dirent_get_dist_dir_attr(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
@@ -112,6 +129,7 @@ static PINT_sm_action mgmt_remove_dirent_get_dist_dir_attr(
 
     return ret;
 }
+#endif
 
 
 static PINT_sm_action mgmt_remove_dirent_get_bitmap(struct PINT_smcb *smcb,
@@ -208,7 +226,7 @@ static PINT_sm_action mgmt_remove_dirent(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     int i;
-    unsigned char *c;
+    unsigned char *c __attribute__ ((unused));
     PVFS_object_attr *attr_p;
 
     js_p->error_code = 0;
@@ -272,18 +290,53 @@ static PINT_sm_action mgmt_remove_dirent(struct PINT_smcb *smcb,
         PVFS_OID_str(&s_op->u.mgmt_remove_dirent.dirdata_handle));
 
     ret = job_trove_keyval_remove(
-        s_op->req->u.mgmt_remove_dirent.fs_id,
-        s_op->req->u.mgmt_remove_dirent.handle,
-        &s_op->key,
-        NULL,
-        TROVE_SYNC | TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY,
-        NULL,
-        smcb,
-        0,
-        js_p,
-        &j_id,
-        server_job_context, s_op->req->hints);
+            s_op->req->u.mgmt_remove_dirent.fs_id,
+            s_op->req->u.mgmt_remove_dirent.handle,
+            &s_op->key,
+            NULL,
+            /* TROVE_SYNC | TROVE_KEYVAL_HANDLE_COUNT | TROVE_KEYVAL_DIRECTORY_ENTRY, */
+            TROVE_SYNC | TROVE_KEYVAL_DIRECTORY_ENTRY,
+            NULL,
+            smcb,
+            0,
+            js_p,
+            &j_id,
+            server_job_context, s_op->req->hints);
 
+    /* keeping this close to the dirent operation
+     * This will get written back in a later state
+     */
+    attr_p->u.dirdata.dirent_count -= 1;
+
+    return ret;
+}
+
+/* added function */
+static PINT_sm_action mgmt_update_dspace(struct PINT_smcb *smcb,
+                                         job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    int ret = -PVFS_EINVAL;
+    job_id_t j_id; 
+    PVFS_object_attr *dspace_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+    
+    dspace_attr = &s_op->attr;
+    
+    ds_attr = &(s_op->u.rmdirent.dirdata_ds_attr);
+    PVFS_ds_attr_from_object_attr(ds_attr, dspace_attr);
+
+    /* setting dspace */
+    ret = job_trove_dspace_setattr(s_op->req->u.mgmt_remove_dirent.fs_id,
+                                   s_op->req->u.mgmt_remove_dirent.handle,
+                                   ds_attr,
+                                   TROVE_SYNC,
+                                   smcb,
+                                   0,
+                                   js_p,
+                                   &j_id,
+                                   server_job_context,
+                                   s_op->req->hints);
     return ret;
 }
 

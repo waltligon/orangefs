@@ -25,6 +25,7 @@
 #include "pint-util.h"
 #include "server-config-mgr.h"
 #include "state-machine.h"
+#include "pvfs2-server.h"
 
 #define MPA_SUM_CT (mop->params.send_ct + mop->params.recv_ct + \
                     mop->params.flow_ct + mop->params.ack_ct)
@@ -171,10 +172,9 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
-                   "(%d msgpair(s))\n", mop->count);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairs %d\n", mop->count);
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"base frame:%d frame count:%d\n"
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"base frame %d frame count %d\n"
                                     ,smcb->base_frame, smcb->frame_count);
 
     /* PVFS_perror_gossip_verbose(); */
@@ -207,45 +207,56 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
         msg_p->op_action = PVFS_MPA_OK;
 
     }
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray init done.");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray init done.\n");
     return SM_ACTION_COMPLETE;
 }
 
+/* Recall that this code may be called by the Server or the Client, and
+ * in either case you can't tell what type of frame it is.  We could
+ * fix this, but it isn't clear its actually needed.  In most cases
+ * referencing a particular frame is mostly for debug printing.
+ */
+/* This pushes frames to start new SMs with a PJMP
+ */
 static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
-                 smcb, __func__);
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray forking off SMCBs: %s\n",
-                 smcb, __func__);
+
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "Setting up SMCBs to fork on mop (%p)\n", mop);
     for(i = 0; i < mop->count; i++)
     {
         PINT_sm_msgarray_op *submop;
         submop = (PINT_sm_msgarray_op *)malloc(sizeof(PINT_sm_msgarray_op));
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) SMCB %d forking\n", smcb, i);
         submop->params = mop->params;
         submop->count = mop->count;
         submop->index = i;
         submop->msgarray = mop->msgarray;
         PINT_sm_push_frame(smcb, i + 1, submop); /* task 0 is invalid */
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "MOP %d(%p) ready to fork\n", i, submop);
     }
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "SMCB (%p) ready to fork\n", smcb);
     return SM_ACTION_COMPLETE;
 }
 
+/* This cleans up the PJMP processes after they are done
+ */
 static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
-                 smcb, __func__);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray fork cleanup\n");
     for(i = 0; i < mop->count; i++)
     {
         PINT_sm_msgarray_op *submop;
         int task_id;
         int error_code;
+        /* is this always one frame, or do we need a loop */
         submop = (PINT_sm_msgarray_op *)PINT_sm_pop_frame(smcb,
                                                           &task_id,
                                                           &error_code,
@@ -262,9 +273,9 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
             {
                char buf[1024];
                PVFS_strerror_r(error_code, buf, 1024);
-               gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                            "error code (%d) returned from pjmp in MPA: %s\n",
-                            error_code, buf);
+               gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                              "error code (%d) returned from pjmp in MPA: %s\n",
+                              error_code, buf);
             }
         }
         if ((submop->count != mop->count && js_p->error_code == 0))
@@ -287,12 +298,14 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
 static PINT_sm_action msgpairarray_done(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
-    int task_id, error_code, remaining;
+    /*int task_id, error_code, remaining;*/
     /* can we pop this before we return? */
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
-                 smcb, __func__);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray done\n");
     PVFS_perror_gossip_verbose();
-    PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
+    /* This may be in error - need to check and see if this
+     * is the right place to pop this.  It generates an error
+     */
+    /*PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);*/
     return SM_ACTION_COMPLETE;
 }
 
@@ -321,12 +334,19 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
-    int ret = -PVFS_EINVAL, i = 0, tmp = 0;
+    int ret = -PVFS_EINVAL, tmp = 0;
+    int i GCC_UNUSED = 0;
     struct server_configuration_s *server_config = NULL;
-    PVFS_msg_tag_t session_tag;
     struct filesystem_configuration_s *cur_fs = NULL;
     int must_loop_encodings = 0;
     int local_enc_and_alloc = 0;
+
+    /* are these asserts appropriate or poor job of error
+     * handling?
+     */
+    assert(mop->count > 0);
+    assert(msg_p);
+    /* assert(mop->params.comp_ct >= 2); */
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, 
                  "%d total message(s) with %d incomplete\n",
@@ -336,10 +356,6 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
                    msg_p->req.op);
 
     js_p->error_code = 0;
-
-    assert(mop->count > 0);
-    assert(msg_p);
-    /* assert(mop->params.comp_ct >= 2); */
 
     i = mop->index; /* we removed a for loop but i is still convenient */
 
@@ -366,11 +382,13 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         if (msg_p->fs_id != PVFS_FS_ID_NULL)
         {
             server_config = PINT_server_config_mgr_get_config(msg_p->fs_id);
+            /* assert or print error and return? */
             assert(server_config);
 
             cur_fs = PINT_config_find_fs_id(server_config, msg_p->fs_id);
-            PINT_server_config_mgr_put_config(server_config);
+            /* assert or print error and return? */
             assert(cur_fs);
+            PINT_server_config_mgr_put_config(server_config);
             msg_p->enc_type = cur_fs->encoding;
         } 
         if (!ENCODING_IS_VALID(msg_p->enc_type))
@@ -387,6 +405,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         }
 
     try_next_encoding:
+        /* is this really a problem?  should we return an error */
         assert(ENCODING_IS_VALID(msg_p->enc_type));
 
         ret = PINT_encode(&msg_p->req,
@@ -430,11 +449,14 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         local_enc_and_alloc = 1;
     } /*  if (msg_p->encoded_resp_p == NULL)  */
 
-    session_tag = PINT_util_get_next_tag();
+    msg_p->session_tag = PINT_util_get_next_tag();
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair session tag %d\n",
+                   msg_p->session_tag);
 
     /*store the session tag for this msgpair, so the msgpair completion */
     /*function can pass it to the caller of msgpairarray.               */
-    msg_p->session_tag = session_tag;
+    mop->params.recv_ct = 0;
+    mop->params.send_ct = 0;
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair index %d: posting recv\n", i);
 
@@ -442,7 +464,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     ret = job_bmi_recv(msg_p->svr_addr,
                        msg_p->encoded_resp_p,
                        msg_p->max_resp_sz,
-                       session_tag,
+                       msg_p->session_tag,
                        BMI_PRE_ALLOC,
                        smcb,
                        PVFS_MPA_RECV,
@@ -468,7 +490,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     }
 
     /* there is an assumption that job_test won't ever return a 1 as
-     * immediate completion doesn't make sense
+     * immediate completion because it doesn't make sense
      */
     if ((ret < 0) || (ret == 1))
     {
@@ -476,6 +498,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         /* it is impossible for this recv to complete at this point
          * without errors; we haven't sent the request yet!
          */
+        /* assert or return error? */
         assert(ret < 0 || msg_p->recv_status.error_code != 0);
         if (ret < 0)
         {
@@ -505,14 +528,21 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         js_p->error_code = ret; /* take default */
         return SM_ACTION_COMPLETE;
     }
+    else
+    {
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Successful Recv post\n");
+    }
 
     /* if we reach here, the recv has been posted without failure, but
      * has not completed yet
      */
+    /* assert?  why?  we don't use ret before it is assigned again
+     * so this really doesn't matter
+     */
     assert(ret == 0);
     mop->params.recv_ct++;
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair index %d: posting send\n",i);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair index %d: posting send\n", i);
 
     /* post send of request; job_id stored in send_id */
     ret = job_bmi_send_list(msg_p->encoded_req.dest,
@@ -520,7 +550,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
                             msg_p->encoded_req.size_list,
                             msg_p->encoded_req.list_count,
                             msg_p->encoded_req.total_size,
-                            session_tag,
+                            msg_p->session_tag,
                             msg_p->encoded_req.buffer_type,
                             1,
                             smcb,
@@ -554,8 +584,9 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     }
     else if (ret == 1)
     {
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Successful post, immediate successful completion\n");
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Successful Send post, immediate successful completion\n");
         /* immediate successful completion */
+        msg_p->op_status = msg_p->send_status.error_code; /* should be zero */
         msg_p->send_id = 0;
     }
     else
@@ -565,7 +596,10 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         mop->params.send_ct++;
     }
  
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Exiting correctly, still waiting on completions\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "Exiting correctly, still waiting for %d "
+                   "send and %d recv completions\n",
+                   mop->params.send_ct, mop->params.recv_ct);
     /* we are still waiting on operations to complete, next state
      * transition will handle them
      */
@@ -714,8 +748,6 @@ static PINT_sm_action msgpairarray_post_ack_flow (struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[js_p->status_user_tag];
     int ret = -PVFS_EINVAL;
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
-                 smcb, __func__);
 
     /* First decode the server response */
     ret = io_process_message_recv(mop, js_p);
@@ -724,10 +756,10 @@ static PINT_sm_action msgpairarray_post_ack_flow (struct PINT_smcb *smcb,
         char buf[64] = {0};
         PVFS_strerror_r(ret, buf, 64);
 
-        gossip_debug(GOSSIP_IO_DEBUG,
-                     "%s: io_process_message_recv failed: "
-                     "%s (%d remaining msgpairs)\n",
-                     __func__, buf, MPA_SUM_CT);
+        gossip_lsdebug(GOSSIP_IO_DEBUG,
+                       "io_process_message_recv failed: "
+                       "%s (%d remaining msgpairs)\n",
+                       buf, MPA_SUM_CT);
                       
         /* if recv failed, probably have to do the send again too */
         msg_p->op_action = PVFS_MPA_FAIL;
@@ -741,8 +773,8 @@ static PINT_sm_action msgpairarray_post_ack_flow (struct PINT_smcb *smcb,
         /* if this is a WRITE there is another ACK at the end so we need
          * to set up to receive it
          */
-        gossip_debug(GOSSIP_IO_DEBUG, "  preposting write "
-                     "ack for context %p.\n", msg_p);
+        gossip_lsdebug(GOSSIP_IO_DEBUG,
+                       "preposting write ack for context %p.\n", msg_p);
 
         msg_p->max_resp_sz = PINT_encode_calc_max_size(
                                                  PINT_ENCODE_RESP,
@@ -770,6 +802,10 @@ static PINT_sm_action msgpairarray_post_ack_flow (struct PINT_smcb *smcb,
          * after the flow completes since we don't know how long a flow
          * can take at this point
          */
+
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Receive session tag %d\n",
+                       msg_p->session_tag);
+
         ret = job_bmi_recv(msg_p->svr_addr,
                            msg_p->encoded_resp_p,
                            msg_p->max_resp_sz,
@@ -818,12 +854,9 @@ static PINT_sm_action msgpairarray_post_ack_flow (struct PINT_smcb *smcb,
         char buf[64] = {0};
         PVFS_strerror_r(ret, buf, 64);
             
-        gossip_debug(GOSSIP_IO_DEBUG,
-                     "%s: io_post_flow failed: "
-                     "%s (%d remaining msgpairs)\n",
-                     __func__, 
-                     buf, 
-                     MPA_SUM_CT);
+        gossip_lsdebug(GOSSIP_IO_DEBUG,
+                       "io_post_flow failed: %s (%d remaining msgpairs)\n",
+                       buf, MPA_SUM_CT);
 
         /* try to cancel the ack if it exists and return error */
         if (msg_p->ack_id != 0)
@@ -858,8 +891,8 @@ static PINT_sm_action msgpairarray_retry_ack_flow (struct PINT_smcb *smcb,
 
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: sm %p, wait %d ms\n",
-                 __func__, smcb, mop->params.retry_delay);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "wait %d ms\n",
+                   mop->params.retry_delay);
 
     js_p->error_code = 0;  /* do not leak MSGPAIRS_RETRY through to wait */
     return job_req_sched_post_timer(mop->params.retry_delay,
@@ -878,8 +911,6 @@ static PINT_sm_action msgpairarray_complete_ack_flow (struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: %s\n",
-                 smcb, __func__);
 
     switch (js_p->status_user_tag)
     {
@@ -952,9 +983,9 @@ static PINT_sm_action msgpairarray_complete_ack_flow (struct PINT_smcb *smcb,
     if (msg_p->flow_id || msg_p->ack_id)
     {
         /* still more jobs need to complete */
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                     "  msgpairarray flow/ack: %d operations remain\n",
-                     MPA_SUM_CT);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "msgpairarray flow/ack: %d operations remain\n",
+                       MPA_SUM_CT);
         js_p->error_code = 0; /* take default */
         return SM_ACTION_DEFERRED;
     }
@@ -975,8 +1006,8 @@ static PINT_sm_action msgpairarray_complete_ack_flow (struct PINT_smcb *smcb,
     }
 
     /* all jobs completed */
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                 "  msgpairarray flow/ack: all operations complete\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                 "msgpairarray flow/ack: all operations complete\n");
 
     return SM_ACTION_COMPLETE;
 }
@@ -1036,13 +1067,15 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     /* this decodes what should be a successful response */
     /* this could either be the recv ack or the write ack */
     /* this is an IO read, do we do this here? was it not done before? */
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"Decoding message\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Decoding message\n");
+
     ret = PINT_serv_decode_resp(msg_p->fs_id,
                                 msg_p->encoded_resp_p,
                                 &decoded_msg,
                                 &msg_p->svr_addr,
                                 msg_p->recv_status.actual_size,
                                 &resp_p);
+
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                  "PINT_serv_decode_resp: return code: (%d)\n", ret);
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
@@ -1075,6 +1108,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
         switch (msg_p->msgclass)
         {
         case PVFS_IO_IO :
+            gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "PVFS_IO_IO\n");
             if (msg_p->msgdir == PVFS_IO_WRITE)
             {
                 /* bytes written comes from write ack */
@@ -1092,15 +1126,19 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
             }
             break;
         case PVFS_IO_SMALL_IO :
+            gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "PVFS_IO_SMALL_IO\n");
             mop->total_size += resp_p->u.small_io.result_size;
             mop->flow_params->dfile_size_array[mop->index] =
                                     resp_p->u.small_io.bstream_size;
             break;
         case PVFS_IO_METADATA :
+            gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "PVFS_IO_METADATA\n");
             /* nothing to do here */
         default :
             break;
-        }/*end switch*/
+        }/* end switch */
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "mop->total_size %d\n",
+                       mop->total_size);
     }/*end decode check*/
 
     if (msg_p->comp_fn != NULL && resp_p != NULL)
@@ -1268,7 +1306,6 @@ static PINT_sm_action msgpairarray_failure (struct PINT_smcb *smcb,
  */
 static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
                                           job_status_s *js_p) 
-                                          
 {
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
     int ret = -PVFS_EINVAL;
@@ -1276,8 +1313,8 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
     struct PINT_decoded_msg decoded_msg;
     struct PVFS_server_resp *resp = NULL;
 
-    gossip_debug(GOSSIP_IO_DEBUG,
-                 "- io_process_message_recv called\n");
+    gossip_ldebug(GOSSIP_IO_DEBUG,
+                  "io_process_message_recv called\n");
 
     assert(js_p);
 
@@ -1289,8 +1326,8 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
             char buf[1024];
             PVFS_strerror_r(js_p->error_code, buf, sizeof(buf));
             buf[sizeof(buf)-1] = '\0';
-            gossip_debug(GOSSIP_IO_DEBUG, "%s: entered with error: %s\n",
-                         __func__, buf);
+            gossip_ldebug(GOSSIP_IO_DEBUG, "entered with error: %s\n",
+                          buf);
         }
         /* attempt to free resources */
         goto free_resources;
@@ -1305,7 +1342,7 @@ static inline int io_process_message_recv(PINT_sm_msgarray_op *mop,
             char buf[1024];
             PVFS_strerror_r(js_p->error_code, buf, sizeof(buf));
             buf[sizeof(buf)-1] = '\0';
-            gossip_debug(GOSSIP_IO_DEBUG, "%s: failed: %s\n", __func__, buf);
+            gossip_ldebug(GOSSIP_IO_DEBUG, "failed: %s\n", buf);
         }
         /* attempt to free resources */
         goto free_resources;
@@ -1362,7 +1399,7 @@ static inline int io_decode_message_recv(PINT_sm_msgpair_state *msg_p,
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "- io_decode_message_recv called\n");
+    gossip_ldebug(GOSSIP_IO_DEBUG, "io_decode_message_recv called\n");
 
     assert(msg_p && decoded_msg && resp);
 
@@ -1384,8 +1421,8 @@ static inline int io_decode_message_recv(PINT_sm_msgpair_state *msg_p,
 
     if (msg_p->recv_status.error_code || msg_p->op_status)
     {
-        gossip_debug(
-                GOSSIP_IO_DEBUG, "  error %d with status %d related "
+        gossip_ldebug(
+                GOSSIP_IO_DEBUG, "error %d with status %d related "
                 "to response from context %p; not submitting flow.\n",
                 msg_p->recv_status.error_code,
                 msg_p->op_status, msg_p);
@@ -1393,7 +1430,7 @@ static inline int io_decode_message_recv(PINT_sm_msgpair_state *msg_p,
         if (msg_p->recv_status.error_code)
         {
             PVFS_perror_gossip(
-                "io_decode_message_reccv (recv_status.error_code)",
+                "io_decode_message_recv (recv_status.error_code)",
                 msg_p->recv_status.error_code);
             ret = msg_p->recv_status.error_code;
         }
@@ -1437,7 +1474,7 @@ static inline int io_post_flow(PINT_smcb *smcb, PINT_sm_msgpair_state *msg_p)
     struct server_configuration_s *server_config = NULL;
     struct filesystem_configuration_s *fs_config;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "%s: entry\n", __func__);
+    gossip_lsdebug(GOSSIP_IO_DEBUG, "entry\n");
 
     if (!msg_p)
     {
@@ -1464,10 +1501,10 @@ static inline int io_post_flow(PINT_smcb *smcb, PINT_sm_msgpair_state *msg_p)
         BMI_set_info(msg_p->svr_addr, BMI_OPTIMISTIC_BUFFER_REG, &binfo);
     }
 
-    gossip_debug(GOSSIP_IO_DEBUG, "* mem req size is %lld, "
-                 "file_req size is %lld (bytes)\n",
-                 lld(PINT_REQUEST_TOTAL_BYTES(mop->flow_params->mem_req)),
-                 lld(PINT_REQUEST_TOTAL_BYTES(mop->flow_params->file_req)));
+    gossip_lsdebug(GOSSIP_IO_DEBUG, "mem req size is %lld, "
+                   "file_req size is %lld (bytes)\n",
+                   lld(PINT_REQUEST_TOTAL_BYTES(mop->flow_params->mem_req)),
+                   lld(PINT_REQUEST_TOTAL_BYTES(mop->flow_params->file_req)));
 
     /* must reset the error_code and internal PINT_distribute fields
      * in case of a retry */
@@ -1553,10 +1590,10 @@ static inline int io_post_flow(PINT_smcb *smcb, PINT_sm_msgpair_state *msg_p)
             msg_p->flow_desc.error_code = ret;
         }
 
-        gossip_debug(GOSSIP_IO_DEBUG, "  immediate flow failure for "
-                     "context %p, error code: %d\n", msg_p,
-                     msg_p->flow_desc.error_code);
-        gossip_debug(GOSSIP_IO_DEBUG, "  posting job_null() to propigate.\n");
+        gossip_lsdebug(GOSSIP_IO_DEBUG, "immediate flow failure for "
+                       "context %p, error code: %d\n", msg_p,
+                       msg_p->flow_desc.error_code);
+        gossip_lsdebug(GOSSIP_IO_DEBUG, "posting job_null() to propigate.\n");
 
         /* post a fake job to propigate the flow failure to a later state */
         ret = job_null(msg_p->flow_desc.error_code,
@@ -1572,8 +1609,7 @@ static inline int io_post_flow(PINT_smcb *smcb, PINT_sm_msgpair_state *msg_p)
     }
     else
     {
-        gossip_debug(GOSSIP_IO_DEBUG, "  posted flow for "
-                     "context %p\n", msg_p);
+        gossip_lsdebug(GOSSIP_IO_DEBUG, "posted flow for context %p\n", msg_p);
     }
 
     mop->params.flow_ct++;
@@ -1641,7 +1677,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
     int ret = -1;
     const char *server_string;
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: calling PINT_decode\n", __func__);
+    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG, "calling PINT_decode\n");
 
     ret = PINT_decode(encoded_resp_p,
                       PINT_DECODE_RESP,
@@ -1649,7 +1685,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                       *svr_addr_p,
                       actual_resp_sz);
 
-    gossip_debug(GOSSIP_MSGPAIR_DEBUG, "%s: PINT_decode return %d\n", __func__, ret);
+    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG, "PINT_decode return %d\n", ret);
     
     if (ret > -1)
     {
@@ -1687,8 +1723,7 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
             return(-EPROTONOSUPPORT);
         }
     }
-    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG,
-                  "returning %d\n", ret);
+    gossip_ldebug(GOSSIP_MSGPAIR_DEBUG, "returning %d\n", ret);
     return ret;
 }
 

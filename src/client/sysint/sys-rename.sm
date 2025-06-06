@@ -452,7 +452,7 @@ static int rename_parent_getattr_comp_fn(void *v_p,
     PVFS_object_attr *attr;
     PVFS_dist_dir_hash_type hash;
     int dirdata_index, i;
-    unsigned char *c;
+    unsigned char *c GCC_UNUSED;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_parent_getattr_comp_fn\n");
 
@@ -1030,7 +1030,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     PINT_SERVREQ_RMDIRENT_FILL(
           msg_p->req,
           sm_p->u.rename.parent_attr[sm_p->u.rename.rmdirent_index].capability,
-          sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
+          sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index],
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_count,
           sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].sid_array,

@@ -40,6 +40,7 @@ static int check_mode(enum access_type access,
                       PVFS_uid userid,
                       PVFS_gid group,
                       const PVFS_object_attr *attr);
+
 static int check_acls(void *acl_buf,
                       size_t acl_size,
                       const PVFS_object_attr *attr,
@@ -47,6 +48,7 @@ static int check_acls(void *acl_buf,
                       PVFS_gid *group_array,
                       uint32_t num_groups,
                       int want);
+
 static int check_seteattr_dir_hint(struct PVFS_servreq_seteattr *seteattr);
 
 /* PINT_get_capabilities
@@ -71,6 +73,9 @@ int PINT_get_capabilities(void *acl_buf,
     int i;
 
     *op_mask = 0;
+
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "userid %d num_groups %d\n",
+                                         userid, num_groups);
     
     /* root has every possible capability */
     if (userid == 0)
@@ -79,6 +84,7 @@ int PINT_get_capabilities(void *acl_buf,
         /* remove dir-only capabilities */
         if (attr->objtype != PVFS_TYPE_DIRECTORY)
         {
+            gossip_ldebug(GOSSIP_SECURITY_DEBUG, "removing dir caps from root\n");
             *op_mask &= ~(PINT_CAP_CREATE|PINT_CAP_REMOVE);
         }
         return 0;
@@ -101,6 +107,7 @@ int PINT_get_capabilities(void *acl_buf,
      * act on here.
      */
 
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "Checking acl permissions\n");
     if (acl_size > 0)
     {
         if (acl_buf == NULL)
@@ -140,45 +147,67 @@ int PINT_get_capabilities(void *acl_buf,
             *op_mask |= PINT_CAP_EXEC;
     }
         
-    if (num_groups == 0 || !(attr->mask & PVFS_ATTR_COMMON_GID)) {
-      gossip_err("%s: no groups or PVFS_ATTR_COMMON_GID not set\n", __func__);
-      return -PVFS_EINVAL;
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "done with acls\n");
+    
+    /* would like to know the reason this MUST be true 
+     * I understand the num_groups - we are going to iterate a
+     * list, still ... but the flag? and UID and PERM all needed
+     * below in check_mode?
+     */
+    if (num_groups == 0 || !(attr->mask & PVFS_ATTR_COMMON_GID))
+    {
+        gossip_err("%s: no groups or PVFS_ATTR_COMMON_GID not set\n", __func__);
+        return -PVFS_EINVAL;
     }
 
     /* see if the user is a member of the object's group */
     active_group = group_array[0];
-    for (i = 0; i < num_groups; i++) {
-       if (group_array[i] == attr->group) {
-         active_group = group_array[i];
-         break;
-       }
+    for (i = 0; i < num_groups; i++)
+    {
+        if (group_array[i] == attr->group)
+        {
+            active_group = group_array[i];
+            break;
+        }
     }
 
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "Checking unix permissions\n");
     /* Check standard UNIX permissions.  */ 
     ret = check_mode(READ_ACCESS, userid, active_group, attr);
-    if (ret > 0) {
-      *op_mask |= PINT_CAP_READ;
-    } else if (ret < 0) {
-      return ret;
+    if (ret > 0)
+    {
+        *op_mask |= PINT_CAP_READ;
+    }
+    else if (ret < 0)
+    {
+        return ret;
     }
 
     ret = check_mode(WRITE_ACCESS, userid, active_group, attr);
-    if (ret > 0) {
-      *op_mask |= PINT_CAP_WRITE;
-    } else if (ret < 0) {
-      return ret;
+    if (ret > 0)
+    {
+        *op_mask |= PINT_CAP_WRITE;
+    }
+    else if (ret < 0)
+    {
+        return ret;
     }
 
     ret = check_mode(EXEC_ACCESS, userid, active_group, attr);
-    if (ret > 0) {
-      *op_mask |= PINT_CAP_EXEC;
-    } else if (ret < 0) {
-      return ret;
+    if (ret > 0)
+    {
+        *op_mask |= PINT_CAP_EXEC;
     }
+    else if (ret < 0)
+    {
+        return ret;
+    }
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "done with unix perms\n");
 
     /* only the owner can set attributes */
     if (userid == attr->owner)
     {
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "SETATTR added to CAP\n");
         *op_mask |= PINT_CAP_SETATTR;
     }
 
@@ -187,6 +216,7 @@ int PINT_get_capabilities(void *acl_buf,
         *op_mask & PINT_CAP_WRITE &&
         *op_mask & PINT_CAP_EXEC)
     {
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "CREATE and REMOVE added to CAP\n");
         *op_mask |= PINT_CAP_CREATE | PINT_CAP_REMOVE;
     }
 
@@ -207,10 +237,10 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     PVFS_handle handle;
     PINT_server_req_perm_fun perm_fun;
     int ret = -PVFS_EINVAL, i;
-    char op_mask[16];
+    char op_mask[16] GCC_UNUSED;
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: checking operation %s\n", 
-                 __func__, PINT_map_server_op_to_string(s_op->req->op));
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "checking operation %s\n", 
+                   PINT_map_server_op_to_string(s_op->req->op));
 
     perm_fun = PINT_server_req_get_perm_fun(s_op->req);
     if (perm_fun == NULL)
@@ -266,9 +296,9 @@ int PINT_perm_check(struct PINT_server_op *s_op)
 
         if (PVFS_OID_NE(&handle, &PVFS_HANDLE_NULL))
         {
-            gossip_debug(GOSSIP_SECURITY_DEBUG,
-                         "%s: using operation handle %s\n",
-                         __func__, PVFS_OID_str(&handle));
+            gossip_ldebug(GOSSIP_SECURITY_DEBUG,
+                         "using operation handle %s\n",
+                         PVFS_OID_str(&handle));
 
             /* ensure we have a capability for the target handle */
             for (i = 0; i < cap->num_handles; i++)
@@ -291,15 +321,15 @@ int PINT_perm_check(struct PINT_server_op *s_op)
         }
     }
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: perms %o (capability mask = %s)\n",
-                 __func__, s_op->attr.perms, 
-                 PINT_capability_is_null(cap) ? "[null]" : 
-                     PINT_print_op_mask(cap->op_mask, op_mask));
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "perms %o (capability mask = %s)\n",
+                  s_op->attr.perms, 
+                  PINT_capability_is_null(cap) ? "[null]" : 
+                      PINT_print_op_mask(cap->op_mask, op_mask));
 
     ret = perm_fun(s_op);
 
 PINT_perm_check_exit:
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: returning %d\n", __func__, ret);
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "returning %d\n", ret);
 
     return ret;
 }
@@ -312,12 +342,18 @@ static int check_mode(enum access_type access,
     int user_other_access = 0;
     int group_access = 0;
     int mask;
+
+    gossip_ldebug(GOSSIP_GETATTR_DEBUG,
+                  "Checking the mode (permissions)\n");
     
+    /* DEBUG_attr_mask(attr->mask); makes a LOT of output */
+
     if (!(attr->mask & PVFS_ATTR_COMMON_UID) ||
         !(attr->mask & PVFS_ATTR_COMMON_GID) ||
         !(attr->mask & PVFS_ATTR_COMMON_PERM))
     {
         gossip_err("%s: invalid mask\n", __func__);
+        /* PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attr->mask); */
         return -PVFS_EINVAL;
     }
 
@@ -417,11 +453,10 @@ static int check_acls(void *acl_buf,
     }
     count = acl_size / sizeof(pvfs2_acl_entry);
 
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: read keyval size "
-                 " %d (%d acl entries)\n", __func__, (int) acl_size, count);
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
-                 "%s: uid = %d, gid = %d, want = %d\n",
-                 __func__, uid, group_array[0], want);
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "read keyval size "
+                  "%d (%d acl entries)\n", (int) acl_size, count);
+    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG,
+                  "uid %d gid %d want %d\n", uid, group_array[0], want);
 
 
     /* point to header */
@@ -438,9 +473,9 @@ static int check_acls(void *acl_buf,
         pe.p_perm = bmitoh32(pa->p_perm);
         pe.p_id   = bmitoh32(pa->p_id);
         pa = &pe;
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: decoded acl entry %d "
-                     "(p_tag %d, p_perm %d, p_id %d)\n",
-                     __func__, i, pa->p_tag, pa->p_perm, pa->p_id);
+        gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "decoded acl entry %d "
+                     "(p_tag %d p_perm %d p_id %d)\n",
+                     i, pa->p_tag, pa->p_perm, pa->p_id);
         switch(pa->p_tag) 
         {
             case PVFS2_ACL_USER_OBJ:
@@ -489,8 +524,7 @@ static int check_acls(void *acl_buf,
             case PVFS2_ACL_OTHER:
                 if (found)
                 {
-                    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning "
-                                 "EINVAL (1)\n", __func__);
+                    gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG, "returning EINVAL (1)\n");
                     return -PVFS_EINVAL;
                 }
                 else
@@ -498,13 +532,11 @@ static int check_acls(void *acl_buf,
                     goto check_perm;
                 }
             default:
-                gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning "
-                             "EINVAL (2)\n", __func__);
+                gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "returning EINVAL (2)\n");
                 return -PVFS_EINVAL;
         }
     }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning EINVAL (3)\n", 
-                 __func__);
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "returning EINVAL (3)\n");
     return -PVFS_EINVAL;
 
 mask:
@@ -521,19 +553,20 @@ mask:
         me.p_perm = bmitoh32(mask_obj->p_perm);
         me.p_id   = bmitoh32(mask_obj->p_id);
         mask_obj = &me;
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
-                     "%s: decoded (mask) acl entry %d "
+        gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG,
+                     "decoded (mask) acl entry %d "
                      "(p_tag %d, p_perm %d, p_id %d)\n",
-                     __func__, i, mask_obj->p_tag, 
+                     i, mask_obj->p_tag, 
                      mask_obj->p_perm, mask_obj->p_id);
+
         if (mask_obj->p_tag == PVFS2_ACL_MASK) 
         {
             if ((pa->p_perm & mask_obj->p_perm & want) == want)
             {
                 return 0;
             }
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
-                         "%s: returning EACCES (mask)\n", __func__);
+            gossip_ldebug(GOSSIP_PERMISSIONS_DEBUG,
+                         "returning EACCES (mask)\n");
             return -PVFS_EACCES;
         }
     }
@@ -543,7 +576,7 @@ check_perm:
     {
         return 0;
     }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: returning EACCES\n", __func__);
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "returning EACCES\n");
     return -PVFS_EACCES;
 }
 

@@ -22,17 +22,15 @@
 #include "security-util.h"
 #include "sid.h"
 
-/* This is defined in pvfs2-server.h */
-/* extern job_context_id server_job_context; */
 
 /* <====================== PUBLIC FUNCTIONS =====================> */
 
 /*
-  given mount information, retrieve the server's configuration by
-  issuing a getconfig operation.  on successful response, we parse the
-  configuration and fill in the config object specified.
+ * given mount information, retrieve the server's configuration by
+ * issuing a getconfig operation.  on successful response, we parse the
+ * configuration and fill in the config object specified.
 
-  returns 0 on success, -errno on error
+ * returns 0 on success, -errno on error
 */
 int PINT_server_get_config(struct server_configuration_s *config,
                            struct PVFS_sys_mntent *mntent_p,

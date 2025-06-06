@@ -1101,7 +1101,9 @@ int PVFS_fsck_get_attributes(
     const PVFS_credential * cred,      /**< populated credentials structure */
     PVFS_sysresp_getattr * getattr_resp) /**< attribute structure to populate */
 {
-    time_t r_atime, r_mtime, r_ctime;
+    time_t r_atime GCC_UNUSED;
+    time_t r_mtime GCC_UNUSED;
+    time_t r_ctime GCC_UNUSED;
     int ret = 0;
 
     ret = PVFS_sys_getattr(*pref, PVFS_ATTR_SYS_ALL, cred, getattr_resp, NULL);

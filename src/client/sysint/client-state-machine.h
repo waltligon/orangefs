@@ -242,8 +242,9 @@ struct PINT_client_mkdir_sm
     int stored_error_code;
 
     /* shouldn't all of this be in the dir_attr? */
-    PVFS_handle *metadata_handle;
-    PVFS_SID *metadata_sid_array;
+    /* this is the new directory being made */
+    PVFS_handle *newdir_handle;
+    PVFS_SID *newdir_sid_array;
 
     int dirdata_count;
     PVFS_handle *dirdata_handles;
@@ -701,6 +702,17 @@ typedef struct
     int32_t          dirdata_index; /* input parameter */
 } PINT_sm_readdir_state;
 
+/* There is potential confusion of op, and op_id which are totally
+ * different things.  The op_id (here sys_op_id) is a unique number
+ * given to each job invocation used to track the job - primarily
+ * to see if a job is done.  An "op" is a number used to indicate
+ * which request we are running, and thus which state machine
+ * to run.  The SMCB has a field for the op, as does the server's
+ * frame (s_op) but the client frame (sm_p) does not.  On the
+ * client when a new request is started the op is passed as an
+ * argument used to select the right SM.  Confusion comes as the
+ * op numerical values are different on the client and the server.
+ */
 typedef struct PINT_client_sm
 {
     /* this code removed and corresponding fields added to the generic
@@ -735,8 +747,21 @@ typedef struct PINT_client_sm
      */
     PINT_sm_msgarray_op msgarray_op;
 
-    PVFS_object_ref object_ref;
-    PVFS_object_ref parent_ref;
+    /* lots of confusion wrt these fields
+     * am going to try to clean up at least wrt mkdir/create/remove
+     * right now the rules below are not universal, but
+     * should become so.
+     */
+    PVFS_object_ref object_ref; /* this is always the target of a req 
+                                   the object req is sent to */
+    PVFS_object_ref parent_ref; /* this is always the direct parent of
+                                   the object */
+
+    /* objects: ... dirent=>dir=>dirdata=>dirent ...
+     * or:      ... dir=>dirdata=>dirent=>metafile=>dfile
+     * dirent is not really an object, but it contains a handle
+     * and sids so it is part of this chain.
+     */
 
     PVFS_credential *cred_p;
     /* Generic capability used with the rename state machine, which is
@@ -832,6 +857,8 @@ const char *PINT_client_get_name_str(int op_type);
 
 /* used with post call to tell the system what state machine to use
  * when processing a new PINT_client_sm structure.
+ * These aree nominally "op" values on the client.  The server
+ * values are different.
  */
 enum
 {

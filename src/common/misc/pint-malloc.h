@@ -40,7 +40,7 @@ struct glibc_malloc_ops_s
 };
 
 #ifndef PVFS_MALLOC_DEBUG
-# define PVFS_MALLOC_DEBUG 0
+# define PVFS_MALLOC_DEBUG 1
 #endif
 
 #if PVFS_MALLOC_DEBUG

@@ -195,44 +195,47 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
  */
 void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
 {
-    char sig_buf[16], mask_buf[16];
+    char sig_buf[16] GCC_UNUSED;
+    char mask_buf[16] GCC_UNUSED;
     int i;
 
     if (!cap)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "capability pointer is NULL\n");
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "capability pointer is NULL\n");
         return;
     }
 
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "%s capability:\n", prefix);
     if (!cap->issuer)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "capability issuer is NULL\n");
-        return;
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "capability issuer is NULL\n");
     }
-
-    if (strlen(cap->issuer) == 0)
+    else
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "%s null capability\n", prefix);
-        return;
+        if (strlen(cap->issuer) == 0)
+        {
+            gossip_ldebug(GOSSIP_SECURITY_DEBUG, "%s null capability\n", prefix);
+        }
+        else
+        {
+            gossip_ldebug(GOSSIP_SECURITY_DEBUG, "\tissuer: %s\n", cap->issuer);
+        }
     }
-
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s capability:\n", prefix);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tissuer: %s\n", cap->issuer);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfsid: %u\n", cap->fsid);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsig_size: %u\n", cap->sig_size);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsignature: %s\n",
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "fsid: %u\n", cap->fsid);
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "sig_size: %u\n", cap->sig_size);
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "signature: %s\n",
              PINT_util_bytes2str(cap->signature, sig_buf, 4));
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\ttimeout: %d\n",
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "timeout: %d\n",
              (int) cap->timeout);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\top_mask: %s\n",
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "op_mask: %s\n",
              PINT_print_op_mask(cap->op_mask, mask_buf));
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tnum_handles: %u\n", 
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "num_handles: %u\n", 
              cap->num_handles);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tfirst handle: %s\n",
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "first handle: %s\n",
              cap->num_handles > 0 ? PVFS_OID_str(&cap->handle_array[0]) : 0LL);
     for (i = 1; i < cap->num_handles; i++)
     {
-        gossip_debug(GOSSIP_SECURITY_DEBUG, "\thandle %d: %s\n",
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "handle %d: %s\n",
                      i+1, PVFS_OID_str(&cap->handle_array[i]));
     }
 }

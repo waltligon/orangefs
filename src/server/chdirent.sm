@@ -277,7 +277,7 @@ static PINT_sm_action chdirent_read_directory_entry(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     int i;
-    unsigned char *c;
+    unsigned char *c GCC_UNUSED;
     PVFS_object_attr *attr_p;
 
     /* V3 Should we check for an error on last keyval read */

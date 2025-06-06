@@ -347,6 +347,19 @@ int __gossip_debug_stub(PVFS_debug_mask mask,
 {
     return 0;
 }
+
+/* __gossip_always_stub()
+ * 
+ * stub for gossip_debug that doesn't do anything; used when debugging
+ * is "compiled out" on non-gcc builds
+ *
+ * returns 0
+ */
+int __gossip_always_stub(char prefix,
+                         const char *format, ...)
+{
+    return 0;
+}
 #endif
 
 
@@ -415,6 +428,27 @@ int __gossip_debug_va(PVFS_debug_mask mask,
     default:
         break;
     }
+
+    return ret;
+}
+
+/** Logs a message.  This will print regardless of the
+ *  mask value and whether debugging is turned on or off, as long as some
+ *  logging facility has been enabled.  It can log any type of message
+ *  such as error E Log L or debug D
+ *
+ *  \return 0 on success, -errno on failure.
+ */
+int __gossip_always(const char tag, const char *format, ...)
+{
+    va_list ap;
+    int ret = -EINVAL;
+
+    va_start(ap, format);
+
+    ret = gossip_msg(tag, format, ap);
+
+    va_end(ap);
 
     return ret;
 }
