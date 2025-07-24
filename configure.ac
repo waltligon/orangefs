@@ -289,8 +289,8 @@ fi
 AC_SUBST(DATABASE_BACKEND)
 AC_SUBST(NEED_BERKELEY_DB)
 AC_SUBST(NEED_LMDB),
-DATABASE_BACKEND=bdb
-NEED_BERKELEY_DB=yes
+DATABASE_BACKEND=lmdb
+NEED_LMDB=yes
 AC_SUBST(DATABASE_BACKEND)
 AC_SUBST(NEED_BERKELEY_DB)
 AC_SUBST(NEED_LMDB))
@@ -538,7 +538,7 @@ AC_ARG_ENABLE(karma,
 dnl shared or static client library (see --enable-shared below)
 AC_ARG_ENABLE(static,
 [  --disable-static        Do not build static client library],
-[build_static=$enableval], [build_static=yes])
+[build_static=$enableval], [build_static=no])
 AC_SUBST(build_static)
 
 dnl NOTE: removing the linux-gnu host check for now; we may want to put it back
@@ -1045,7 +1045,7 @@ dnl shared or static client library
 AC_ARG_ENABLE(shared,
     [  --enable-shared         Build shared client library],
     [build_shared=$enableval],
-    [build_shared=no])
+    [build_shared=yes])
 AC_SUBST(build_shared)
 
 dnl Bad things happen in the makefile if you happen to --disable-static

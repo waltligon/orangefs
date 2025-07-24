@@ -1,116 +1,73 @@
-#!/bin/csh -f
-unalias *
+#!/bin/bash
+#
+# This script expects pvfs2-xattr and pvfs2-stat to be on your search path.
+#
 
-#set echo
-#set verbose
-
-#echo $0
-
-#if no options entered, then display usage information
-if ( $#argv == 0 ) then
-   goto usage
-endif
-
-#get the path associated with this command
-set mybin = $0:h
-
-#make sure that pvfs-xattr exists
-if ( ! -e $mybin/pvfs2-xattr ) then
-   echo "$mybin/pvfs2-xattr command not found."
-   goto usage
-endif
-
-#initialize parms
-set init = "init"
-set myFile   = $init
-set myCopies = $init
-set myMode   = $init
-set myCopiesParm = 0
-set myModeParm   = 0
-set myFileParm   = 0
-
-#parse the command line....
-set index = 1
-while ( $index <= $#argv )
-   if ( {$argv[$index]} == {-h} ) then
-      goto usage
-   endif
-
-   if ( $index == $#argv ) then
-      echo
-      echo "Missing parameters.  Recheck usage."
-      goto usage
-   endif
-
-   @ i = $index + 1
-
-   if ( {$argv[$index]} == {-c} ) then
-              set myCopies = $argv[$i]
-              set myCopiesParm = 1
-   else if ( {$argv[$index]} == {-m} ) then
-              set myMode = $argv[$i]
-              set myModeParm = 1
-   else if ( {$argv[$index]} == {-f} ) then
-              set myFile = $argv[$i]
-              set myFileParm = 1
-   else
-        echo
-        echo "Missing or invalid parameters.  Recheck usage."
-        goto usage
-   endif
-
-   @ index += 2
-end #while
-
-#NOTE:  When PVFS is NOT in kernel mode, we can't easily check for file
-#       existence.  So, we just check to see that SOMETHING was entered.
-#       pvfs-xattr will validate the filename.
-#Did the user enter a file name?
-if ( $myFile == $init ) then
-   echo
-   echo "Filename is required. Recheck usage."
-   goto usage
-endif
-
-#Did the user enter a numeric copy value?
-if ( $myCopiesParm ) then
-   echo $myCopies | grep -E "[^0-9]" -
-   if ( ! $status ) then
-      echo
-      echo "Invalid copies value entered : $myCopies.  Check usage."
-      goto usage
-   endif
-endif
-
-#Did the user enter a valid mode?
-if ( $myModeParm ) then
-   if ( ! ($myMode == 100 || $myMode == 200) ) then
-      echo
-      echo "Invalid mirror mode entered : $myMode.  Check usage."
-      goto usage
-   endif
-endif
-
-
-#issue commands
-if ( $myCopiesParm ) then
-   {$mybin}/pvfs2-xattr -s -k user.pvfs2.mirror.copies -v {$myCopies} {$myFile}
-endif
-if ( $myModeParm ) then
-   {$mybin}/pvfs2-xattr -s -k user.pvfs2.mirror.mode   -v {$myMode} {$myFile}
-endif
-
-#leave script
-exit
-
-#display help and exit script
-usage:
-    echo
+function usage {
     echo "pvfs2-setmattr {-c copies} {-m mode} {-h} -f file"
     echo "  copies : positive numeric value"
     echo "    mode : 100 => No Mirroring"
     echo "           200 => Create Mirror when IMMUTABLE is set"
     echo "      -h : Display this message" 
     echo "    file : file to mirror (may include path)"
-exit
-######## end of script file ##########
+    exit
+}
+
+if [ "$#" -lt 4 ] || [ "$#" -gt 6 ]
+then
+  usage
+fi
+
+XATTR_PATH=`which pvfs2-xattr 2> /dev/null`
+if [ $? -eq "1" ]
+then
+  echo "pvfs2-xattr command not found."
+  exit
+fi
+
+MODE=0
+COPY=0
+
+while [[ $# -gt 0 ]]
+do
+  case "$1" in
+    -c) COPY=1
+        shift
+        if [[ "$1" =~ ^[0-9]+$ ]]
+        then
+          CVAL="$1"
+        else
+          usage
+        fi
+        shift;;
+    -m) MODE=1
+        shift
+        if [[ "$1" =~ ^[0-9]+$ && ( "$1" -eq 100 || "$1" -eq 200 ) ]]
+        then
+          MVAL="$1"
+        else
+          usage
+        fi
+        shift;;
+    -f) shift
+        pvfs2-stat "$1" > /dev/null 2>&1
+        if [ "$?" != 0 ]
+        then
+          usage
+        fi
+        TARGET="$1"
+        shift;;
+     *) usage;;
+  esac
+done
+
+if [ "$COPY" -eq "1" ]
+then
+     pvfs2-xattr -s -k user.pvfs2.mirror.copies -v "$CVAL" "$TARGET"
+fi
+
+if [ "$MODE" -eq "1" ]
+then
+     pvfs2-xattr -s -k user.pvfs2.mirror.mode -v "$MVAL" "$TARGET"
+fi
+
