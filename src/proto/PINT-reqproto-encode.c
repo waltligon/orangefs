@@ -53,7 +53,7 @@ int PINT_encode_initialize(void)
     int ret = -PVFS_EINVAL;
     void * header = NULL;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_initialize\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"initialize encoder\n");
     if (ENCODING_IS_SUPPORTED(ENCODING_LE_BFIELD))
     {
         /* setup little endian bytefield encoding */
@@ -109,7 +109,7 @@ int PINT_encode(void* input_buffer,
     target_msg->dest = target_addr;
     target_msg->enc_type = enc_type;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"Starting encode\n");
     switch(enc_type)
     {
 	case ENCODING_LE_BFIELD:
@@ -168,14 +168,14 @@ int PINT_decode(void *input_buffer,
     int32_t enc_type_recved, proto_ver_recved;
     int proto_major_recved, proto_minor_recved;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_decode\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"Starting decode\n");
     target_msg->enc_type = -1;  /* invalid */
 
     /* sanity check size */
     if(size < PINT_ENC_GENERIC_HEADER_SIZE)
     {
-        gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Too small: message only %lld bytes.\n", lld(size));
+        gossip_lerr("Error: poorly formatted protocol message received.\n");
+	gossip_lerr("   Too small: message only %lld bytes.\n", lld(size));
 	return(-PVFS_EPROTO);
     }
  
@@ -188,8 +188,8 @@ int PINT_decode(void *input_buffer,
     /* check encoding type */
     if(enc_type_recved != ENCODING_LE_BFIELD)
     {
-        gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Encoding type mismatch: received type %d when "
+        gossip_lerr("Error: poorly formatted protocol message received.\n");
+	gossip_lerr("   Encoding type mismatch: received type %d when "
 	    "expecting %d.\n", (int)enc_type_recved, ENCODING_LE_BFIELD);
         return(-PVFS_EPROTONOSUPPORT);
     }
@@ -197,36 +197,36 @@ int PINT_decode(void *input_buffer,
     /* check various protocol version possibilities */
     if(proto_major_recved != PVFS2_PROTO_MAJOR)
     {
-        gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Protocol version mismatch: received major version %d when "
+        gossip_lerr("Error: poorly formatted protocol message received.\n");
+	gossip_lerr("   Protocol version mismatch: received major version %d when "
 	    "expecting %d.\n", (int)proto_major_recved,
 	    PVFS2_PROTO_MAJOR);
-	gossip_err("   Please verify your OrangeFS installation\n");
-        gossip_err("   and make sure that the version is consistent.\n");
+	gossip_lerr("   Please verify your OrangeFS installation\n");
+        gossip_lerr("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
 
     if((input_type == PINT_DECODE_REQ) && 
         (proto_minor_recved > PVFS2_PROTO_MINOR))
     {
-        gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Protocol version mismatch: request has minor version %d when "
+        gossip_lerr("Error: poorly formatted protocol message received.\n");
+	gossip_lerr("   Protocol version mismatch: request has minor version %d when "
 	    "expecting %d or lower.\n", (int)proto_minor_recved, PVFS2_PROTO_MINOR);
-        gossip_err("   Client is too new for server.\n");
-	gossip_err("   Please verify your OrangeFS installation\n");
-        gossip_err("   and make sure that the version is consistent.\n");
+        gossip_lerr("   Client is too new for server.\n");
+	gossip_lerr("   Please verify your OrangeFS installation\n");
+        gossip_lerr("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
 
     if((input_type == PINT_DECODE_RESP) && 
         (proto_minor_recved < PVFS2_PROTO_MINOR))
     {
-        gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Protocol version mismatch: request has minor version %d when "
+        gossip_lerr("Error: poorly formatted protocol message received.\n");
+	gossip_lerr("   Protocol version mismatch: request has minor version %d when "
 	    "expecting %d or higher.\n", (int)proto_minor_recved, PVFS2_PROTO_MINOR);
-        gossip_err("   Server is too old for client.\n");
-	gossip_err("   Please verify your OrangeFS installation\n");
-        gossip_err("   and make sure that the version is consistent.\n");
+        gossip_lerr("   Server is too old for client.\n");
+	gossip_lerr("   Please verify your OrangeFS installation\n");
+        gossip_lerr("   and make sure that the version is consistent.\n");
         return(-PVFS_EPROTONOSUPPORT);
     }
     for(i = 0; i < ENCODING_TABLE_SIZE; i++)
@@ -240,7 +240,7 @@ int PINT_decode(void *input_buffer,
             /* GDB reporting wrong input_type, but right behavior ??? */
 	    if(input_type == PINT_DECODE_REQ)
 	    {
-                gossip_debug(GOSSIP_ENDECODE_DEBUG, "calling decode req method\n");
+                gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "calling decode req method\n");
 		ret = PINT_encoding_table[i]->op->decode_req(buffer_index,
 		                                             size_index,
 		                                             target_msg,
@@ -250,7 +250,7 @@ int PINT_decode(void *input_buffer,
 	    }
 	    else if(input_type == PINT_DECODE_RESP)
 	    {
-                gossip_debug(GOSSIP_ENDECODE_DEBUG, "calling decode resp method\n");
+                gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "calling decode resp method\n");
 		ret = PINT_encoding_table[i]->op->decode_resp(buffer_index,
 		                                              size_index,
 		                                              target_msg,
@@ -266,7 +266,7 @@ int PINT_decode(void *input_buffer,
 	}
     }
 
-    gossip_err("Error: poorly formatted protocol message received.\n");
+    gossip_lerr("Error: poorly formatted protocol message received.\n");
 
     return(-PVFS_EPROTONOSUPPORT);
 }
@@ -281,7 +281,7 @@ int PINT_decode(void *input_buffer,
 void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
 			 enum PINT_encode_msg_type input_type)
 { 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_release\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"release resources from encoding\n");
     if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
     {
         PINT_encoding_table[input_buffer->enc_type]->op->encode_release(
@@ -289,7 +289,7 @@ void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
     }
     else
     {
-        gossip_err("PINT_encode_release: Encoder type %d is not "
+        gossip_lerr("PINT_encode_release: Encoder type %d is not "
                    "supported.\n", input_buffer->enc_type);
     }
 }
@@ -304,7 +304,7 @@ void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
 void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
 			 enum PINT_encode_msg_type input_type)
 {
-    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"called.\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"releasing resources from decoding\n");
     if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
     {
         gossip_ldebug(GOSSIP_ENDECODE_DEBUG,
@@ -339,7 +339,7 @@ int PINT_encode_calc_max_size(
 {    
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_calc_max_size\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"calc max size of a request message\n");
     switch(enc_type)
     {
 	case ENCODING_LE_BFIELD:

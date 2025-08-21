@@ -444,9 +444,17 @@ static int mkdir_msg_comp_fn(void *v_p,
 {
     PINT_smcb *smcb = v_p;
     PINT_smcb *parent_smcb = smcb->parent_smcb;
-    PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
+    /* These are not sm_p's, the are mops! */
+    /* PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT); */
+    /* PINT_client_sm *psm_p = PINT_sm_frame(parent_smcb, PINT_FRAME_CURRENT); */
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgarray_op *pmop = PINT_sm_frame(parent_smcb, PINT_FRAME_CURRENT);
+    gossip_ldebug(GOSSIP_MKDIR_DEBUG,
+                  "smcb (%p) smcb->mop (%p) psmcb (%p) psmcb->pmop (%p)\n",
+                  smcb, mop, parent_smcb, pmop);
+
     int ret GCC_UNUSED;
-    PVFS_uid local_uid;
+    PVFS_uid local_uid GCC_UNUSED;
     
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "---------- MKDIR COMP_FN:mkdir_msg_comp_fn\n");
 
@@ -458,9 +466,13 @@ static int mkdir_msg_comp_fn(void *v_p,
     }
 
     PINT_debug_capability(&resp_p->u.mkdir.capability, "mkdir returned");
-    PINT_copy_capability(&resp_p->u.mkdir.capability, &sm_p->u.mkdir.capability);
+    /* where do we want to copy this? */
+    PINT_copy_capability(&resp_p->u.mkdir.capability, &resp_p->u.mkdir.capability);
+
+    /* What needs to be copied from sm_p to psm_p? */
 
     /* get local uid for indexing */
+#if 0
     local_uid = PINT_HINT_GET_LOCAL_UID(sm_p->hints);
     if (local_uid == (PVFS_uid) -1)
     {
@@ -471,12 +483,15 @@ static int mkdir_msg_comp_fn(void *v_p,
     }
     else  /* (local_uid != (PVFS_uid) -1) */
     {
+        /* we don't have an sm_p! */
         ret = PINT_client_capcache_update(sm_p->object_ref,
-                  local_uid, &resp_p->u.mkdir.capability);
-        gossip_lsdebug(GOSSIP_SECURITY_DEBUG, "%s: "
-                     "PINT_client_capcache_update returned %d\n",
-                     __func__, ret);
+                                          local_uid,
+                                          &resp_p->u.mkdir.capability);
+
+        gossip_lsdebug(GOSSIP_SECURITY_DEBUG,
+                     "PINT_client_capcache_update returned %d\n", ret);
     }
+#endif
 
     /* WBL - REVIEW this - can we update attr without size array?
      * can we avoid the following invalidation - what are the
@@ -501,11 +516,13 @@ static int mkdir_msg_comp_fn(void *v_p,
      *
      * Can we return new attrs from mkdir?  maybe not.
      */
+    /*
     PINT_acache_invalidate(sm_p->object_ref);
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
                  "*** Got newly created dir handle %s\n",
                  PVFS_OID_str(sm_p->u.mkdir.newdir_handle));
+    */
 
     return 0;
 }
@@ -980,6 +997,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
     }
 
+    /* this is a mop set up for jumping to MPA */
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;
 }

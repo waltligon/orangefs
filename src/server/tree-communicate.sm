@@ -207,6 +207,7 @@ machine pvfs2_tree_get_dirent_count_sm
 }
 
 /* this is new and might go away */
+/* it is not currently being used */
 nested machine pvfs2_tree_get_dirent_count_local_sm
 {
     state tree_get_dirent_count_local_setup
@@ -222,6 +223,7 @@ nested machine pvfs2_tree_get_dirent_count_local_sm
     }
 }
 
+/* We JUMP here from pvfs2_get_attr_work_sm:get_dirent_count */
 nested machine pvfs2_tree_get_dirent_count_work_sm
 {
     state tree_get_dirent_count_work_do_work
@@ -878,6 +880,10 @@ static PINT_sm_action tree_communicate_partition_handles(
                         tc->sid_array_remote,
                         s_op->req->u.tree_get_dirent_count.retry_msgpair_at_leaf,
                         s_op->req->hints);
+
+                PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &msg_p->req);
+                PINT_debug_capability(&capability, "from dirent request");
+                DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG, &(s_op->req->u.tree_get_dirent_count.credential));       
 
                 msg_p->comp_fn = tree_get_dirent_count_comp_fn;
                 msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
@@ -1859,6 +1865,9 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
     struct PVFS_server_req *req = &s_op->msgarray_op.msgpair.req;
     struct PVFS_server_resp *resp = &s_op->resp;
     /* PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgpair; */
+
+    DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &(req->u.tree_get_dirent_count.credential));
+
 
     /* assert(s_op->req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT); */
     assert(req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT);

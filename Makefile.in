@@ -1290,7 +1290,7 @@ endif
 # here
 clean:: 
 	$(Q) "  CLEAN"
-	$(E)rm -f   $(DEPENDS) \
+	$(E)rm -f   $(DEPENDS) $(SMCGEN) \
 	            $(LIBOBJS) $(LIBTHREADEDOBJS) \
                 $(LIBPICOBJS) $(LIBTHREADEDPICOBJS) \
                 $(ULIBOBJS) $(ULIBPICOBJS) \

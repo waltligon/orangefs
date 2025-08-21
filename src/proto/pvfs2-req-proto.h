@@ -284,10 +284,22 @@ do { \
     sprintf(string, "%d", (integer)); \
 } while (0)
 
+#define PVFS_to_string_uint32_t(integer, string) \
+do { \
+    sprintf(string, "%u", (integer)); \
+} while (0)
+
 #define PVFS_to_string_PVFS_SID(sid, string) \
 do { \
     PVFS_SID_bin2str(sid, string); \
 } while (0)
+
+#define PVFS_debug_areqfield(field, type) \
+do { \
+    char string[100]; \
+    PVFS_to_string_##type(field, string); \
+    gossip_lsadebug(#field ": %s\n", string); \
+} while (0) 
 
 #define PVFS_debug_reqfield(mask, field, type) \
 do { \
@@ -1037,6 +1049,28 @@ endecode_fields_3a1a_struct(
     PVFS_fs_id, fs_id,
     int32_t, sid_count,
     PVFS_SID, sid_array);
+
+#define PVFS_debug_servreq_tree_get_dirent_count(mask, req)          \
+do {                                                                 \
+    struct PVFS_servreq_tree_get_dirent_count *treq =                \
+                                  &((req)->u.tree_get_dirent_count); \
+    gossip_if (mask)                                                 \
+    {                                                                \
+        gossip_lsadebug("Tree Get Dirent Count Request:\n");         \
+        gossip_lsadebug("req = (%p)\n", (req));                      \
+        PVFS_debug_areqfield(treq->caller_handle_index, uint32_t);   \
+        PVFS_debug_areqfield(treq->retry_msgpair_at_leaf, int32_t);  \
+        /* DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential)); */  \
+        PVFS_debug_areqfield(treq->num_dirdata, uint32_t);           \
+        PVFS_debug_areqfield(treq->handle_array, PVFS_handle);       \
+        PVFS_debug_areqfield(treq->fs_id, PVFS_fs_id);               \
+        PVFS_debug_areqfield(treq->sid_count, int32_t);              \
+        PVFS_debug_areqfield(treq->sid_array, PVFS_SID);             \
+        gossip_lsadebug("Tree Get Dirent Count End:\n");             \
+    }                                                                \
+    gossip_end;                                                      \
+} while (0)
+    
 #define extra_size_PVFS_servreq_tree_get_dirent_count \
     ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
      (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)) + \
@@ -1084,6 +1118,23 @@ endecode_fields_1aa_struct(
     uint32_t, handle_count, /* actually number of sizes and errors returned */
     PVFS_size, dentcnt,
     PVFS_error, error);
+
+#define PVFS_debug_servresp_tree_get_dirent_count(mask, resp) \
+do { \
+    gossip_if (mask) \
+    { \
+        PVFS_debug_areqfield((resp)->caller_handle_index, uint32_t); \
+        PVFS_debug_areqfield((resp)->handle_count, uint32_t); \
+        PVFS_debug_areqfield((resp)->dentcnt, PVFS_size); \
+        PVFS_debug_areqfield((resp)->error, PVFS_error); \
+    } \
+    gossip_end; \
+} while (0)
+    
+#define extra_size_PVFS_servreq_tree_get_dirent_count \
+    ((PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle)) + \
+     (PVFS_REQ_LIMIT_SIDS_COUNT * sizeof(PVFS_SID)) + \
+     extra_size_PVFS_credential)
 #define extra_size_PVFS_servresp_tree_get_dirent_count       \
             ( (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_error)) + \
               (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_size)) )

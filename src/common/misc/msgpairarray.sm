@@ -349,8 +349,8 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     /* assert(mop->params.comp_ct >= 2); */
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, 
-                 "%d total message(s) with %d incomplete\n",
-                 mop->count * 2, MPA_SUM_CT);
+                   "%d total message(s) with %d incomplete\n",
+                   mop->count * 2, MPA_SUM_CT);
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "req op %d\n",
                    msg_p->req.op);
@@ -381,6 +381,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msg_p->encoded_resp_p == NULL\n");
         if (msg_p->fs_id != PVFS_FS_ID_NULL)
         {
+            gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "fs_id != NULL\n");
             server_config = PINT_server_config_mgr_get_config(msg_p->fs_id);
             /* assert or print error and return? */
             assert(server_config);
@@ -405,8 +406,18 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         }
 
     try_next_encoding:
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Trying encoding\n");
         /* is this really a problem?  should we return an error */
         assert(ENCODING_IS_VALID(msg_p->enc_type));
+
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "req (%p) encoded_req (%p) \n",
+                       (void*)&msg_p->req, (void *)&msg_p->encoded_req);
+
+        if (msg_p->req.op == PVFS_SERV_TREE_GET_DIRENT_COUNT)
+        {
+            //DEBUG_PVFS_CREDENTIAL(GOSSIP_MSGPAIR_DEBUG,&(msg_p->req.u.tree_get_dirent_count.credential));
+            PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_MSGPAIR_DEBUG, &(msg_p->req));
+        }
 
         ret = PINT_encode(&msg_p->req,
                           PINT_ENCODE_REQ,
@@ -415,6 +426,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
                           msg_p->enc_type);
         if (ret != 0)
         {
+            gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "encoding failed\n");
             if (must_loop_encodings)
             {
                 gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Looping through "
@@ -433,16 +445,19 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         }
 
         /* calculate max response msg size and allocate space */
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "calc max response size\n");
         msg_p->max_resp_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
                                                        msg_p->req.op,
                                                        msg_p->enc_type);
 
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "allocate BMI mem\n");
         msg_p->encoded_resp_p = BMI_memalloc(msg_p->svr_addr,
                                              msg_p->max_resp_sz,
                                              BMI_RECV);
 
         if (msg_p->encoded_resp_p == NULL)
         {
+            gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "failed to allocate BMI mem\n");
             js_p->error_code = -PVFS_ENOMEM; /* take default */
             return SM_ACTION_COMPLETE;
         }
@@ -1082,6 +1097,13 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
                  "PINT_serv_decode_resp: msg_p op_status: (%d)\n", msg_p->op_status);
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                  "PINT_serv_decode_resp: resp_p->status: (%d)\n", resp_p->status);
+    if (resp_p->status != 0)
+    {
+        char buf[256];
+        PVFS_strerror_r(resp_p->status, buf, sizeof(buf));
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "resp_p->status = %s\n", buf);
+    }
     if (ret != 0)
     {
         /* Didn't decode right, keep decode error */
@@ -1690,19 +1712,19 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
     if (ret > -1)
     {
         /* correct return, so why this message? */
-        PVFS_perror_gossip("\tPINT_decode returns an error", ret);            
+        /* PVFS_perror_gossip("PINT_decode returns an error", ret); */
 
         *resp_out_pp = (struct PVFS_server_resp *)decoded_msg_p->buffer;
 
-        gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                     "\tresp->op is %d\n", (*resp_out_pp)->op);
+        gossip_ldebug(GOSSIP_MSGPAIR_DEBUG,
+                     "resp->op is %d\n", (*resp_out_pp)->op);
 
         if ((*resp_out_pp)->op == PVFS_SERV_PROTO_ERROR)
         {
 
-            gossip_err("Error: server does not seem to understand "
+            gossip_lerr("Error: server does not seem to understand "
                        "the protocol that this client is using.\n");
-            gossip_err("   Please check server logs for more "
+            gossip_lerr("   Please check server logs for more "
                        "information.\n");
 
             if (fs_id != PVFS_FS_ID_NULL)
@@ -1712,11 +1734,11 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                 {
                     server_string = "[UNKNOWN]";
                 }
-                gossip_err("   Server: %s.\n", server_string);
+                gossip_lerr("   Server: %s.\n", server_string);
             }
             else
             {
-                gossip_err("   Server: unknown; probably an error "
+                gossip_lerr("   Server: unknown; probably an error "
                            "contacting server listed in pvfs2tab "
                            "file.\n");
             }

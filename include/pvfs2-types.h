@@ -1588,24 +1588,32 @@ typedef PVFS_credential PVFS_credentials;
 
 #define DEBUG_PVFS_CREDENTIAL(mask,cred) \
 do { \
-    if (cred) { \
-        gossip_ldebug((mask), "Debug PVFS Credential\n"); \
-        gossip_ldebug((mask), "userid:       %d\n", (cred)->userid); \
-        gossip_ldebug((mask), "num_groups:   %d\n", (cred)->num_groups);   \
-        gossip_ldebug((mask), "group_array (%p):\n", (cred)->group_array);  \
-        if((cred)->group_array && (cred)->num_groups > 0) { \
-            int g; \
-            for(g = 0; g < (cred)->num_groups; g++) { \
-                gossip_ldebug((mask), "    group %d\n", (cred)->group_array[g]); \
+    gossip_if(mask) \
+    { \
+        if (cred) { \
+            gossip_ladebug("DEBUG_PVFS_CREDENTIAL\n"); \
+            gossip_ladebug("userid:       %d\n", (cred)->userid); \
+            gossip_ladebug("num_groups:   %d\n", (cred)->num_groups);   \
+            gossip_ladebug("group_array (%p):\n", (cred)->group_array);  \
+            gossip_ladebug("1\n");  \
+            if((cred)->num_groups > 0 && (cred)->group_array) { \
+                int g; \
+                for(g = 0; g < (cred)->num_groups; g++) { \
+                    gossip_ladebug("    group %d\n", (cred)->group_array[g]); \
+                } \
+            }  \
+            gossip_ladebug("2\n");  \
+            if((cred)->issuer) { \
+                gossip_ladebug("issuer:  %s\n", (cred)->issuer); \
             } \
-        }  \
-        if((cred)->issuer) { \
-            gossip_ldebug((mask), "issuer:  %s\n", (cred)->issuer); \
+            gossip_ladebug("3\n");  \
+            gossip_ladebug("sig_size:     %d\n", (cred)->sig_size);  \
+            gossip_ladebug("DEBUG_PVFS_CREDENTIAL End\n"); \
+        } else { \
+            gossip_ladebug("Credential pointer is NULL\n"); \
         } \
-        gossip_ldebug((mask), "sig_size:     %d\n", (cred)->sig_size);  \
-    } else { \
-        gossip_ldebug((mask), "Credential pointer is NULL\n"); \
     } \
+    gossip_end; \
 } while(0)
 
 #define COPY_PVFS_CREDENTIAL(dst,src) \
@@ -1618,8 +1626,9 @@ do { \
     if ((src)->group_array && (src)->num_groups > 0) \
     { \
         (dst)->group_array = malloc((src)->num_groups * sizeof(PVFS_gid)); \
-        memcpy((dst)->group_array,(src)->group_array, \
-                (src)->num_groups * sizeof(PVFS_gid)); \
+        memcpy((dst)->group_array, \
+               (src)->group_array, \
+               (src)->num_groups * sizeof(PVFS_gid)); \
     } else { \
         (dst)->group_array = NULL; \
     } \

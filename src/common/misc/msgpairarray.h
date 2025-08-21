@@ -182,16 +182,10 @@ typedef struct PINT_sm_msgarray_op
 } PINT_sm_msgarray_op;
 
 /*
- * Freeing a "pointer" you know nothing about is bad Ju-Ju!
- * In this case it should be OK, except its not.  It needs an
- * Error message at minimum because a properly set up MPA system
- * should not have this issue, but this can cause memory errors that
- * are very hard to find.  For now I'm going to take out the free
- * and assume a little mem loss is better than a screwed up heap.
- * I'm going to try to write a new routine part of our memory code
- * that can see if the pointer looks like it is safe to free. And
- * of course, I'll try to fix the problem that caused this.
- * Didn't have to write a new routine, I already did.  We'll see
+ * This now silently ignores non-freeable address in msgarray
+ * setting it to msgpair.  This SHOULD be a pointer to an
+ * embedded msgpair - IOW not malloc'd, but if it isn't we
+ * just throw it away.
  */
 #define PINT_msgpair_init(op)                                     \
     do {                                                          \
@@ -202,12 +196,6 @@ typedef struct PINT_sm_msgarray_op
             {                                                     \
                 free((op)->msgarray);                             \
             }                                                     \
-            else                                                  \
-            {                                                     \
-                gossip_ldebug(GOSSIP_MSGPAIR_DEBUG,               \
-                      "PINT_msgpair_init wants to free a bad pointer\n");\
-            }                                                     \
-            (op)->msgarray = NULL;                                \
         }                                                         \
         (op)->count = 1;                                          \
         (op)->msgarray = &(op)->msgpair;                          \

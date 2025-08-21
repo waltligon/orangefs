@@ -2098,7 +2098,9 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
     new_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT + 1); /* get new frame */
 
     new_op->op = PVFS_SERV_TREE_GET_DIRENT_COUNT; /* tree op we are about to jump to */
-    new_op->req = (struct PVFS_server_req *)malloc(sizeof(struct PVFS_server_req));
+    new_op->msgarray_op.msgarray = &(new_op->msgarray_op.msgpair);
+    new_op->req = &(new_op->msgarray_op.msgpair.req);  /* don't malloc if we don't have to */
+    /* new_op->req = (struct PVFS_server_req *)malloc(sizeof(struct PVFS_server_req)); */
 
     memcpy(new_op->req, s_op->req, sizeof(struct PVFS_server_req));
     memcpy(&new_op->resp, &s_op->resp, sizeof(struct PVFS_server_resp));
@@ -2147,6 +2149,7 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
                    //(void *)getattr_p->dirent_array);
 
     /* set up the tree op */
+    DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &(s_op->req->u.getattr.credential));
     PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
                                     msg_p->req, /* dest is new_op */
                                     capability,

@@ -114,6 +114,14 @@ void PVFS_perror(const char *text, int retcode)
         return;
     }
 
+    if (retcode == 0)
+    {
+        /* should return "Success" */
+        PVFS_strerror_r(abscode, buf, sizeof(buf));
+        fprintf(stderr, "%s: %s\n", text, buf);
+        return;
+    }
+
     if (IS_PVFS_NON_ERRNO_ERROR(abscode))
     {
         int index = PVFS_get_errno_mapping(abscode);
@@ -173,6 +181,14 @@ void PVFS_perror_gossip(const char *text, int retcode)
         return;
     }
 
+    if (retcode == 0)
+    {
+        /* should return "Success" */
+        PVFS_strerror_r(abscode, buf, sizeof(buf));
+        gossip_ladebug("%s: %s\n", text, buf);
+        return;
+    }
+
     if (IS_PVFS_NON_ERRNO_ERROR(abscode))
     {
         int index = PVFS_get_errno_mapping(abscode);
@@ -180,22 +196,22 @@ void PVFS_perror_gossip(const char *text, int retcode)
         snprintf(buf, MAX_PVFS_STRERROR_LEN, "%s: %s (error class: %d)\n", 
                  text, PINT_non_errno_strerror_mapping[index], 
                  PVFS_ERROR_CLASS(abscode));
-        gossip_err("%s", buf);
+        gossip_lerr("%s", buf);
     }
     else if (IS_PVFS_ERROR(abscode))
     {
         PVFS_strerror_r(PVFS_ERROR_TO_ERRNO(abscode), buf, sizeof(buf));
 
-        gossip_err("%s: %s (error class: %d)\n", text, buf, 
+        gossip_lerr("%s: %s (error class: %d)\n", text, buf, 
                    PVFS_ERROR_CLASS(abscode));
     }
     else
     {
-        gossip_err("Warning: non PVFS2 error code (%d):\n", retcode);
+        gossip_lerr("Warning: non PVFS2 error code (%d):\n", retcode);
 
         PVFS_strerror_r(abscode, buf, sizeof(buf));
 
-        gossip_err("%s: %s\n", text, buf);
+        gossip_lerr("%s: %s\n", text, buf);
     }
     return;
 }

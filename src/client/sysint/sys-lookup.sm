@@ -721,29 +721,32 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
     PINT_smcb *parent_smcb = smcb->parent_smcb;
     PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
-    int current_seg_index = sm_p->u.lookup.contexts[ sm_p->u.lookup.current_context ].current_segment;
+    int current_seg_index = sm_p->u.lookup.contexts[sm_p->u.lookup.current_context].current_segment;
     PVFS_object_ref last_resolved_refn;
     struct server_configuration_s *server_config = NULL;
     struct filesystem_configuration_s* cur_fs = NULL;
     int metasidcnt;
     char oid1[OID_STR_SZ+1]={0}, oid2[OID_STR_SZ+1]={0};
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_segment_lookup_comp_fn\n");
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "beginning lookup comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
 
     if (resp_p->status != 0)
     {
+        gossip_lerr("Response status is not zero\n");
         return resp_p->status;
     }
 
     /* we are assuming here that we were able
      * to resolve at least one segment */
+    /* who guarantees this - or is this poor error checking? */
     assert(resp_p->u.lookup_path.handle_count);
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
+    gossip_ldebug(GOSSIP_LOOKUP_DEBUG, "Resolved %d segments\n",
                  resp_p->u.lookup_path.handle_count);
 
+    /* this is duplicated below */
     memset(&last_resolved_refn, 0, sizeof(PVFS_object_ref));
 
     /*
@@ -777,7 +780,7 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
             cur_seg->seg_starting_refn = last_resolved_refn;
         }
 
-        memset(&last_resolved_refn,0,sizeof(last_resolved_refn));
+        memset(&last_resolved_refn, 0, sizeof(last_resolved_refn));
         last_resolved_refn.fs_id  = cur_seg->seg_starting_refn.fs_id;
         last_resolved_refn.handle = resp_p->u.lookup_path.handle_array[i];
 
@@ -792,10 +795,10 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
          */
         last_resolved_refn.sid_count = metasidcnt;
         last_resolved_refn.sid_array = 
-                   calloc(metasidcnt,sizeof(*last_resolved_refn.sid_array));
-        if ( !last_resolved_refn.sid_array )
+                   calloc(metasidcnt, sizeof(*last_resolved_refn.sid_array));
+        if (!last_resolved_refn.sid_array)
         {
-           gossip_err("%s:Unable to allocate memory for sid_array\n",__func__);
+           gossip_lerr("%s:Unable to allocate memory for sid_array\n",__func__);
            return -PVFS_ENOMEM;
         }
         memcpy(last_resolved_refn.sid_array,
@@ -826,13 +829,11 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
         memcpy(oid2,
                PVFS_OID_str(&cur_seg->seg_starting_refn.handle),
                OID_STR_SZ); 
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "*** ncache update on %s target "
-                     "(%s|%d) parent (%s|%d)\n",
-                     cur_seg->seg_name,
-                     oid1,
-                     last_resolved_refn.fs_id,
-                     oid2,
-                     cur_seg->seg_starting_refn.fs_id);
+        gossip_ldebug(GOSSIP_LOOKUP_DEBUG,
+                      "ncache update on %s target (%s|%d) parent (%s|%d)\n",
+                      cur_seg->seg_name, oid1,
+                      last_resolved_refn.fs_id, oid2,
+                      cur_seg->seg_starting_refn.fs_id);
 
         PINT_ncache_update((const char*) cur_seg->seg_name,
                            (const PVFS_object_ref*) &(last_resolved_refn),
@@ -957,7 +958,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *seg_to_lookup = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s\n", __func__);
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "setting up lookup request\n");
     js_p->error_code = 0;
 
     /* do a lookup on the current segment of the current context */
@@ -985,7 +986,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     /* ensure a capability exists for the parent directory */    
     if (!(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY))
     {
-        gossip_err("%s: missing cap\n", __func__);
+        gossip_lerr("missing cap\n");
         js_p->error_code = -PVFS_EACCES;
         return SM_ACTION_COMPLETE;
     }
@@ -999,7 +1000,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
                                   PVFS_ATTR_COMMON_ALL,
                                   sm_p->hints);
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle %s\n",
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Looking up segment %s parent %s\n",
                  seg_to_lookup, PVFS_OID_str(&cur_seg->seg_starting_refn.handle));
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -1015,7 +1016,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
-        gossip_err("Failed to map meta server address\n");
+        gossip_lerr("Failed to map meta server address\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
@@ -1027,8 +1028,8 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
 static PINT_sm_action lookup_segment_lookup_failure(struct PINT_smcb *smcb,
                                                     job_status_s *js_p)
 {
-    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
-                 "lookup state: lookup_segment_lookup_failure\n");
+    gossip_lsdebug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
+                   "lookup failure ignored\n");
     return SM_ACTION_COMPLETE;
 }
 
@@ -1044,8 +1045,15 @@ static PINT_sm_action lookup_segment_verify_attr_present(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
-                 "lookup state: lookup_segment_verify_attr_present\n");
+    /* remove frame used in jump to MPA */
+    void *old_frame = PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    if (PINT_check_malloc(old_frame)) /* this may be a portion of sm_p */
+    {
+        free(old_frame);
+    }
+
+    gossip_lsdebug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
+                 "Verifying attrs\n");
 
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
     assert(cur_seg);
@@ -1069,8 +1077,8 @@ static PINT_sm_action lookup_segment_verify_attr_present(
         (cur_seg->seg_attr.objtype == PVFS_TYPE_SYMLINK))
     {
         /* if we don't have the attr, direct sm to fetch the attr */
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, " -- NO attrs for %s\n",
-                     cur_seg->seg_name);
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "NO attrs for %s\n",
+                      cur_seg->seg_name);
 
         PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,  
                                    cur_seg->seg_resolved_refn,
@@ -1079,15 +1087,14 @@ static PINT_sm_action lookup_segment_verify_attr_present(
                                    PVFS_TYPE_NONE,
                                    0);
 
-        js_p->error_code = 1;
+        js_p->error_code = 1; /* defaults to getattr */
     }
     else
     {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, " -- we have the attrs for %s\n",
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "we have the attrs for %s\n",
                      cur_seg->seg_name);
 
-        /* otherwise, continue to next state */
-        js_p->error_code = 0;
+        js_p->error_code = 0; /* success, continue to next state */
     }
     return SM_ACTION_COMPLETE;
 }

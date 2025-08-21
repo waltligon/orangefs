@@ -521,14 +521,22 @@ static int lebf_encode_req(struct PVFS_server_req *req,
     {
         goto out;
     }
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_req\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,
+                 "req (%p) target_msg (%p)\n",
+                 req, target_msg);
 
     /* every request has these fields */
     p = &target_msg->ptr_current;
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,
+                 "calling encode_PVFS_server_req p (%p)\n", (void *)p);
     encode_PVFS_server_req(p, req);
 
 #define CASE(tag,var) \
-    case tag: encode_PVFS_servreq_##var(p,&req->u.var); break
+    case tag: encode_PVFS_servreq_##var(p,&req->u.var);  \
+         gossip_ldebug(GOSSIP_ENDECODE_DEBUG, \
+                       "tag " #tag "var (%p)\n", &(req->u.var)); \
+        break
+         
 
     switch (req->op)
     {
@@ -914,11 +922,11 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
     char **p = &ptr;
     struct PVFS_server_resp *resp = &target_msg->stub_dec.resp;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG, "lebf_decode_resp\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Sstarting decode method\n");
     target_msg->buffer = resp;
 
     /* decode generic part of response (including op number) */
-    gossip_debug(GOSSIP_ENDECODE_DEBUG, "decoding generic part of resp\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "decoding generic part of resp\n");
     decode_PVFS_server_resp(p, resp);
 
     if (resp->status != 0) 
@@ -930,18 +938,16 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
     case tag: decode_PVFS_servresp_##var(p,&resp->u.var); break
 
     gpptr = *p; /* q&d debugging skipping header decoding */
-    gossip_debug(GOSSIP_ENDECODE_DEBUG, "decoding op (%d) specific part of resp\n",
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "decoding op (%d) specific part of resp\n",
                  resp->op);
     switch (resp->op)
     {
-
         /* call standard function defined in headers */
         CASE(PVFS_SERV_GETCONFIG, getconfig);
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_MIRROR, mirror);
         CASE(PVFS_SERV_UNSTUFF, unstuff);
-        /* CASE(PVFS_SERV_BATCH_CREATE, batch_create); */
         CASE(PVFS_SERV_IO, io);
         CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
