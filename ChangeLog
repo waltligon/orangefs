@@ -3,6 +3,29 @@
 OrangeFS Release ChangeLog
 -----------------------
 
+orangefs-2.10.1 (Git Branch v.2.10.1)
+https://github.com/waltligon/orangefs.git
+up to commit-id f4854f7c
+
+* - general updates
+	1. documentation updates.
+	2. removed c-shell dependency.
+	3. change default build linkage from static to shared
+	4. change from bdb to lmdb for default database
+	5. updated configure script for usrint.
+	6. some code refactored to adhere to coding standards.
+
+* - trove
+	1. truncate bstream before set size attr in case former fails.
+	2. lock local lock for truncate as well as set size attr.
+
+* - general fixes
+	1. adjust some functions in state machines to match their prototypes.
+	2. add some gossip statements, and improve some others.
+	3. restored ability to invoke "make dist".
+	4. fixed db_display string processing.
+	5. fixed bstream-resize truncation failure error handling.
+
 orangefs-2.10.0 (Git Branch v.2.10.0)
 https://github.com/waltligon/orangefs.git
 up to commit-id 7c28362b
