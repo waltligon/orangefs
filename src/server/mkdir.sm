@@ -842,11 +842,13 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     s_op->u.mkdir.dirdata_index = i;
     s_op->u.mkdir.rmt_dirdata_index = j;
 
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Final i %d j %d\n", i, j);
+
     /* if i is (less than?) zero there are no more dirdata to test/create */
     if (i < 0)
     {
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                       "setting return (error) code: 1: SM branch control\n");
+                       "setting return (error) code: 1: STATE_DIRDATA_DONE\n");
         js_p->error_code = STATE_DIRDATA_DONE;
         return SM_ACTION_COMPLETE;
     }
@@ -858,6 +860,7 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
      * cleanup state.
      */
 
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "doing buffer memcpy's\n");
     if (!s_op->u.mkdir.dirdata_parent_buffer)
     {
         char *p;
@@ -1072,22 +1075,25 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
+#if 1
     /* we are bypassing this step for now - might try to add it back using
      * a PJMP to prevent delaying the end of the request but for now we
      * assume remote dirdatas are created on demand at the server when a
      * request accesses them.
      */
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                   "setting return (error) code: 1 is SM branch control\n");
+                   "setting return (error) code: 1 STATE_DIRDATA_DONE\n");
     js_p->error_code = STATE_DIRDATA_DONE;
     return SM_ACTION_COMPLETE;
+#endif
 
     /* set up for an array of requests */
-    ret = PINT_msgpairarray_init(&s_op->msgarray_op, s_op->u.mkdir.rmt_dirdata_index);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Setting up array of req\n");
+    ret = PINT_msgpairarray_init(&s_op->msgarray_op, s_op->u.mkdir.rmt_dirdata_index + 1);
     if (ret != 0)
     {
         gossip_err("mkdir: setattr failed to initialize %d msgpairs\n",
-                   s_op->u.mkdir.rmt_dirdata_index);
+                   s_op->u.mkdir.rmt_dirdata_index + 1);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
@@ -1098,6 +1104,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
      * it again.  Going to try the latter.  Note handle is edited inside the
      * loop below.
      */
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Setting attributes\n");
     pattr = (&s_op->req->u.mkdir.attr);
     pattr->objtype = PVFS_TYPE_DIRDATA;
     pattr->owner = 0;
@@ -1122,6 +1129,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
         /* setattr on a new remote dirdata will create the dirdata on
          * the remote server
          */
+        gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Fill in setattr request\n");
         PINT_SERVREQ_SETATTR_FILL(msg_p->req,
                                   PVFS_REQ_DIRDATA, /* sub_op req type */
                                   capability,
@@ -1155,6 +1163,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
         }
     }
 
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Pushing mop frame\n");
     ret = PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     if ( ret < 0 )
     {
@@ -1164,6 +1173,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
        return SM_ACTION_COMPLETE;
     }
 
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Returning %d\n", ret);
     js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
 }
