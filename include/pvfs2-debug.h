@@ -315,6 +315,74 @@ static inline int DBG_TRUE(PVFS_debug_mask mask)
     return mask.mask1 || mask.mask2;
 }
 
+/*
+ * These make it easier to define complex debug routines and are used
+ * in src/proto/pvfs2-req.proto.h src/proto/pvfs2-attr.h
+ * src/server/pvfs2-server.h and others.
+ */
+
+#define PVFS_to_string_ptr(ptr, string) \
+do { \
+    sprintf(string, "(%p)", (ptr)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_fs_id(fsid, string) \
+do { \
+    sprintf(string, "%d", (fsid)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_handle(handle, string) \
+do { \
+    PVFS_OID_bin2str(handle, string); \
+} while (0)
+
+#define PVFS_to_string_int32_t(integer, string) \
+do { \
+    sprintf(string, "%d", (integer)); \
+} while (0)
+
+#define PVFS_to_string_uint32_t(integer, string) \
+do { \
+    sprintf(string, "%u", (integer)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_SID(sid, string) \
+do { \
+    PVFS_SID_bin2str(sid, string); \
+} while (0)
+
+#define PVFS_to_string_string(stringin, stringout) \
+do { \
+    strcpy(stringout, stringin); \
+} while (0)
+
+#define PVFS_to_string_PVFS_object_ref(ref, string) \
+do { \
+    PVFS_debug_object_ref(ref); \
+    strcpy(string, ""); \
+} while (0)
+
+#define PVFS_to_string_PVFS_object_attr(ref, string) \
+do { \
+} while (0)
+
+#define PVFS_debug_afield(field, type) \
+do { \
+    char string[100]; \
+    PVFS_to_string_##type(field, string); \
+    gossip_lsadebug(#field ": %s\n", string); \
+} while (0) 
+#define PVFS_debug_areqfield(field, type) PVFS_debug_afield(field, type)
+
+#define PVFS_debug_field(mask, field, type) \
+do { \
+    char string[100]; \
+    PVFS_to_string_##type(field, string); \
+    gossip_lsdebug((mask), #field ": %s\n", string); \
+} while (0)
+#define PVFS_debug_reqfield(field, type) PVFS_debug_field(field, type)
+
+
 #endif /* __PVFS2_DEBUG_H */
 
 /*
