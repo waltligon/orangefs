@@ -187,11 +187,12 @@ int gossip_debug_fp(FILE *fp,
                                  (__m1.mask2 & (__m2).mask2))
 
 #define gossip_debug_enabled(__m)  \
-                  (gossip_debug_on && gossip_isset(gossip_debug_mask, __m))
+                  (gossip_debug_on && gossip_isset(gossip_debug_mask, (__m)))
 
 #define gossip_if(__mask)            \
 do {                                 \
-   if (gossip_debug_enabled(__mask))                      
+   if (gossip_debug_enabled(__mask)) 
+
 
 #define gossip_end                   \
 } while(0)

@@ -854,10 +854,11 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
         if (frame_entry->frame_info->frame)
         {
            gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
-                          "frame:%p \ttask-id:%d\trefcnt:%d\n",
+                          "frame:%p \ttask-id:%d\trefcnt:%d->%d\n",
                           frame_entry->frame_info->frame,
                           frame_entry->task_id,
-                          frame_entry->frame_info->frefcnt);
+                          frame_entry->frame_info->frefcnt,
+                          frame_entry->frame_info->frefcnt - 1);
         }
         else
         {
@@ -866,12 +867,11 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
         }
 
         frame_entry->frame_info->frefcnt -= 1;
-        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "modified refcnt %d\n",
-                       frame_entry->frame_info->frefcnt);
         if ((frame_entry->frame_info->frefcnt <= 0) && 
             frame_entry->frame_info->frame /*&& frame_entry->task_id != 0*/)
         {
-            gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Freeing Frame\n");
+            /* This combines with the lsdebug below */
+            gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Freeing / ");
             /* V3 - are we assured this frame has had any referenced
              * memory freed.  Shouldn't we call a specific free routine
              * on it to make sure and free anything remaining, rather

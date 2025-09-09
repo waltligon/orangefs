@@ -1585,7 +1585,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->comp_fn = create_crdirent_comp_fn;
     /* not adding an object so no attr needed */
 
-    PVFS_debug_servreq_crdirent(GOSSIP_CREATE_DEBUG, &(msg_p->req.u.crdirent));
+    PVFS_debug_servreq_crdirent(GOSSIP_CREATE_DEBUG, &(msg_p->req));
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)

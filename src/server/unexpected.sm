@@ -254,6 +254,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     int remote_op_cnt = 0;
     int remote_op = 0;
 
+
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Running Setup\n");
 
     server_config_p = PINT_server_config_mgr_get_config();
@@ -282,6 +283,10 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, 
                    "After req decode enc_type is %d\n", s_op->decoded.enc_type);
 
+    s_op->req = s_op->decoded.buffer;
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "s_op->op %d s_op->req->op %d smcb->op %d\n",
+                                        s_op->op, s_op->req->op, smcb->op);
+
     if (ret == -PVFS_EPROTONOSUPPORT)
     {
         /* we have a protocol mismatch of some sort; try to trigger a
@@ -308,7 +313,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
      * we can switch properly.
      */
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Set up req and op\n");
-    if (s_op->req)
+    if (((void *)s_op->req) < ((void *)s_op) || ((void *)s_op->req) > (void *)(s_op + 1))
     {   /* don't leave hanging memory */
         free(s_op->req);
     }
@@ -327,8 +332,8 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     PINT_server_req_get_credential(s_op->req, &cred);
     DEBUG_PVFS_CREDENTIAL(GOSSIP_UNEXP_DEBUG, cred);
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
-                   "s_op (%p) s_op->req (%p) s_op->op %d s_op->req->op %d\n",
-                   s_op, s_op->req, s_op->op, s_op->req->op);
+                   "s_op (%p) s_op->req (%p) smcb->op %d s_op->op %d s_op->req->op %d\n",
+                   s_op, s_op->req, smcb->op, s_op->op, s_op->req->op);
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
                    "Received a request with op = %d (%s)\n", s_op->op,
@@ -349,6 +354,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                   sizeof(uint32_t),
                   &s_op->req->op);
 
+    /************* LOCAL OP *************/
 
     /* Setup 1 local op */
     local_op_frame = (struct PINT_server_op *)
@@ -366,6 +372,12 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
      * original and push it onto the framestack
      */
     memcpy(local_op_frame, s_op, sizeof(struct PINT_server_op));
+    local_op_frame->req = (struct PVFS_server_req *)local_op_frame->decoded.buffer;
+
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
+                   "local_op_frame (%p) local_op_frame->req (%p) smcb->op %d local_op_frame->op %d local_op_frame->req->op %d\n",
+                   local_op_frame, local_op_frame->req, smcb->op, local_op_frame->op, local_op_frame->req->op);
+
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Pushing local op frame\n");
     s_op->num_pjmp_frames = 1;
 
@@ -378,6 +390,8 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     {
         gossip_lerr("failed to push frame for local_op!\n");
     }
+
+    /************* REMOTE OP CTRL *************/
 
     /* Replicate and Tree are very similar so we share a lot of code */
     if ((s_op->req->ctrl.mode == PVFS_REQ_REPLICATE ||
@@ -425,6 +439,8 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
             goto noremote;
         }
 
+        /************* REMOTE OP *************/
+
         /* Allocate a structure to manage syncing the SMs */
         local_op_frame->join =
                 (struct PINT_mpa_join *)calloc(1, sizeof(struct PINT_mpa_join));
@@ -442,6 +458,8 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
             js_p->error_code = -PVFS_ENOMEM;
             return SM_ACTION_COMPLETE;
         }
+        memcpy(remote_op_frame, s_op, sizeof(struct PINT_server_op));
+        remote_op_frame->req = (struct PVFS_server_req *)remote_op_frame->decoded.buffer;
         gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
                        "Created new frame for remote op (%p) after PJMP\n",
                        remote_op_frame);

@@ -50,6 +50,12 @@ enum
 
 nested machine pvfs2_crdirent_work_sm
 {
+    state init
+    {
+        run crdirent_init;
+        default => prelude;
+    }
+
     state prelude
     {
         jump pvfs2_prelude_sm;
@@ -159,6 +165,14 @@ machine pvfs2_crdirent_sm
 }
 
 %%
+
+static PINT_sm_action crdirent_init(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_debug_servreq_crdirent(GOSSIP_SERVER_DEBUG, s_op->req);
+    return SM_ACTION_COMPLETE;
+}
+
 
 #if 0
 /* crdirent_setup_op()

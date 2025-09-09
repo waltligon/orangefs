@@ -806,6 +806,15 @@ do { \
     memset((oref), 0, sizeof(PVFS_object_ref)); \
 } while (0)
 
+#define PVFS_debug_object_ref(oref) \
+do { \
+    gossip_lsadebug("Object ref Debug (" #oref "):\n"); \
+    gossip_lsadebug("Handle    %s\n", PVFS_OID_str(&((oref)->handle))); \
+    gossip_lsadebug("FS_id     %d\n", (oref)->fs_id); \
+    gossip_lsadebug("SID count %d\n", (oref)->sid_count); \
+    gossip_lsadebug("SID %s\n", PVFS_SID_str((oref)->sid_array)); \
+} while (0)     
+
 /* kernel compatibility version of a PVFS_handle */
 typedef struct PVFS_khandle_s
 {

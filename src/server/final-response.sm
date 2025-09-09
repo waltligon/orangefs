@@ -81,18 +81,26 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
         for (i = 0; i < smcb->frame_count; i++)
         {
             struct PINT_server_op *top = PINT_sm_frame(smcb, PINT_FRAME_CURRENT - i);
-            gossip_log("final_response_release (%p): frame %d top (%p) op %d resp_op %d\n",
-                       smcb, PINT_FRAME_CURRENT - i, top, top->op, top->resp.op);
+            gossip_lsadebug("frame %d top (%p) op %d resp_op %d\n",
+                          PINT_FRAME_CURRENT - i, top, top->op, top->resp.op);
             if (top->op == 52)
             {
-                gossip_log("final_response_release (%p): handle count %d dirent_count %ld\n",
-                       smcb, top->resp.u.tree_get_dirent_count.handle_count,
-                       *top->resp.u.tree_get_dirent_count.dentcnt);
+                gossip_lsadebug("handle count %d ",
+                                top->resp.u.tree_get_dirent_count.handle_count);
+                if (top->resp.u.tree_get_dirent_count.dentcnt)
+                {
+                    gossip_adebug("dirent_count %ld\n",
+                                  *top->resp.u.tree_get_dirent_count.dentcnt);
+                }
+                else
+                {
+                    gossip_adebug("\n");
+                }
             }
-            if (top->op == 4)
+            else if (top->op == 4)
             {
-                gossip_log("final_response_release (%p): handle count %d dirent_count %ld attr type %d\n",
-                       smcb, top->resp.u.getattr.attr.u.dir.dist_dir_attr.dirdata_count,
+                gossip_lsadebug("handle count %d dirent_count %ld attr type %d\n",
+                       top->resp.u.getattr.attr.u.dir.dist_dir_attr.dirdata_count,
                        top->resp.u.getattr.attr.u.dir.dirent_count, top->resp.u.getattr.attr.objtype);
             }
         }

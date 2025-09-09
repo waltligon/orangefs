@@ -982,7 +982,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
 
-    PVFS_debug_servreq_mkdir(GOSSIP_MKDIR_DEBUG, &(msg_p->req.u.mkdir));
+    PVFS_debug_servreq_mkdir(GOSSIP_MKDIR_DEBUG, &(msg_p->req));
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret < 0)
@@ -1131,7 +1131,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
 
-        PVFS_debug_servreq_setattr(GOSSIP_SETATTR_DEBUG, &(msg_p->req.u.setattr));
+        PVFS_debug_servreq_setattr(GOSSIP_SETATTR_DEBUG, &(msg_p->req));
 
         ret = PVFS_SID_get_addr(&msg_p->svr_addr, msg_p->sid_array);
         /* ret = PVFS_SID_get_addr(&msg_p->svr_addr, &sm_p->object_ref.sid_array[0]); */
@@ -1208,13 +1208,17 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
         gossip_lsadebug("posting crdirent req\n");
 
-        gossip_lsadebug("hooking dirent %s (%s) under "
-                        "parent handle %s, dirdata_handle %s with server_no=%d\n",
+        gossip_lsadebug("hooking dirent %s (%s)\n",
                         sm_p->u.mkdir.object_name,
-                        PVFS_OID_str(sm_p->u.mkdir.newdir_handle),
-                        PVFS_OID_str(&sm_p->parent_ref.handle),
-                        PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
-                                                    dirdata_server_index]),
+                        PVFS_OID_str(sm_p->u.mkdir.newdir_handle));
+
+        gossip_lsadebug("under parent handle %s\n",
+                        PVFS_OID_str(&sm_p->parent_ref.handle));
+
+        gossip_lsadebug("dirdata_handle %s\n",
+                        PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index]));
+
+        gossip_lsadebug("with server_no %d\n",
                         dirdata_server_index);
     }
     gossip_end;
@@ -1266,6 +1270,8 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
         gossip_lerr("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    PVFS_debug_servreq_crdirent(GOSSIP_MKDIR_DEBUG, &(msg_p->req));
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
     return SM_ACTION_COMPLETE;

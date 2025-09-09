@@ -186,7 +186,7 @@ static PINT_sm_action setattr_verify_attribs(struct PINT_smcb *smcb,
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     char ostr[32], gstr[32];
 
-    PVFS_debug_servreq_setattr(GOSSIP_SETATTR_DEBUG, &(s_op->req->u.setattr));
+    PVFS_debug_servreq_setattr(GOSSIP_SETATTR_DEBUG, (s_op->req));
 
     a_p = &s_op->attr; /* attributes read during prelude */
     req_a_p = &s_op->req->u.setattr.attr;

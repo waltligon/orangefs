@@ -525,7 +525,7 @@ int main(int argc, char **argv)
              * processing, so it is defined in the src/common/misc
              * directory.
              */
-            gossip_ldebug(GOSSIP_SERVER_DEBUG, "continuing smcb (%p)\n", smcb);
+            gossip_ldebug(GOSSIP_SERVER_DEBUG, "continuing smcb (%p) op %d\n", smcb, smcb->op);
             ret = PINT_state_machine_continue(smcb,
                                               &server_job_status_array[i]);
 

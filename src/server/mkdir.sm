@@ -1147,7 +1147,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = NULL;
 
-        PVFS_debug_servreq_setattr(GOSSIP_SETATTR_DEBUG, &(msg_p->req.u.setattr));
+        PVFS_debug_servreq_setattr(GOSSIP_SETATTR_DEBUG, &(msg_p->req));
 
         /* This sets svr_addr for BMI */
         ret = PVFS_SID_get_addr(&msg_p->svr_addr, msg_p->sid_array);

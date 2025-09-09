@@ -667,9 +667,13 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
 
     object_ref = sm_p->getattr.object_ref;
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "OIDS:\nobj_ref: %s\nnil: %s\n",
-                   PVFS_OID_str(&object_ref.handle),
-                   PVFS_OID_str(&PVFS_HANDLE_NULL));
+    gossip_if(GOSSIP_GETATTR_DEBUG)
+    {
+        gossip_lsadebug("OIDS:\n");
+        gossip_lsadebug("obj_ref: %s\n", PVFS_OID_str(&object_ref.handle));
+        gossip_lsadebug("nil: %s\n", PVFS_OID_str(&PVFS_HANDLE_NULL));
+    }
+    gossip_end;
 
     assert(PVFS_OID_NE(&object_ref.handle, &PVFS_HANDLE_NULL));
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
@@ -1912,9 +1916,14 @@ static PINT_sm_action getattr_mpa_cleanup(struct PINT_smcb *smcb,
                    "handle refers to invalid object type\n");
         */
 
-        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "sm_p->getattr.attr.objtype %d\n", sm_p->getattr.attr.objtype);
-        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "attr->objtype %d\n", attr->objtype);
-        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op->u.getattr.getattr_resp_p->attr.objtype %d\n", sm_p->u.getattr.getattr_resp_p->attr.objtype);
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                       "sm_p->getattr.attr.objtype %d\n",
+                       sm_p->getattr.attr.objtype);
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                       "attr->objtype %d\n", attr->objtype);
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                       "s_op->u.getattr.getattr_resp_p->attr.objtype %d\n",
+                       sm_p->u.getattr.getattr_resp_p->attr.objtype);
 
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
