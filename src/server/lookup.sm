@@ -226,8 +226,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
      */
     if ( s_op->ds_attr.type != PVFS_TYPE_DIRECTORY )
     {
-       gossip_err("%s:Parent object is NOT a directory(%s)\n"
-                 ,__func__
+       gossip_lerr("Parent object is NOT a directory(%s)\n"
                  ,s_op->req->u.lookup_path.path);
        js_p->error_code = STATE_ENOTDIR;
        return SM_ACTION_COMPLETE;
@@ -247,33 +246,34 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
      * system default metasidcount and NOT the root's sid count.  
      */
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "%s:s_op->target_handle=(%s)\n", __func__,
-                 PVFS_OID_str(&s_op->target_handle));
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "%s:s_op->target_handle=(%s)\n", __func__,
+                   PVFS_OID_str(&s_op->target_handle));
 
     PVFS_object_ref fs_root;
     memset(&fs_root, 0, sizeof(fs_root));
     ret = PINT_cached_config_get_root_ref(s_op->target_fs_id, &fs_root);
     if (ret)
     {
-       gossip_err("%s: Root handle for filesystem(%d) not found\n", __func__,
-                  s_op->target_fs_id);
+       gossip_lerr("Root handle for filesystem(%d) not found\n",
+                   s_op->target_fs_id);
     }
     else
     {
-       gossip_debug(GOSSIP_SERVER_DEBUG,
-                    "%s: Root handle(%s)\n", __func__,
-                    PVFS_OID_str(&fs_root.handle));
+       gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                      "Root handle(%s)\n", 
+                      PVFS_OID_str(&fs_root.handle));
+
        if (!PVFS_OID_cmp(&s_op->target_handle, &fs_root.handle))
        {
-          gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                       "%s: Target handle(%s) is root handle\n", __func__,
-                       PVFS_OID_str(&s_op->target_handle));
+          gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                         "Target handle(%s) is root handle\n", 
+                         PVFS_OID_str(&s_op->target_handle));
        }
        else
        {
           gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                       "%s: Target handle(%s) is NOT a root handle\n", __func__,
+                       "Target handle(%s) is NOT a root handle\n", 
                        PVFS_OID_str(&s_op->target_handle));
        }
     }
@@ -292,7 +292,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
                                                        &(s_op->metasidcnt));
        if (ret)
        {
-          gossip_err("%s:Error retrieving metadata sid count from config file.\n",__func__);
+          gossip_lerr("Error retrieving metadata sid count from config file.\n");
           js_p->error_code = ret;
           return SM_ACTION_COMPLETE;
        }
@@ -305,25 +305,26 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->req->u.lookup_path.path);
     s_op->u.lookup.handle_ct = 0;
     s_op->u.lookup.attr_ct = 0;
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup handle ct = %u\n",
-                 __func__, s_op->u.lookup.handle_ct);
+    gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                 "s_op lookup handle ct = %u\n", s_op->u.lookup.handle_ct);
 
     /* temp memory block for moving around dirents */
     s_op->u.lookup.temp_dirent_store = (PVFS_ID *)malloc(OSASZ(1, s_op->metasidcnt));
     
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 " STARTING LOOKUP REQUEST "
-                 "(path:%s)(fs_id:%d)(handle:%s)(attrmask:0x%0lx)"
-                 "(# of segments:%u)\n",
-                 s_op->req->u.lookup_path.path,
-                 s_op->req->u.lookup_path.fs_id,
-                 PVFS_OID_str(&s_op->req->u.lookup_path.handle),
-                 s_op->req->u.lookup_path.attrmask,
-                 s_op->u.lookup.seg_ct);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "STARTING LOOKUP REQUEST "
+                   "(path:%s)(fs_id:%d)(handle:%s)(attrmask:0x%0lx)"
+                   "(# of segments:%u)\n",
+                   s_op->req->u.lookup_path.path,
+                   s_op->req->u.lookup_path.fs_id,
+                   PVFS_OID_str(&s_op->req->u.lookup_path.handle),
+                   s_op->req->u.lookup_path.attrmask,
+                   s_op->u.lookup.seg_ct);
+
     if ((s_op->u.lookup.seg_ct < 0) ||
         (s_op->u.lookup.seg_ct > PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
     {
-        gossip_err("  invalid path %s (bad segment count); "
+        gossip_lerr("invalid path %s (bad segment count); "
                    "sending error response\n",
                    s_op->req->u.lookup_path.path);
         js_p->error_code = -PVFS_ENOTDIR;
@@ -454,21 +455,21 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(struct PINT_smcb *smcb,
              s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.array_index ];
     }
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-            "lookup: get dist-dir-attr for dir meta handle %s "
-            "with tree_height=%d, dirdata_min=%d, dirdata_max=%d, dirdata_count=%d, "
-            "sid_count=%d, bitmap_size=%d, "
-            "split_size=%d, server_no=%d and branch_level=%d\n",
-            PVFS_OID_str(&handle),
-            attr->u.dir.dist_dir_attr.tree_height,
-            attr->u.dir.dist_dir_attr.dirdata_min,
-            attr->u.dir.dist_dir_attr.dirdata_max,
-            attr->u.dir.dist_dir_attr.dirdata_count,
-            attr->u.dir.dist_dir_attr.sid_count,
-            attr->u.dir.dist_dir_attr.bitmap_size,
-            attr->u.dir.dist_dir_attr.split_size,
-            attr->u.dir.dist_dir_attr.server_no,
-            attr->u.dir.dist_dir_attr.branch_level);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "lookup: get dist-dir-attr for dir meta handle %s "
+                   "with tree_height=%d, dirdata_min=%d, dirdata_max=%d, "
+                   "dirdata_count=%d, sid_count=%d, bitmap_size=%d, "
+                   "split_size=%d, server_no=%d and branch_level=%d\n",
+                   PVFS_OID_str(&handle),
+                   attr->u.dir.dist_dir_attr.tree_height,
+                   attr->u.dir.dist_dir_attr.dirdata_min,
+                   attr->u.dir.dist_dir_attr.dirdata_max,
+                   attr->u.dir.dist_dir_attr.dirdata_count,
+                   attr->u.dir.dist_dir_attr.sid_count,
+                   attr->u.dir.dist_dir_attr.bitmap_size,
+                   attr->u.dir.dist_dir_attr.split_size,
+                   attr->u.dir.dist_dir_attr.server_no,
+                   attr->u.dir.dist_dir_attr.branch_level);
 
     /* I don't think any of this is needed - except maybe on the first handle
      * The code below calls getattr to get the attributes, and it gets the
@@ -627,8 +628,8 @@ static PINT_sm_action lookup_compute_directory_entry_location(
 
     if (ret != 0)
     {
-        gossip_err("%s:PINT_string_next_segment failed: path: %s\n",__func__,
-                   s_op->req->u.lookup_path.path);
+        gossip_lerr("PINT_string_next_segment failed: path: %s\n",
+                    s_op->req->u.lookup_path.path);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
@@ -636,9 +637,9 @@ static PINT_sm_action lookup_compute_directory_entry_location(
 
     /* find the hash value for that segment */
     dirdata_hash = PINT_encrypt_dirdata(s_op->u.lookup.segp);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "lookup: encrypt dirent %s into hash value %llu.\n",
-                 s_op->u.lookup.segp, llu(dirdata_hash));
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "lookup: encrypt dirent %s into hash value %llu.\n",
+                   s_op->u.lookup.segp, llu(dirdata_hash));
 
 
     /* determine which dirdata handle hosts that segment */
@@ -658,16 +659,16 @@ static PINT_sm_action lookup_compute_directory_entry_location(
     s_op->u.lookup.dirdata_sid_index = (s_op->u.lookup.dirdata_server_index *
                                         s_op->metasidcnt);
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "lookup: selecting bucket No.%d from dist_dir_bitmap.\n",
-                 s_op->u.lookup.dirdata_server_index);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "  need to read from dirent handle=%s, sid=%s, segment=%s (len=%d)\n",
-                 PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[
-                                       s_op->u.lookup.dirdata_server_index]),
-                 PVFS_SID_str(&s_op->u.lookup.attr.u.dir.dirdata_sids[
-                                       s_op->u.lookup.dirdata_sid_index]),
-                 s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "lookup: selecting bucket No.%d from dist_dir_bitmap.\n",
+                   s_op->u.lookup.dirdata_server_index);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "  need to read from dirent handle=%s, sid=%s, segment=%s (len=%d)\n",
+                   PVFS_OID_str(&s_op->u.lookup.attr.u.dir.dirdata_handles[
+                                         s_op->u.lookup.dirdata_server_index]),
+                   PVFS_SID_str(&s_op->u.lookup.attr.u.dir.dirdata_sids[
+                                         s_op->u.lookup.dirdata_sid_index]),
+                   s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
     /* For that dirdata handle, do any of its sids identify the local machine? 
      * If not, then we start with the first one in the list.  MSGPAIR will access 
@@ -678,7 +679,7 @@ static PINT_sm_action lookup_compute_directory_entry_location(
     {
         if (PINT_cached_config_server_local(&s_op->u.lookup.attr.u.dir.dirdata_sids[i]))
         {
-           gossip_debug(GOSSIP_LOOKUP_DEBUG, "lookup: local server !!!\n");
+           gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "lookup: local server !!!\n");
            js_p->error_code = LOCAL_DIRENT;
            break;
         }
@@ -686,7 +687,7 @@ static PINT_sm_action lookup_compute_directory_entry_location(
 
     if ( i == last_dirdata_sid_index )
     {   
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "lookup: remote server !!!\n");
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "lookup: remote server !!!\n");
         js_p->error_code = REMOTE_DIRENT;
     }
 
@@ -716,6 +717,7 @@ static PINT_sm_action lookup_read_directory_entry_local(
 
     s_op->val.buffer_sz = OSASZ(1, s_op->metasidcnt);
 
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Reading local keyval\n");
     ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
                                 s_op->u.lookup.attr.u.dir.dirdata_handles[
                                           s_op->u.lookup.dirdata_server_index],
@@ -777,18 +779,21 @@ static PINT_sm_action lookup_read_directory_entry_remote(struct PINT_smcb *smcb,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_get_dirent_comp_fn;
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "reading remote dirent %s from dirdata handle %s sid %s\n",
-                 s_op->u.lookup.segp, PVFS_OID_str(&msg_p->handle),
-                 PVFS_SID_str(&msg_p->sid_array[0]));
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "reading remote dirent %s from dirdata handle %s sid %s\n",
+                   s_op->u.lookup.segp, PVFS_OID_str(&msg_p->handle),
+                   PVFS_SID_str(&msg_p->sid_array[0]));
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
     {
-        gossip_err("Failed to map dirdata server address\n");
+        gossip_lerr("Failed to map dirdata server address\n");
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
+
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Push Frame (mop) (%p) and call MPA\n",
+                   &s_op->msgarray_op);
 
     PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
     js_p->error_code = 0;
@@ -815,8 +820,8 @@ static int lookup_get_dirent_comp_fn(void *v_p,
         /* copy handle from the request's response to lookup area */
         s_op->u.lookup.temp_dirent_store[0].oid = resp_p->u.mgmt_get_dirent.handle;
 
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: sid count = %d\n",
-                     __func__, resp_p->u.mgmt_get_dirent.sid_count);
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "sid count = %d\n",
+                       resp_p->u.mgmt_get_dirent.sid_count);
 
         /* copy sids from the request's response to lookup area */
         memcpy(&s_op->u.lookup.temp_dirent_store[1],
@@ -826,8 +831,7 @@ static int lookup_get_dirent_comp_fn(void *v_p,
         s_op->u.lookup.temp_dirent_sid_count = resp_p->u.mgmt_get_dirent.sid_count;
 
         gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                     "  lookup_get_dirent_comp_fn: got dirent handle %s\n"
-                     "\t\tdirent sid %s\n",
+                     "lookup_get_dirent_comp_fn: got dirent.handle %s dirent.sid_array %s\n",
                      PVFS_OID_str(&resp_p->u.mgmt_get_dirent.handle),
                      PVFS_SID_str(&resp_p->u.mgmt_get_dirent.sid_array[0]));
     }
@@ -876,8 +880,7 @@ static PINT_sm_action lookup_read_object_metadata(
     handle  = (PVFS_handle)s_op->u.lookup.temp_dirent_store[0].oid;
     /* ds_attr = &(s_op->u.lookup.ds_attr_array[s_op->u.lookup.array_index]); */
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: handle = %s\n", __func__, 
-                 PVFS_OID_str(&handle));
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "handle = %s\n", PVFS_OID_str(&handle));
 
     /* store dirent object in the response structure */
     s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.array_index] = handle; 
@@ -888,13 +891,13 @@ static PINT_sm_action lookup_read_object_metadata(
      */
     start_index = ((s_op->u.lookup.array_index) * (s_op->metasidcnt));
     end_index   = start_index + s_op->metasidcnt;
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-              "%s: start_index(%d) end_index(%d) lookup_path.sid_count(%d)\n"
-              ,__func__ , start_index ,end_index
-              ,s_op->resp.u.lookup_path.sid_count);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "start_index %d  end_index %d  lookup_path.sid_count %d \n"
+                   , start_index ,end_index
+                   ,s_op->resp.u.lookup_path.sid_count);
  
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: sid[0] = %s\n", __func__, 
-                 PVFS_SID_str(&s_op->u.lookup.temp_dirent_store[1].sid));
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "sid[0] = %s\n", 
+                   PVFS_SID_str(&s_op->u.lookup.temp_dirent_store[1].sid));
 
     /* I think these are the sids for handles that represent the segment in the
      * response.  They wouldn't be anywhere else - the sid lists in the attr are
@@ -926,10 +929,8 @@ static PINT_sm_action lookup_read_object_metadata(
 
         /* But, the handle is valid; it just lives on another server */
         s_op->u.lookup.handle_ct++;
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup handle ct = %u\n",
-                     __func__, s_op->u.lookup.handle_ct);
-
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: Remote Segment\n", __func__);
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "Remote Segment s_op->lookup.handle_ct = %u\n",
+                     s_op->u.lookup.handle_ct);
 
         /* the SM does not look for this, we will go to
          * lookup_verify_metadata_object() in either case.
@@ -946,7 +947,7 @@ static PINT_sm_action lookup_read_object_metadata(
 
     /* local handle dspace */
 
-    /* get the dspace attributes for this object
+    /* get the dspace attributes for this object - WBL why?
      * (could be a directory or a metafile) should we cal SM? */
 #if 0
     ret = job_trove_dspace_getattr(s_op->req->u.lookup_path.fs_id,
@@ -995,8 +996,7 @@ static PINT_sm_action lookup_read_object_metadata(
 
     if ( ret < 0 )
     {
-        gossip_err("%s:Error pushing getattr frame onto lookup stack:ret(%d)\n",
-                   __func__,ret);
+        gossip_err("Error pushing getattr frame onto lookup stack:ret %d \n", ret);
         free(getattr_op);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
@@ -1049,8 +1049,8 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
 
     /* update our successful handle read count */
     s_op->u.lookup.handle_ct++;
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup handle ct = %u\n",
-                 __func__, s_op->u.lookup.handle_ct);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op lookup handle ct = %u\n",
+                   s_op->u.lookup.handle_ct);
 
     /* setup local variables. 
      * convert dspace attrs into sysint attrs.
@@ -1089,9 +1089,9 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
             (a_p->objtype == PVFS_TYPE_METAFILE)  ||
             (a_p->objtype == PVFS_TYPE_SYMLINK)));
 
-    gossip_debug( GOSSIP_LOOKUP_DEBUG, "  attrs = (owner = %d, group = %d, "
-                  "perms = %o, type = %d)\n", a_p->owner, a_p->group,
-                  a_p->perms, a_p->objtype);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
+                   a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
     /* if we hit a metafile in local dspace db,
      * then we know additional attributes are in the
@@ -1099,7 +1099,7 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
      */
     if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "  object is a metafile; "
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "object is a metafile; "
                      "gathering keyval attributes from local server.....\n");
 
         js_p->error_code = LOOKUP_LOCAL_METAFILE_KEYVALS;
@@ -1114,7 +1114,7 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
      */
     if (a_p->objtype == PVFS_TYPE_SYMLINK)
     {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "  object is a symlink; "
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "object is a symlink; "
                      "halting lookup and sending response\n");
 
         /* This is not recognized by the state machine.  This would look back
@@ -1125,31 +1125,32 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
         goto errorout;
     }
 
-    /* DIRECTORY by default at this point */
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  object is a directory; "
-                 "dir_dir_attrs: tree ht:%u, dd min:%u, ddmax:%u, dd_cnt:%u, sid_cnt:%u, bit_sz:%d\n",
-                 a_p->u.dir.dist_dir_attr.tree_height,
-                 a_p->u.dir.dist_dir_attr.dirdata_min,
-                 a_p->u.dir.dist_dir_attr.dirdata_max,
-                 a_p->u.dir.dist_dir_attr.dirdata_count,
-                 a_p->u.dir.dist_dir_attr.sid_count,
-                 a_p->u.dir.dist_dir_attr.bitmap_size);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  directory lists; "
-                 "handles = %p, sids = %p, bitmap = %p\n",
-                 a_p->u.dir.dirdata_handles,
-                 a_p->u.dir.dirdata_sids,
-                 a_p->u.dir.dist_dir_bitmap);
-
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup handle ct = %u\n",
-                 __func__, s_op->u.lookup.handle_ct);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op lookup attr ct = %u\n",
-                 __func__, s_op->u.lookup.attr_ct);
+    gossip_if(GOSSIP_LOOKUP_DEBUG)
+    {
+        /* DIRECTORY by default at this point */
+        gossip_lsadebug("object is a directory; dir_dir_attrs: tree_ht %u dd min %u, "
+                        "ddmax %u dd_cnt %u sid_cnt %u bit_sz %d\n",
+                        a_p->u.dir.dist_dir_attr.tree_height,
+                        a_p->u.dir.dist_dir_attr.dirdata_min,
+                        a_p->u.dir.dist_dir_attr.dirdata_max,
+                        a_p->u.dir.dist_dir_attr.dirdata_count,
+                        a_p->u.dir.dist_dir_attr.sid_count,
+                        a_p->u.dir.dist_dir_attr.bitmap_size);
+        gossip_lsadebug("directory lists; handles (%p) sids (%p) bitmap (%p)\n",
+                        a_p->u.dir.dirdata_handles,
+                        a_p->u.dir.dirdata_sids,
+                        a_p->u.dir.dist_dir_bitmap);
+   
+        gossip_lsadebug("s_op lookup handle_ct = %u\n", s_op->u.lookup.handle_ct);
+        gossip_lsadebug("s_op lookup attr_ct = %u\n", s_op->u.lookup.attr_ct);
+    }
+    gossip_end;
 
     /* if we looked up all the segments, we are done */
     if (s_op->u.lookup.seg_nr == s_op->u.lookup.seg_ct)
     {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "  no more segments in path; "
-                     "sending response\n");
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                       "no more segments in path; sending response\n");
 
         /* This is not recognized by the state machine.  This would loop back
          * to get_dirdata_from_kv the same as other dirs but without checking perms.
@@ -1219,8 +1220,7 @@ static PINT_sm_action lookup_setup_getattr_request(
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
     if ( ret < 0 )
     {
-        gossip_err("%s:Error pushing getattr frame onto lookup stack:ret(%d)\n",
-                   __func__,ret);
+        gossip_lerr("Error pushing getattr frame onto lookup stack:ret(%d)\n", ret);
         free(getattr_op);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
@@ -1260,27 +1260,24 @@ static PINT_sm_action lookup_verify_getattr_results(struct PINT_smcb *smcb,
 
     resp_attr = &(getattr_op->resp.u.getattr.attr);
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: attr: %p\n", __func__,
-                                      resp_attr);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: objtype: %d\n", __func__,
-                                      resp_attr->objtype);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: dcount: %d\n", __func__,
-                                      resp_attr->u.dir.dist_dir_attr.dirdata_count);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: scount: %d\n", __func__,
-                                      resp_attr->u.dir.dist_dir_attr.sid_count);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: serno: %d\n", __func__,
-                                      resp_attr->u.dir.dist_dir_attr.server_no);
+    gossip_if(GOSSIP_LOOKUP_DEBUG)
+    {
+        gossip_lsadebug("attr: %p\n", resp_attr);
+        gossip_lsadebug("objtype: %d\n", resp_attr->objtype);
+        gossip_lsadebug("dcount: %d\n", resp_attr->u.dir.dist_dir_attr.dirdata_count);
+        gossip_lsadebug("scount: %d\n", resp_attr->u.dir.dist_dir_attr.sid_count);
+        gossip_lsadebug("serno: %d\n", resp_attr->u.dir.dist_dir_attr.server_no);
+    }
+    gossip_end;
 
     ret = PINT_copy_object_attr(&s_op->resp.u.lookup_path.attr_array[
                                               s_op->u.lookup.array_index],
                                 resp_attr);
     if (ret)
     {
-        gossip_err(
-            "%s:Error copying metafile attributes from getattr to lookup:ret(%d)\n",
-            __func__, ret);
-       js_p->error_code = ret;
-       goto out;
+        gossip_lerr("Error copying metafile attributes from getattr to lookup:ret(%d)\n", ret);
+        js_p->error_code = ret;
+        goto out;
     }
 
 out:
@@ -1356,8 +1353,7 @@ static PINT_sm_action lookup_check_perms(struct PINT_smcb *smcb,
         /* Currently PINT_get_capabilities only returns 0 unless ACLs are 
          * being checked. This code is provided for future-proofing.
          */
-        gossip_err("  lookup_check_perms: could not retrieve permissions mask "
-                   "(%d)\n", ret);
+        gossip_lerr("lookup_check_perms: could not retrieve permissions mask (%d)\n", ret);
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
@@ -1365,8 +1361,8 @@ static PINT_sm_action lookup_check_perms(struct PINT_smcb *smcb,
     } /* if */
 #endif
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  lookup_check_perms: op mask = %s\n",
-                 PINT_print_op_mask(op_mask, mask_buf));
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "lookup_check_perms: op mask = %s\n",
+                   PINT_print_op_mask(op_mask, mask_buf));
     
     /* must have executable permission */
     if ((op_mask & PINT_CAP_EXEC) == 0)
@@ -1419,9 +1415,9 @@ static PINT_sm_action lookup_read_directory_acls(struct PINT_smcb *smcb,
     }
     s_op->val.buffer_sz = PVFS_REQ_LIMIT_VAL_LEN;
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "  About to retrieve acl keyvals for handle %s\n",
-                 PVFS_OID_str(&s_op->target_handle));
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "About to retrieve acl keyvals for handle %s\n",
+                   PVFS_OID_str(&s_op->target_handle));
 
     /* Read acl keys */
     ret = job_trove_keyval_read(s_op->target_fs_id,
@@ -1462,7 +1458,7 @@ static PINT_sm_action lookup_check_acls(
     if (s_op->val.read_sz == 0)
     {
         /* No ACLs available--return EACCES */
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "  lookup_check_acls: no acls\n");
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "lookup_check_acls: no acls\n");
         js_p->error_code = -PVFS_EACCES;
         goto cleanup;
     }
@@ -1486,13 +1482,12 @@ static PINT_sm_action lookup_check_acls(
     if (ret != 0)
     {
         /* unexpected error */
-        gossip_err("  lookup_check_acls: could not retrieve permissions mask "
-                   "(%d)\n", ret);
+        gossip_lerr("lookup_check_acls: could not retrieve permissions mask (%d)\n", ret);
         js_p->error_code = -PVFS_EINVAL;
         goto cleanup;
     }
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  lookup_check_acls: op mask = %s\n",
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "lookup_check_acls: op mask = %s\n",
                  PINT_print_op_mask(op_mask, mask_buf));
 
     /* must have executable permission */
@@ -1527,10 +1522,10 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
      * continue with the path (attr) lookup.  otherwise, we're returning 
      * N handles, N*metasidcnt, and  N attrs.
      */
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: Begin: s_op=%p s_op->decoded.enc_type=%d\n",
-                 __func__, s_op, s_op->decoded.enc_type);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: s_op->lookup.handle_ct=%u\n",
-                 __func__, s_op->u.lookup.handle_ct);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Begin: s_op (%p) s_op->decoded.enc_type %d\n",
+                   s_op, s_op->decoded.enc_type);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op->lookup.handle_ct %u\n",
+                   s_op->u.lookup.handle_ct);
     s_op->resp.u.lookup_path.handle_count = s_op->u.lookup.handle_ct;
     s_op->resp.u.lookup_path.attr_count   = s_op->u.lookup.attr_ct;
 
@@ -1542,15 +1537,15 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
     else if (js_p->error_code < 0)
     {
         /* preserve error code in this case and fall through */
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, "  lookup error in previous step\n");
+        gossip_debug(GOSSIP_LOOKUP_DEBUG, "lookup error in previous step\n");
     }
     else
     {
         js_p->error_code = -PVFS_ENOENT;
     }
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "  sending '%s' response with %u "
-                 "handle(s) and %u attr(s)\n",
+    gossip_debug(GOSSIP_LOOKUP_DEBUG,
+                 "sending '%s' response with %u handle(s) and %u attr(s)\n",
                  (js_p->error_code ? "error" : "success"),
                  s_op->resp.u.lookup_path.handle_count,
                  s_op->resp.u.lookup_path.attr_count);
@@ -1598,14 +1593,12 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
     int i;
     for (i = 0; i < s_op->resp.u.lookup_path.sid_count; i++)
     {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG
-                    ,"%s: sid[%d] = (%s)\n"
-                    ,__func__
-                    ,i
-                    ,PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[i]));
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG
+                       ,"sid[%d] = (%s)\n" ,i
+                       ,PVFS_SID_str(&s_op->resp.u.lookup_path.sid_array[i]));
     }
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "%s: End: s_op=%p s_op->decoded.enc_type=%d\n",
-                 __func__, s_op, s_op->decoded.enc_type);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "End: s_op (%p) s_op->decoded.enc_type %d\n",
+                   s_op, s_op->decoded.enc_type);
 
     return SM_ACTION_COMPLETE;
 }
@@ -1628,6 +1621,9 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
 static PINT_sm_action lookup_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Cleaning up\n");
+
     if (s_op->resp.u.lookup_path.handle_array)
     {
         free(s_op->resp.u.lookup_path.handle_array);

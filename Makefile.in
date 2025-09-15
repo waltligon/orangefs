@@ -290,6 +290,10 @@ CFLAGS += @OPENSSL_CPPFLAGS@
 # always want these gcc flags
 GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
 
+ifneq (,$(ASSERT_CFLAGS))
+    GCC_CFLAGS += -DNDEBUG
+endif
+
 ifneq (,$(STRICT_CFLAGS))
     GCC_CFLAGS += -Wcast-align -Wbad-function-cast
     GCC_CFLAGS += -Wmissing-prototypes -Wmissing-declarations

@@ -687,11 +687,11 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
 #if 0
     gossip_backtrace();
 #endif
-    gossip_ldebug(GOSSIP_GETATTR_DEBUG,
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                   "handle %s fsid %d\n",
                   PVFS_OID_str(&object_ref.handle), object_ref.fs_id);
 
-    gossip_ldebug(GOSSIP_GETATTR_DEBUG, "called on behalf of %s\n",
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "called on behalf of %s\n",
                   PINT_client_get_name_str(smcb->op));
 
 /* I don't think this whole attrmask thing is terribly useful
@@ -749,7 +749,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
 
     if(sm_p->getattr.flags & PINT_SM_GETATTR_BYPASS_CACHE)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                      "acache: forced acache miss: [%s]\n",
                       PVFS_OID_str(&object_ref.handle));
         js_p->error_code = GETATTR_CACHE_MISS;
@@ -767,7 +767,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                                        &size_status);
     if(ret < 0 || attr_status < 0)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                      "acache: clean acache miss: [%s]\n",
                       PVFS_OID_str(&object_ref.handle));
   
@@ -797,10 +797,10 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
      */
     trimmed_mask = sm_p->getattr.req_attrmask;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: request attrmask:\n", __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "request attrmask:\n");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.req_attrmask);
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: returned attrmask:\n", __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "returned attrmask:\n");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.attr.mask);
 
     /* the trimmed mask is used for making sure that we're only
@@ -824,7 +824,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_ALL);
     }
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: trimmed attrmask:\n", __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "trimmed attrmask:\n");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, trimmed_mask);
 
     /* trimmed_mask contains the list of attributes
@@ -845,54 +845,49 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
 
     if (missing_attrs == 0)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: NO ATTRS MISSING.\n", __func__);
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "NO ATTRS MISSING.\n");
 
         PINT_perf_count(PINT_acache_get_pc(),
                         PERF_ACACHE_HITS,
                         1,
                         PINT_PERF_ADD);
-        if(trimmed_mask & PVFS_ATTR_DATA_SIZE)
-        {
-            /* Definitely requested size and valid size was in cache. */
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DATA_SIZE requested. \n",
-                         __func__);
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE HIT.\n",
-                         __func__);
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "%s: cached size = %lld\n",
-                         __func__,
-                         lld(sm_p->getattr.size));
-        }
 
-        if(trimmed_mask & PVFS_ATTR_DIR_DIRENT_COUNT)
+        /* the use of gossip_if here is OK because even though we
+         * reference variables, we do no modify them.  All that
+         * happens is printing out values
+         */
+        gossip_if(GOSSIP_GETATTR_DEBUG)
         {
-            /* Definitely requested PVFS_ATTR_DIR_DIRENT_COUNT and valid
-             * PVFS_ATTR_DIR_DIRENT_COUNT related attributes are cached.
-             */
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DIR_DIRENT_COUNT requested. \n",
-                         __func__);
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "%s: NOTE, PVFS_ATTR_DIR_DIRENT_COUNT --> "
-                         "ACACHE HIT.\n",
-                         __func__);
-            /* TODO consider displaying some debug output for
-             * PVFS_ATTR_DIR_DIRENT_COUNT related attributes.
-             */
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: tmp_payload->size_array = %p\n",
-                         __func__,
-                         (void *) sm_p->getattr.size_array);
-        }
+            if(trimmed_mask & PVFS_ATTR_DATA_SIZE)
+            {
+                /* Definitely requested size and valid size was in cache. */
+                gossip_lsadebug("NOTE, PVFS_ATTR_DATA_SIZE requested. \n");
+                gossip_lsadebug("NOTE, PVFS_ATTR_DATA_SIZE --> ACACHE HIT.\n");
+                gossip_lsadebug("cached size = %lld\n", lld(sm_p->getattr.size));
+            }
 
-        /* nothing is missing, an acache hit on attrs and size! */
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "%s: acache hit on all attributes requested of handle: "
-                     "[%s]. Returning...\n",
-                     __func__,
-                     PVFS_OID_str(&object_ref.handle));
+            if(trimmed_mask & PVFS_ATTR_DIR_DIRENT_COUNT)
+            {
+                /* Definitely requested PVFS_ATTR_DIR_DIRENT_COUNT and valid
+                 * PVFS_ATTR_DIR_DIRENT_COUNT related attributes are cached.
+                 */
+                gossip_lsadebug("NOTE, PVFS_ATTR_DIR_DIRENT_COUNT requested. \n");
+                gossip_lsadebug("NOTE, PVFS_ATTR_DIR_DIRENT_COUNT --> "
+                                "ACACHE HIT.\n");
+                /* TODO consider displaying some debug output for
+                 * PVFS_ATTR_DIR_DIRENT_COUNT related attributes.
+                 */
+                gossip_lsadebug("tmp_payload->size_array = %p\n",
+                                (void *) sm_p->getattr.size_array);
+            }
+
+            /* nothing is missing, an acache hit on attrs and size! */
+            gossip_lsadebug("acache hit on all attributes requested of handle: "
+                            "[%s]. Returning...\n",
+                            PVFS_OID_str(&object_ref.handle));
+        }
+        gossip_end;
+
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -907,17 +902,14 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     if(missing_attrs == PVFS_ATTR_DATA_SIZE)
     {
         /* Some attr(s) are missing. */
-        gossip_debug(GOSSIP_ACACHE_DEBUG, 
-                     "%s: TRULY MISSING attrs:\n",
-                     __func__);
+        gossip_lsdebug(GOSSIP_ACACHE_DEBUG, "TRULY MISSING attrs:\n");
         PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
 
         /* Was the size missing? */
         if(missing_attrs & PVFS_ATTR_DATA_SIZE)
         {
-            gossip_debug(GOSSIP_GETATTR_DEBUG,
-                         "%s: NOTE, MISSING PVFS_ATTR_DATA_SIZE --> ACACHE MISS.\n",
-                         __func__);
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                           "NOTE, MISSING PVFS_ATTR_DATA_SIZE --> ACACHE MISS.\n");
         }
     }
 
@@ -931,7 +923,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
      * overwritten when we request updated information from the server
      */
     PINT_free_object_attr(&sm_p->getattr.attr);
-    gossip_debug(GOSSIP_ACACHE_DEBUG,
+    gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
                  "acache: acache miss due to mask: [%s]\n",
                  PVFS_OID_str(&object_ref.handle));
 

@@ -806,13 +806,18 @@ do { \
     memset((oref), 0, sizeof(PVFS_object_ref)); \
 } while (0)
 
+/* This is meant to be called from another debug macro that checks the mask
+ */
 #define PVFS_debug_object_ref(oref) \
 do { \
-    gossip_lsadebug("Object ref Debug (" #oref "):\n"); \
-    gossip_lsadebug("Handle    %s\n", PVFS_OID_str(&((oref)->handle))); \
-    gossip_lsadebug("FS_id     %d\n", (oref)->fs_id); \
-    gossip_lsadebug("SID count %d\n", (oref)->sid_count); \
-    gossip_lsadebug("SID %s\n", PVFS_SID_str((oref)->sid_array)); \
+        gossip_lsadebug("Object ref Debug (" #oref "):\n"); \
+        gossip_lsadebug("Handle    %s\n", PVFS_OID_str(&((oref)->handle))); \
+        gossip_lsadebug("FS_id     %d\n", (oref)->fs_id); \
+        gossip_lsadebug("SID count %d\n", (oref)->sid_count); \
+        if ((oref)->sid_count > 0) \
+        { \
+           gossip_lsadebug("SID %s\n", PVFS_SID_str((oref)->sid_array)); \
+        } \
 } while (0)     
 
 /* kernel compatibility version of a PVFS_handle */
@@ -1604,18 +1609,15 @@ do { \
             gossip_ladebug("userid:       %d\n", (cred)->userid); \
             gossip_ladebug("num_groups:   %d\n", (cred)->num_groups);   \
             gossip_ladebug("group_array (%p):\n", (cred)->group_array);  \
-            gossip_ladebug("1\n");  \
             if((cred)->num_groups > 0 && (cred)->group_array) { \
                 int g; \
                 for(g = 0; g < (cred)->num_groups; g++) { \
                     gossip_ladebug("    group %d\n", (cred)->group_array[g]); \
                 } \
             }  \
-            gossip_ladebug("2\n");  \
             if((cred)->issuer) { \
                 gossip_ladebug("issuer:  %s\n", (cred)->issuer); \
             } \
-            gossip_ladebug("3\n");  \
             gossip_ladebug("sig_size:     %d\n", (cred)->sig_size);  \
             gossip_ladebug("DEBUG_PVFS_CREDENTIAL End\n"); \
         } else { \

@@ -1078,10 +1078,10 @@ do {                                                                 \
     gossip_if (mask)                                                 \
     {                                                                \
         gossip_lsadebug("Tree Get Dirent Count Request:\n");         \
-        gossip_lsadebug("req = (%p)\n", (req));                      \
+        gossip_lsadebug("\treq = (%p)\n", (req));                      \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);      \
         PVFS_debug_afield(treq->retry_msgpair_at_leaf, int32_t);     \
-        /* DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential)); */  \
+        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));  \
         PVFS_debug_afield(treq->num_dirdata, uint32_t);              \
         PVFS_debug_afield(treq->handle_array, PVFS_handle);          \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);                  \

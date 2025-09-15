@@ -1869,7 +1869,7 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
     /* struct PVFS_server_req *req = &s_op->msgarray_op.msgpair.req; */
     struct PVFS_server_req *req = s_op->req;
     struct PVFS_server_resp *resp = &s_op->resp;
-    PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgpair;
+    PINT_sm_msgpair_state *msg_p GCC_UNUSED = &s_op->msgarray_op.msgpair;
 
     /* DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &(req->u.tree_get_dirent_count.credential)); */
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "frame (%p) req->op %d smcb->op %d\n", s_op, req->op, smcb->op);

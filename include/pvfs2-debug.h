@@ -370,7 +370,7 @@ do { \
 do { \
     char string[100]; \
     PVFS_to_string_##type(field, string); \
-    gossip_lsadebug(#field ": %s\n", string); \
+    gossip_lsadebug("\t" #field ": %s\n", string); \
 } while (0) 
 #define PVFS_debug_areqfield(field, type) PVFS_debug_afield(field, type)
 
@@ -378,7 +378,7 @@ do { \
 do { \
     char string[100]; \
     PVFS_to_string_##type(field, string); \
-    gossip_lsdebug((mask), #field ": %s\n", string); \
+    gossip_lsdebug((mask), "\t" #field ": %s\n", string); \
 } while (0)
 #define PVFS_debug_reqfield(field, type) PVFS_debug_field(field, type)
 

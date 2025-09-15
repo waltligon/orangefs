@@ -2463,6 +2463,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
 
     /* map credential based on credential certificate */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "mapping credentials\n");
+    DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
     ret = PINT_map_credential(&s_op->u.getattr.credential, 
                               &uid, 
                               &num_groups,
