@@ -321,6 +321,11 @@ static inline int DBG_TRUE(PVFS_debug_mask mask)
  * src/server/pvfs2-server.h and others.
  */
 
+#define PVFS_to_string_PVFS_credential(cred, string) \
+do { \
+    /*sprintf(string, "(%p)", (cred));*/ \
+} while (0)
+
 #define PVFS_to_string_ptr(ptr, string) \
 do { \
     sprintf(string, "(%p)", (ptr)); \
@@ -358,7 +363,7 @@ do { \
 
 #define PVFS_to_string_PVFS_object_ref(ref, string) \
 do { \
-    PVFS_debug_object_ref(ref); \
+    /*PVFS_debug_object_ref(ref);*/ \
     strcpy(string, ""); \
 } while (0)
 

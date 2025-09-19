@@ -1387,7 +1387,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->req.u.create.attr.u.meta.stuffed_size = 0;
 #endif
 
-    PVFS_debug_servreq_create(GOSSIP_CREATE_DEBUG, &(msg_p->req.u.create));
+    PVFS_debug_servreq_create(GOSSIP_CREATE_DEBUG, &(msg_p->req));
 
     gossip_debug(GOSSIP_CREATE_DEBUG, "sys-create: Resolving address\n");
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
