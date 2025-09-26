@@ -246,7 +246,6 @@
     <ClCompile Include="..\..\..\..\src\common\misc\dist-dir-utils.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\extent-utils.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\md5.c" />
-    <ClCompile Include="..\..\..\..\src\common\misc\mmap-ra-cache.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\msgpairarray.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\pint-cached-config.c" />
     <ClCompile Include="..\..\..\..\src\common\misc\pint-eattr.c" />
@@ -270,7 +269,6 @@
     <ClInclude Include="..\..\..\..\src\common\misc\extent-utils.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\md5.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\mkspace.h" />
-    <ClInclude Include="..\..\..\..\src\common\misc\mmap-ra-cache.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\msgpairarray.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\pint-cached-config.h" />
     <ClInclude Include="..\..\..\..\src\common\misc\pint-eattr.h" />

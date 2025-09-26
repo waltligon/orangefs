@@ -37,7 +37,7 @@ struct PINT_worker_queues_s
     gen_cond_t cond;
 };
 
-struct PINT_worker_impl PINT_worker_queues_impl;
+extern struct PINT_worker_impl PINT_worker_queues_impl;
 
 #endif
 

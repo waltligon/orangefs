@@ -9,7 +9,7 @@
 
 #include "pint-op.h"
 
-struct PINT_worker_impl PINT_worker_blocking_impl;
+extern struct PINT_worker_impl PINT_worker_blocking_impl;
 
 #endif
 

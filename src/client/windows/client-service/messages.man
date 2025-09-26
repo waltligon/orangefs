@@ -1,0 +1,58 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<instrumentationManifest
+    xmlns="http://schemas.microsoft.com/win/2004/08/events"
+    xmlns:win="http://manifests.microsoft.com/win/2004/08/windows/events"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    >
+
+	<instrumentation>
+		<events>
+			<provider name="OrangeFS-Client-Provider"
+                guid="{CD75D1D2-A19B-4C81-A8A9-629FCD2FD998}"
+                symbol="PROVIDER_GUID"
+                resourceFileName="orangefs-client.exe"
+				messageFileName="orangefs-client.exe"
+                message="$(string.Provider.Name)">
+
+				<channels>
+					<importChannel chid="win_application"
+								   name="Application"
+								   symbol="WINEVENT_CHANNEL_GLOBAL_APPLICATION"
+					/>
+				</channels>
+
+				<templates>
+					<template tid="default">
+						<data name="MessageData" inType="win:AnsiString"/>
+					</template>
+				</templates>
+				
+				<events>
+					<event value="1"
+						   level="win:Informational"
+						   template="default"
+						   channel="win_application"
+						   symbol="INFO_EVENT"
+						   message="$(string.Event.Info)"/>
+					<event value="2"
+						   level="win:Error"
+						   template="default"
+						   channel="win_application"
+						   symbol="ERROR_EVENT"
+						   message="$(string.Event.Error)"/>
+				</events>
+            </provider>
+		</events>
+	</instrumentation>
+
+	<localization>
+		<resources culture="en-US">
+			<stringTable>
+				<string id="Provider.Name" value="OrangeFS Client"/>
+				<string id="Event.Info" value="%1."/>
+				<string id="Event.Error" value="%1."/>
+			</stringTable>
+		</resources>
+	</localization>
+
+</instrumentationManifest>

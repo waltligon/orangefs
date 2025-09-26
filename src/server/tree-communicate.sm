@@ -700,7 +700,7 @@ static int tree_setattr_comp_fn(void *v_p,
     return 0;
 }
 
-static int tree_setattr_work_cleanup(struct PINT_smcb *smcb, 
+static PINT_sm_action tree_setattr_work_cleanup(struct PINT_smcb *smcb,
                                      job_status_s *js_p)
 {
     /* get frame from bottom of stack */
@@ -853,7 +853,7 @@ void tree_setattr_free(PINT_server_op *s_op)
     }
 }
 
-static int tree_setattr_cleanup(
+static PINT_sm_action tree_setattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -952,7 +952,7 @@ static int tree_remove_comp_fn(void *v_p,
     return 0;
 }
 
-static int tree_remove_work_cleanup(struct PINT_smcb *smcb,
+static PINT_sm_action tree_remove_work_cleanup(struct PINT_smcb *smcb,
                                     job_status_s *js_p)
 {
     /* get frame from bottom of stack */
@@ -1095,7 +1095,7 @@ void tree_remove_free(PINT_server_op *s_op)
        free(s_tree->status);
 }
 
-static int tree_remove_cleanup(
+static PINT_sm_action tree_remove_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1211,7 +1211,7 @@ static int tree_get_file_size_comp_fn(void *v_p,
     return 0;
 }
 
-static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
+static PINT_sm_action tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
     /* get frame from bottom of stack */
@@ -1351,7 +1351,7 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }/*end tree_get_file_size_work_cleanup*/
  
-static int tree_get_file_size_cleanup(struct PINT_smcb *smcb,
+static PINT_sm_action tree_get_file_size_cleanup(struct PINT_smcb *smcb,
                                       job_status_s *js_p)
 {
    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1470,7 +1470,7 @@ static int tree_getattr_comp_fn(void *v_p,
     return 0;
 }
 
-static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
+static PINT_sm_action tree_getattr_work_cleanup(struct PINT_smcb *smcb,
                                      job_status_s *js_p)
 {
     /* get frame from bottom of stack */
@@ -1621,7 +1621,7 @@ void tree_getattr_free(PINT_server_op *s_op)
    }
 }
 
-static int tree_getattr_cleanup(struct PINT_smcb *smcb,
+static PINT_sm_action tree_getattr_cleanup(struct PINT_smcb *smcb,
                                 job_status_s *js_p)
 {
    PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1639,7 +1639,7 @@ static inline int PINT_get_object_ref_tree_setattr(struct PVFS_server_req *req,
     return 0;
 };
 
-static int perm_tree_setattr(struct PINT_server_op *s_op)
+static PINT_sm_action perm_tree_setattr(struct PINT_server_op *s_op)
 {
     int ret;
 
@@ -1670,7 +1670,7 @@ static inline int PINT_get_object_ref_tree_remove(struct PVFS_server_req *req,
     return 0;
 };
 
-static int perm_tree_remove(struct PINT_server_op *s_op)
+static PINT_sm_action perm_tree_remove(struct PINT_server_op *s_op)
 {
     int ret;
 
@@ -1707,7 +1707,7 @@ static inline int PINT_get_object_ref_tree_get_file_size(
     return 0;
 };
 
-static int perm_tree_get_file_size(PINT_server_op *s_op)
+static PINT_sm_action perm_tree_get_file_size(PINT_server_op *s_op)
 {
     int ret;
 
@@ -1734,7 +1734,7 @@ static inline int PINT_get_object_ref_tree_getattr(
     return 0;
 };
 
-static int perm_tree_getattr(PINT_server_op *s_op)
+static PINT_sm_action perm_tree_getattr(PINT_server_op *s_op)
 {
     int ret;
 

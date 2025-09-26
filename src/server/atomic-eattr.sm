@@ -325,7 +325,7 @@ static PINT_sm_action atomiceattr_check_resp(
  * improperly sized attributes.  Finally, we adjust the request nkey
  * accordingly.
  */
-static int atomiceattr_modify_eattrib(
+static PINT_sm_action atomiceattr_modify_eattrib(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -476,7 +476,7 @@ static int atomiceattr_modify_eattrib(
 /*
  * This routine checks keys to confirm that the name spaces are valid.
  */
-static int atomiceattr_verify_eattribs(
+static PINT_sm_action atomiceattr_verify_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -555,7 +555,7 @@ static int atomiceattr_verify_eattribs(
  * 
  * NOTE: Currently we are not using the flags passed in the request
  */
-static int atomiceattr_setobj_eattribs(
+static PINT_sm_action atomiceattr_setobj_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -958,7 +958,7 @@ static PINT_sm_action check_immutable(struct PINT_smcb *smcb
  * Synopsis: free memory and return
  *           
  */
-static int atomiceattr_cleanup(
+static PINT_sm_action atomiceattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int i;
@@ -1042,7 +1042,7 @@ static void init_keyval_structs(PINT_server_op *s_op, int free_val)
    return;
 }/*end init_keyval_structs*/
 
-static int perm_atomiceattr(PINT_server_op *s_op)
+static PINT_sm_action perm_atomiceattr(PINT_server_op *s_op)
 {
     int ret;
 

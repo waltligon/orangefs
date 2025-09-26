@@ -17,7 +17,7 @@ fundamental:
     for data storage.
 
 The OrangeFS Hadoop Client is an [HCFS
-plug-in](https://www.google.com/url?q=https://wiki.apache.org/hadoop/HCFS&sa=D&sntz=1&usg=AFQjCNHWZmiUahISFtopF-sJ8nUqfYB3MA)
+plug-in](https://cwiki.apache.org/confluence/display/HADOOP2/HCFS)
 which allows you to run Apache Hadoop version 1.2.1 and 2.6.0 with the
 OrangeFS distributed file system replacing Hadoop's HDFS filesystem.
 Together, these two open source products can perform massive
@@ -85,9 +85,16 @@ This setup simulates a traditional Hadoop installation, running a client and ser
 Linux Operating System
 ----------------------
 
+<!-- TODO: what page are we referring to? does it exist somewhere?
 All server and client systems should use the same distribution of Linux.
 Guidelines for selecting a Linux distribution in [Preview System
 Requirements](Preview_System_Requirements.md) also apply to any systems
+used with the OrangeFS Hadoop Client.
+-->
+
+<!-- TODO: (see above) the linked section may not be useful but better than a broken link -->
+All server and client systems should use the same distribution of Linux.
+Guidelines for selecting a Linux distribution in [Common System Requirements]({{<relref "#common-system-requirements">}}) also apply to any systems
 used with the OrangeFS Hadoop Client.
 
 **Note** For consistency, all topics about the OrangeFS Hadoop
@@ -161,8 +168,7 @@ their content.
 -   Assumes that OrangeFS servers have already been configured and
     installed on the storage cluster. For more information on completing
     that setup process prior to setting up the OrangeFS Hadoop Client,
-    see the [beginning](Installation_Guide.md) of the Installation
-    Guide.
+    see the [Quickstart Guides]({{<relref "quickstart">}}) or [Add Servers]({{<relref "add-servers">}}).
 -   Hadoop was not originally designed to work in a scheduled HPC
     environment, but you can use a customized version of myHadoop,
     myHadoop-orangefs, with PBS to support on-demand clusters.

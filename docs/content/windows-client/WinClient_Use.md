@@ -5,11 +5,11 @@ weight=460
 
 Information in this topic includes:
 
--   [Interfacing with OrangeFS](#Interfacing_with_OrangeFS)
--   [Running the Client](#Running_the_Client)
--   [Understanding Security](#Understanding_Security)
--   [Getting/Generating New User-Mapping
-    Certificates](#Getting__or_Generating__New_Certificates)
+-   [Interfacing with OrangeFS]({{<relref "#interfacing-with-orangefs">}})
+-   [Running the Client]({{<relref "#running-the-client">}})
+-   [Understanding Security]({{<relref "#understanding-security">}})
+-   [Getting (or Generating) New User-Mapping
+    Certificates]({{<relref "#getting-or-generating-new-user-mapping-certificates">}})
 
 Interfacing with OrangeFS
 -------------------------
@@ -18,7 +18,7 @@ When the Windows Client is running on your computer, the OrangeFS file
 system appears as a removable drive at the drive letter (E:-Z:). This
 drive letter, specified during installation, is a setting in the
 configuration file that can be changed. For more information, see
-[Client Administration]({{<relref "WinClient_Admin.md">}}).
+[Client Administration]({{<relref "WinClient_Admin">}}).
 
 You can interact with files and directories in the file system like
 local files. For example, they can be viewed in Windows Explorer, listed
@@ -63,14 +63,14 @@ First you must set the Client to operate using the File System security
 mode used by the servers. Do this by setting the “security-mode” option
 in the configuration file to “default”, “key” or “certificate”, with
 “default” being used if no option is specified. (For more information,
-see [Client Administration](WinClient_Admin.htm).)
+see [Client Administration]({{<relref "WinClient_Admin">}}).)
 
 You can configure the file as read-only on Windows to remove owner write
 permissions.
 
 **Note     **The default permissions mask can be changed with the
 new-file-perms and new-dir-perms configuration file keywords. Form more
-information, see [Client Administration]({{<relref "WinClient_Admin.md">}}).
+information, see [Client Administration]({{<relref "WinClient_Admin">}}).
 
 Level of security will also depend on the user mapping configuration of
 your Windows Client. The three types of user mapping are
@@ -82,7 +82,7 @@ your Windows Client. The three types of user mapping are
   Server        Used only when the security mode is “certificate,” this mode features client-side certificates for each user and server-side identity mapping with LDAP.
   ------------- ----------------------------------------------------------------------------------------------------------------------------------------------------------
 
-For more information, see [Client Administration](WinClient_Admin.htm).
+For more information, see [Client Administration]({{<relref "WinClient_Admin">}}).
 
 Getting (or Generating) New User-Mapping Certificates
 -----------------------------------------------------

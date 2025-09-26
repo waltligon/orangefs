@@ -1,0 +1,89 @@
+#include "Ifx.h"
+
+// Constants
+#define BUTTON_NEXT      1
+#define BUTTON_BACK     12
+#define BUTTON_CANCEL2   9
+#define COMBO_MOUNT   1304
+#define EDIT_FS       1331
+
+prototype NUMBER MountPointDialog(BYREF STRING, BYREF STRING); 
+prototype LIST CreateMountList();
+
+function LIST CreateMountList()
+    LIST listMount;
+begin
+    // We must create a list of mount points programatically, since there
+    // seems to be a bug saving our mount points in the dialog
+    listMount = ListCreate(STRINGLIST);
+    ListAddString(listMount, "Auto", AFTER);
+    ListAddString(listMount, "E:", AFTER);
+    ListAddString(listMount, "F:", AFTER);
+    ListAddString(listMount, "G:", AFTER);
+    ListAddString(listMount, "H:", AFTER);
+    ListAddString(listMount, "I:", AFTER);
+    ListAddString(listMount, "J:", AFTER);
+    ListAddString(listMount, "K:", AFTER);
+    ListAddString(listMount, "L:", AFTER);
+    ListAddString(listMount, "M:", AFTER);
+    ListAddString(listMount, "N:", AFTER);
+    ListAddString(listMount, "O:", AFTER);
+    ListAddString(listMount, "P:", AFTER);
+    ListAddString(listMount, "Q:", AFTER);
+    ListAddString(listMount, "R:", AFTER);
+    ListAddString(listMount, "S:", AFTER);
+    ListAddString(listMount, "T:", AFTER);
+    ListAddString(listMount, "U:", AFTER);
+    ListAddString(listMount, "V:", AFTER);
+    ListAddString(listMount, "W:", AFTER);
+    ListAddString(listMount, "X:", AFTER);
+    ListAddString(listMount, "Y:", AFTER);
+    ListAddString(listMount, "Z:", AFTER);
+                               
+    return listMount;
+end;
+
+// handler for the MountPointUserModeDialog
+function NUMBER MountPointDialog(svFSURI, svMountPoint)
+    BOOL bDone;
+    NUMBER nResult, nControl;
+    LIST listMount;
+begin
+    EzDefineDialog("MountPointDialog",
+                   ISUSER,
+                   "MountPointDialog",
+                   0);
+    
+    bDone = FALSE;
+    while (!bDone)
+        nControl = WaitOnDialog("MountPointDialog");
+        switch (nControl)
+            case DLG_INIT:       
+                // Init combo
+                listMount = CreateMountList();
+                CtrlSetList("MountPointDialog", COMBO_MOUNT, listMount);
+                ListDestroy(listMount);
+                // Default values
+                CtrlSetCurSel("MountPointDialog", COMBO_MOUNT, "Auto");
+            case BUTTON_NEXT:
+                // Return specified values       
+                CtrlGetText("MountPointDialog", EDIT_FS, svFSURI);         
+                CtrlGetCurSel("MountPointDialog", COMBO_MOUNT, svMountPoint);
+                nResult = BUTTON_NEXT;
+                bDone = TRUE;                
+            case BUTTON_CANCEL2:
+                // Cancel requested
+                Do(EXIT);
+            case BUTTON_BACK:
+                // Back requested
+                nResult = BUTTON_BACK;
+                bDone = TRUE;         
+        endswitch;
+    endwhile;  
+    
+    EndDialog("MountPointDialog");
+    
+    ReleaseDialog("MountPointDialog");
+    
+    return nResult;        
+end;

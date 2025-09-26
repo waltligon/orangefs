@@ -42,7 +42,7 @@ typedef unsigned int socklen_t;
 #define DEFAULT_MSG_FLAGS 0
 #endif
 
-int BMI_sockio_new_sock()
+SOCKET BMI_sockio_new_sock()
 {
     return(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
 }
@@ -98,7 +98,7 @@ int BMI_sockio_connect_sock(int sockd,
 
     if ((ret = BMI_sockio_init_sock(&saddr, name, service)) != 0)
         return (ret);
-  connect_sock_restart:
+    connect_sock_restart:
     if (connect(sockd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0)
     {
         if (WSAGetLastError() == WSAEINTR)

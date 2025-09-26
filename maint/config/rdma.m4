@@ -82,46 +82,30 @@ AC_DEFUN([AX_RDMA],
 
         dnl Check for existence of reregister event; it's somewhat new.
         AC_MSG_CHECKING(for IBV_EVENT_CLIENT_REREGISTER)
-        AC_TRY_COMPILE(
-            [ #include "infiniband/verbs." ],
-            [ enum ibv_event_type x = IBV_EVENT_CLIENT_REREGISTER; ],
-            [ AC_MSG_RESULT(yes)
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include "infiniband/verbs." ]], [[ enum ibv_event_type x = IBV_EVENT_CLIENT_REREGISTER; ]])],[ AC_MSG_RESULT(yes)
             AC_DEFINE(HAVE_IBV_EVENT_CLIENT_REREGISTER,
                         1,
-                        Define if libibverbs has reregister event) ],
-            [ AC_MSG_RESULT(no) ])
+                        Define if libibverbs has reregister event) ],[ AC_MSG_RESULT(no) ])
 
         dnl Check for existence of experimental Dynamically Connected
         dnl Transport events.
         AC_MSG_CHECKING(for IBV_EXP_EVENT_DCT_KEY_VIOLATION)
-        AC_TRY_COMPILE(
-            [ #include "infiniband/verbs.h" ],
-            [ enum ibv_event_type x = IBV_EXP_EVENT_DCT_KEY_VIOLATION; ],
-            [ AC_MSG_RESULT(yes)
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include "infiniband/verbs.h" ]], [[ enum ibv_event_type x = IBV_EXP_EVENT_DCT_KEY_VIOLATION; ]])],[ AC_MSG_RESULT(yes)
             AC_DEFINE(HAVE_IBV_EXP_EVENT_DCT_KEY_VIOLATION,
                         1,
-                        Define if libibverbs has dct key violation event) ],
-            [ AC_MSG_RESULT(no) ])
+                        Define if libibverbs has dct key violation event) ],[ AC_MSG_RESULT(no) ])
 
         AC_MSG_CHECKING(for IBV_EXP_EVENT_DCT_ACCESS_ERR)
-        AC_TRY_COMPILE(
-            [ #include "infiniband/verbs.h" ],
-            [ enum ibv_event_type x = IBV_EXP_EVENT_DCT_ACCESS_ERR; ],
-            [ AC_MSG_RESULT(yes)
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include "infiniband/verbs.h" ]], [[ enum ibv_event_type x = IBV_EXP_EVENT_DCT_ACCESS_ERR; ]])],[ AC_MSG_RESULT(yes)
             AC_DEFINE(HAVE_IBV_EXP_EVENT_DCT_ACCESS_ERR,
                         1,
-                        Define if libibverbs has dct access error event) ],
-            [ AC_MSG_RESULT(no) ])
+                        Define if libibverbs has dct access error event) ],[ AC_MSG_RESULT(no) ])
 
         AC_MSG_CHECKING(for IBV_EXP_EVENT_DCT_REQ_ERR)
-        AC_TRY_COMPILE(
-            [ #include "infiniband/verbs.h" ],
-            [ enum ibv_event_type x = IBV_EXP_EVENT_DCT_REQ_ERR; ],
-            [ AC_MSG_RESULT(yes)
+        AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ #include "infiniband/verbs.h" ]], [[ enum ibv_event_type x = IBV_EXP_EVENT_DCT_REQ_ERR; ]])],[ AC_MSG_RESULT(yes)
             AC_DEFINE(HAVE_IBV_EXP_EVENT_DCT_REQ_ERR,
                         1,
-                        Define if libibverbs has dct request error event) ],
-            [ AC_MSG_RESULT(no) ])
+                        Define if libibverbs has dct request error event) ],[ AC_MSG_RESULT(no) ])
 
         LDFLAGS="$save_ldflags"
         CPPFLAGS="$save_cppflags"

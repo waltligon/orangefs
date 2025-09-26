@@ -70,21 +70,18 @@ typedef struct
 
 dbpf_queued_op_t *dbpf_queued_op_alloc(void);
 
-void dbpf_queued_op_init(
-    dbpf_queued_op_t *q_op_p,
-    enum dbpf_op_type type,
-    TROVE_handle handle,
-    struct dbpf_collection *coll_p,
-    int (*svc_fn)(struct dbpf_op *op),
-    void *user_ptr,
-    TROVE_ds_flags flags,
-    TROVE_context_id context_id);
+void dbpf_queued_op_init(dbpf_queued_op_t *q_op_p,
+                         enum dbpf_op_type type,
+                         TROVE_handle handle,
+                         struct dbpf_collection *coll_p,
+                         int (*svc_fn)(struct dbpf_op *op),
+                         void *user_ptr,
+                         TROVE_ds_flags flags,
+                         TROVE_context_id context_id);
 
-void dbpf_queued_op_free(
-    dbpf_queued_op_t *q_op_p);
+void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p);
 
-void dbpf_queued_op_touch(
-    dbpf_queued_op_t *q_op_p);
+void dbpf_queued_op_touch(dbpf_queued_op_t *q_op_p);
 
 #if defined(__cplusplus)
 }

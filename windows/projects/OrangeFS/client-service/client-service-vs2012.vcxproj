@@ -205,7 +205,7 @@
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(TargetDir);..\..\..\dokan\lib64;..\..\..\ldap\Win64\lib;..\..\..\openssl\lib64\debug</AdditionalLibraryDirectories>
-      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldapsdk.lib;ldapssl.lib;ldapx.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>kernel32.lib;user32.lib;advapi32.lib;ws2_32.lib;netapi32.lib;userenv.lib;bmi.lib;bmi_misc.lib;bmi_wintcp.lib;description.lib;dev.lib;flow.lib;gen-locks.lib;gossip.lib;id-generator.lib;job.lib;misc.lib;request-scheduler.lib;sysint-client.lib;proto.lib;security.lib;dokan.lib;libeay32.lib;ssleay32.lib;ldap_ssl.lib;liblber.lib;libldap.lib;libldap_r.lib;liblunicode.lib;liblutil.lib;nldapextd.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AllowIsolation>false</AllowIsolation>
     </Link>
   </ItemDefinitionGroup>

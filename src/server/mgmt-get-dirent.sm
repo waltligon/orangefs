@@ -187,7 +187,7 @@ static PINT_sm_action mgmt_get_dirent_get_bitmap(
     return ret;
 }
 
-static int mgmt_get_dirent(
+static PINT_sm_action mgmt_get_dirent(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -310,7 +310,7 @@ static PINT_sm_action mgmt_get_dirent_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-static int perm_mgmt_get_dirent(PINT_server_op *s_op)
+static PINT_sm_action perm_mgmt_get_dirent(PINT_server_op *s_op)
 {
     int ret;
 

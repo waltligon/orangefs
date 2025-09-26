@@ -1,10 +1,11 @@
-/* Copyright (C) 2011 Omnibond, LLC
+/* Copyright (C) Omnibond, LLC
    Client test - IO functions */
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #ifdef WIN32
+#include <Windows.h>
 #include <process.h>
 #include <direct.h>
 #else
@@ -19,6 +20,19 @@
 
 #define BUF_MAX_SIZE    1024*1024   /* 1 MB */
 
+/*
+const char* local_time(const char *out_time) {
+    SYSTEMTIME localtime;
+
+    GetLocalTime(&localtime);
+
+    sprintf(out_time, "%04d-%02d-%02d %02d:%02d:%02d.%03d", localtime.wYear,
+            localtime.wMonth, localtime.wDay, localtime.wHour, localtime.wMinute,
+            localtime.wSecond, localtime.wMilliseconds);
+    return out_time;
+}
+*/
+
 void io_file_cleanup(char *file_name)
 {
     _unlink(file_name);
@@ -27,8 +41,11 @@ void io_file_cleanup(char *file_name)
 int io_file_int(char *file_name, char *mode, char *buffer, size_t size)
 {
     FILE *f;
-    int code = 0, imode;
+    int code = 0, imode, i = 0;
     size_t real_size, total = 0, buf_size;
+    /* const char timestr[64]; */
+    unsigned __int64 subtimer;
+    double elapsed;
 
     f = fopen(file_name, mode);
     if (!f)
@@ -44,11 +61,20 @@ int io_file_int(char *file_name, char *mode, char *buffer, size_t size)
     {
         if (imode == 0) /* "rb" */
         {
+            /* printf("  [%s] read start %llu of %llu\n", local_time(timestr), buf_size, total); */
+            subtimer = timer_start();
             real_size = fread(buffer, 1, buf_size, f);
+            elapsed = timer_elapsed(subtimer);
+            /* printf("  [%s] read complete %llu of %llu (%llu)\n", local_time(timestr), buf_size, total, real_size); */
+            
         }
         else /* "wb" or "ab" */
         {
+            /* printf("  [%s] write start %llu of %llu\n", local_time(timestr), buf_size, total); */
+            subtimer = timer_start();
             real_size = fwrite(buffer, 1, buf_size, f);
+            elapsed = timer_elapsed(subtimer);
+            /* printf("  [%s] write complete %llu of %llu (%llu)\n", local_time(timestr), buf_size, total, real_size); */
         }
 
         if (real_size == 0)
@@ -58,9 +84,9 @@ int io_file_int(char *file_name, char *mode, char *buffer, size_t size)
         }
         total += real_size;
 
-        /* debugging 
-        printf("%s %u: %u\n", (imode == 0) ? "read" : "write", size, total);
-        */
+        /* debugging */
+        /* printf("  %s %llu of %llu #%u: %llu (%7.3fs)\n", (imode == 0) ? "read" : "write", buf_size,
+               size, i++, total, elapsed); */
     }
 
     fclose(f);
@@ -199,8 +225,8 @@ int flush_file(global_options *options, int fatal)
 {
     char *file_name;
     FILE *f, *f2;
-    int i, size = 4 * 1024, total = 0,
-        code;
+    int i, size = 4 * 1024, code;
+    size_t total = 0;
     char *buffer, *copy;
 
     file_name = randfile(options->root_dir);

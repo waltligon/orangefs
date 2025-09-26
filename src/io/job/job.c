@@ -3325,7 +3325,8 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
         jd = NULL;
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        return (1);
+        ret = 1;
+        goto common_return;
     }
 
     if (ret == 1)
@@ -3335,7 +3336,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
         out_status_p->status_user_tag = status_user_tag;
         dealloc_job_desc(jd);
         jd = NULL;
-        return (ret);
+        goto common_return;
     }
 
     /* if we fall through to this point, the job did not
@@ -3343,8 +3344,13 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
      */
     *id = jd->job_id;
     trove_pending_count++;
+    ret = 0;
 
-    return (0);
+common_return:
+    /* yes this is tied to TROVE debugging on purpose */
+    gossip_debug(GOSSIP_TROVE_DEBUG, "%s: returning %d error code %d\n",
+                 __func__, ret, out_status_p->error_code);
+    return (ret);
 }
 
 /* job_trove_dspace_verify()

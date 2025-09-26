@@ -408,7 +408,7 @@ static int small_io_completion_fn(void * user_args,
 }
 
 
-static int small_io_check_for_retries( struct PINT_smcb *smcb
+static PINT_sm_action small_io_check_for_retries( struct PINT_smcb *smcb
                                      , job_status_s *js_p)
 {
 #ifndef WIN32
@@ -646,7 +646,7 @@ static int small_io_check_for_retries( struct PINT_smcb *smcb
 
 
 
-static int small_io_cleanup(struct PINT_smcb *smcb,
+static PINT_sm_action small_io_cleanup(struct PINT_smcb *smcb,
                             job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

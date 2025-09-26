@@ -255,7 +255,7 @@ static PINT_sm_action rmdirent_get_bitmap(
  * from the dirdata object.
  *           
  */
-static int rmdirent_remove_directory_entry(
+static PINT_sm_action rmdirent_remove_directory_entry(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -473,7 +473,7 @@ static PINT_sm_action rmdirent_cleanup(
     return(server_state_machine_complete(smcb));
 }
 
-static int perm_rmdirent(PINT_server_op *s_op)
+static PINT_sm_action perm_rmdirent(PINT_server_op *s_op)
 {
     int ret;
 

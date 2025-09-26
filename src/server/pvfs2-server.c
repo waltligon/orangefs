@@ -2408,7 +2408,8 @@ int server_state_machine_start(
 
     if(s_op->req)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "client:%d, reqid:%d, rank:%d\n",
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "server HINTS: client:%d, reqid:%d, rank:%d\n",
                      PINT_HINT_GET_CLIENT_ID(s_op->req->hints),
                      PINT_HINT_GET_REQUEST_ID(s_op->req->hints),
                      PINT_HINT_GET_RANK(s_op->req->hints));
@@ -2636,9 +2637,22 @@ int server_state_machine_terminate(
  */
 struct PINT_state_machine_s *server_op_state_get_machine(int op)
 {
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-            "server_op_state_get_machine %d\n",op);
-
+    if (op == 999)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "server_op_state_get_machine "
+                "%d\n", op);
+    }
+    else
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                "===================== New Request ================\n"
+                "                        " 
+                "server_op_state_get_machine "
+                "%d(%s)\n", op,
+                PINT_map_server_op_to_string(op));
+    }
+    
     switch (op)
     {
     case BMI_UNEXPECTED_OP :

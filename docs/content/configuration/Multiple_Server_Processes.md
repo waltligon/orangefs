@@ -9,11 +9,11 @@ may elect to run multiple server processes on each server.
 The topic is organized into the following three sections:
 
 -   [Multiple Server Processes, Single File
-    System](Multiple_Server_Processes.htm#Multiple_Server_Processes__Single_File_System)
+    System]({{<relref "#multiple-server-processes-single-file-system">}})
 -   [Multiple Servers, Single File System, Some Data-only
-    Servers](Multiple_Server_Processes.htm#Multiple_Servers__Single_File_System__Some_Data-only_Servers)
+    Servers]({{<relref "#multiple-servers-single-file-system-some-data-only-servers">}})
 -   [Multiple Server Processes, Single File System, Multiple
-    Machines](Multiple_Server_Processes.htm#Multiple_Server_Processes__Single_File_System__Multiple_Machines)
+    Machines]({{<relref "#multiple-server-processes-single-file-system-multiple-machines">}})
 
 Multiple Server Processes, Single File System
 ---------------------------------------------

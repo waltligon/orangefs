@@ -11,8 +11,8 @@ For key-based security, most of this work can be done once on the build system, 
                            
 This topic includes sections for setting up two types of security:
                            
--   [Key-Based Security](Set_Up_Security_(Linux_Clients).htm#Key-Based_Security)
--   [Certificate-Based Security](Set_Up_Security_(Linux_Clients).htm#Certificate-Based_Security)
+-   [Key-Based Security]({{<relref "#key-based-security">}})
+-   [Certificate-Based Security]({{<relref "#certificate-based-security">}})
                            
 
 Key-Based Security
@@ -71,8 +71,7 @@ using the --keypath parameter when running pvfs2-client. Example:
 
 The script pvfs2-dist-keys.sh distributes private keys and the keystore
 to multiple systems using scp. The keys should have been generated with
-the pvfs2-gen-keys.sh script as described in the *[Administration
-Guide](_Automated_Key_and_Keystore_Generation_Scripts1.htm#Generating_Key_Pairs_and_a_Keystore).*
+the pvfs2-gen-keys.sh script as described in [Advanced Security Build]({{<relref "build-configure/Setup_Security_(Build)#key-based-mode">}}).
 
 **Note     **The script requires one argument: the installation
 directory of OrangeFS which must be the same on all systems. This
@@ -90,8 +89,7 @@ execute this command, given /opt/orangefs as the installation directory:
 scp
 orangefs-serverkey-orangefs-server01.pem    orangefs-server01:/opt/orangefs/etc/orangefs-serverkey.pem
 
-Generate a client private key as instructed in the *[Administration
-Guide](Setting_Up_Key-Based_Security_Mode.htm#Generating_Client_Private_Keys)*
+Generate a client private key as instructed in [Advanced Security Build > Key-Based Mode]({{<relref "build-configure/Setup_Security_(Build)#key-based-mode">}})
 and append its public key to the keystore. Distribute the private key to
 the client system and the keystore to all servers.
 
@@ -112,9 +110,7 @@ Certificate-Based Security
 security mode (certificates, in this case) to interoperate.
 
 Prior to configuring your client(s) for certificate-based security, you
-must configure your servers and create a CA certificate. See [Building
-OrangeFS for Certificate-Based
-Security](Setting_Up_Certificate-Based_Security_Mode.htm#Building_OrangeFS_for_Certificate-Based_Security__Admin_Guide_)
+must configure your servers and create a CA certificate. See [Advanced Security Build > Certificate-Based Mode]({{<relref "build-configure/Setup_Security_(Build)#certificate-based-mode">}})
 for steps to take before configuring clients.
 
 Then, install OpenSSL client libraries to the client system if
@@ -129,13 +125,12 @@ administrator.
 
 You must configure the client system to connect to a running OrangeFS
 server; the file pvfs2tab, located in /opt/orangefs/etc by default,
-contains the necessary configuration information. (See [pvfs2tab
-File](pvfs2tab_File.htm) for more information on pvfs2tab.)
+contains the necessary configuration information. (See [pvfs2tab File]({{<relref "pvfs2tab-File">}}) for more information on pvfs2tab.)
 
 The requesting user must have an identity (user account) in the LDAP
 directory before requesting a certificate. See [Configuring LDAP for
 Identity
-Mapping](http://www.omnibond.com/orangefs/docs/v_2_9/admin_Certificate-Based_Security.htm#Configuring_LDAP_for_Identity_Mapping)
+Mapping]({{<relref "build-configure/Configuring_LDAP_for_Identity_Mapping">}})
 for more information.
 
 The usage of pvfs2-get-user-cert is:

@@ -51,7 +51,7 @@ struct PINT_worker_threaded_queues_s
     int remove_requested;
 };
 
-struct PINT_worker_impl PINT_worker_threaded_queues_impl;
+extern struct PINT_worker_impl PINT_worker_threaded_queues_impl;
 
 #endif
 

@@ -234,7 +234,7 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
 #define PINT_FRAME_CURRENT 0
 #define PINT_FRAME_TOP 1
 
-struct PINT_state_machine_s pvfs2_void_sm;
+extern struct PINT_state_machine_s pvfs2_void_sm;
 
 /*
  * Local variables:

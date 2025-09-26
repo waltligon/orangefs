@@ -88,7 +88,7 @@ The settings are defined below.
 |GIDAttr: the name of the GID-storing attribute.|“gidNumber”|
 |SearchTimeout: timeout in seconds for LDAP searches.| “15”|
 
-You should have noted these values during “[Planning for LDAP Binding](http://www.omnibond.com/orangefs/docs/v_2_9/admin_Certificate-Based_Security.htm#Planning_for_LDAP_Identity_Mapping)” described above.
+You should have noted these values during [Planning for LDAP Binding]({{<relref "#planning-for-ldap-binding">}}) described above.
 
 Searching LDAP for Identities
 -----------------------------
@@ -129,7 +129,7 @@ The script pvfs2-ldap-create-dir.sh will create a new OpenLDAP directory and
 -   suffix dn: base (topmost) DN of directory; default based on hostname, for example hostname acme.com would give dc=acme,dc=com
 -   admin password: LDAP administrator password, default “ldappwd”.
 
-The script will create the new LDAP directory and add two organizational units, named "Users" and "Groups." A user object for the system root account will be created with a random password. See “[Adding Users to LDAP](Configuring_LDAP_For_Identity_Mapping.htm#Adding_Users_to_LDAP)” below for information on changing the password.
+The script will create the new LDAP directory and add two organizational units, named "Users" and "Groups." A user object for the system root account will be created with a random password. See [Adding Users to LDAP]({{<relref "#adding-users-to-ldap">}}) below for information on changing the password.
 
 **Important  **The directory created is not secure. User passwords are stored in plaintext, and SSL/TLS security is not enabled.
  The directory should only be used for testing, or as a starting point for a secure directory. Consult the OpenLDAP documentation for information on securing the directory.

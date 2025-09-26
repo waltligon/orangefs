@@ -17,13 +17,13 @@ Direct Interface.
 
 Setting up a FUSE client involves four main steps on your Mac system:
 
--   [Install FUSE](#Install_FUSE)
+-   [Install FUSE]({{<relref "#install-fuse">}})
 
--   [Install OrangeFS](#Install_OrangeFS)
+-   [Install OrangeFS]({{<relref "#install-orangefs">}})
 
--   [Mount an OrangeFS Server](#Mount_an_OrangeFS_Server)
+-   [Mount an OrangeFS Server]({{<relref "#mount-an-orangefs-server">}})
 
--   [Set up Security](FUSE_Client.md)
+-   [Set up Security]({{<relref "#set-up-security">}})
 
 Install FUSE
 ------------
@@ -57,9 +57,7 @@ separately.
 ### Prerequisites
 
 Prior to installing OrangeFS, you must install gcc, flex, bison, make,
-and openssl-devel as described in [Additional Linux Software for the
-Build
-System](Preview_System_Requirements.md).
+and openssl-devel as described in [Build Prerequisites]({{<relref "quickstart/quickstart-build#build-prerequisites">}}).
 
 ### Procedure
 
@@ -76,18 +74,19 @@ where...
 
 Example: orangefs-2.9. \
  \
- If your OrangeFS filesystem is using an older version, select the [New
-releases](http://www.orangefs.org/downloads/old-releases/) in the
-Previous Releases section on the OrangeFS downloads page.  select your
-release then select the source link to find the tar ball.
+ If your OrangeFS filesystem is using an older version, select the
+ matching version's tar ball from the releases directory on the OrangeFS
+ downloads page.
 
 **Notes   **The OrangeFS client and servers MUST be using the same
-version.\
- \
+version.
+
+ <!-- TODO: link is dead
  For systems using releases older than 2.8.2-1, the tar balls can be
 found by selecting the [Previous
 releases](ftp://ftp.parl.clemson.edu/pub/pvfs2/old) link; however, these
 releases have not been recently tested.  Use at your own discretion.\
+ -->
  \
  If using Safari to download, the tar ball will be automatically
 unzipped, producing an orangefs-*\<version\>*.tar file.  In Firefox, you
@@ -137,8 +136,8 @@ This will create the OrangeFS installation directory in /opt/orangefs.
 Within that directory, the binary you need to run FUSE, pvfs2fuse, will
 be located in the bin directory.
 
-Mount an OrangeFS Filesystem
-----------------------------
+Mount an OrangeFS Server
+------------------------
 
 Assuming you have network access to the OrangeFS filesystem, you must
 first create a mount point on your Mac.
@@ -276,8 +275,7 @@ administrator to create the correct public/private key pair.
 **Notes   **The system administrator must add the public key to the
 OrangeFS keystore, copy the keystore to each server machine, then
 restart the servers before you will have access to the file system.  See
-[Setting up Key-Based Security
-Mode](Setting_Up_Key-Based_Security_Mode.md) for more information.\
+[Advanced Security Build > Key-Based Mode]({{<relref "build-configure/Setup_Security_(Build)#key-based-mode">}}) for more information.\
  \
  If your Mac has a non-static IP address in your environment, you will
 have to regenerate a new public/private key pair each time the address
@@ -285,7 +283,7 @@ changes.\
  \
  The default security using UID and GID for file permissions is used in
 addition to the public/private key pair.  See [Using Default
-Security](FUSE_Client.md) above.
+Security]({{<relref "#using-default-security">}}) above.
 
  
 

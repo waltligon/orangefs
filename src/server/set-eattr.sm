@@ -107,7 +107,7 @@ machine pvfs2_set_eattr_sm
 /*
  * This routine checks keys to confirm that the name spaces are valid.
  */
-static int seteattr_verify_eattribs(
+static PINT_sm_action seteattr_verify_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -199,7 +199,7 @@ static int seteattr_verify_eattribs(
  * We translate this to an internal trove flag 
  *  (TROVE_NOOVERWRITE, TROVE_ONLYOVERWRITE)
  */
-static int seteattr_setobj_eattribs(
+static PINT_sm_action seteattr_setobj_eattribs(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -608,7 +608,7 @@ static PINT_sm_action check_immutable(struct PINT_smcb *smcb
  * Synopsis: free memory and return
  *           
  */
-static int seteattr_cleanup(
+static PINT_sm_action seteattr_cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -692,7 +692,7 @@ static void init_keyval_structs(PINT_server_op *s_op, int free_val)
     return;
 }/*end init_keyval_structs*/
 
-static int perm_seteattr(PINT_server_op *s_op)
+static PINT_sm_action perm_seteattr(PINT_server_op *s_op)
 {
     int ret;
 

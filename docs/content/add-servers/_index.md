@@ -15,10 +15,10 @@ managed for optimal storage and retrieval.
 Adding servers includes the following topics:
 
 -   [Copy OrangeFS Installation
-    Directory](Copy_OFS_Install_Directory_(Servers).htm)
--   [Set up Security](Set_Up_Security_(Servers).htm)
--   [Run](Run_(Servers).htm)
--   [Review Results](Results_of_Add_Servers.htm)
+    Directory]({{<relref "Copy_OFS_Install_Directory_(Servers)">}})
+-   [Set up Security]({{<relref "Set_Up_Security_(Servers)">}})
+-   [Run]({{<relref "Server-Startup">}})
+-   [Review Results]({{<relref "Results_of_Add_Servers">}})
 
  
 

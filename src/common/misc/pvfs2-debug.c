@@ -13,7 +13,8 @@
 #include "pvfs2-debug.h"
 
 static uint64_t debug_to_mask(__keyword_mask_t *mask_map, 
-        int num_mask_map, const char *event_logging)
+                              int num_mask_map,
+                              const char *event_logging)
 {
     uint64_t mask = 0;
     char *s = NULL, *t = NULL;
@@ -67,13 +68,15 @@ static uint64_t debug_to_mask(__keyword_mask_t *mask_map,
 uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
 {
     return debug_to_mask(s_keyword_mask_map, 
-            num_keyword_mask_map, event_logging);
+                         num_keyword_mask_map,
+                         event_logging);
 }
 
 uint64_t PVFS_kmod_eventlog_to_mask(const char *event_logging)
 {
     return debug_to_mask(s_kmod_keyword_mask_map, 
-            num_kmod_keyword_mask_map, event_logging);
+                         num_kmod_keyword_mask_map,
+                         event_logging);
 }
 
 /*
