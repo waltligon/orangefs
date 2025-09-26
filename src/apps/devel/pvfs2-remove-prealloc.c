@@ -327,15 +327,15 @@ int process_args(int argc, char ** argv)
                 break;
 
             case 2: /*dbpath */ 
-                strncpy(opts.dbpath, optarg, PATH_MAX);
+                strncpy(opts.dbpath, optarg, PATH_MAX-1);
                 break;
 
             case 3: /* hexdir */
-                strncpy(opts.hexdir, optarg, PATH_MAX);
+                strncpy(opts.hexdir, optarg, PATH_MAX-1);
                 break;
 
             case 4: /* host */
-                strncpy(opts.host, optarg, PATH_MAX);
+                strncpy(opts.host, optarg, PATH_MAX-1);
                 break;
 
             default:

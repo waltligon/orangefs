@@ -288,6 +288,7 @@ int dbpf_op_init_queued_or_immediate(
                      flags,
                      context_id,
                      0);
+        /* makes last argument ptr point to the op in the queue */
         *op_pp = op_p;
     }
     else
@@ -308,6 +309,7 @@ int dbpf_op_init_queued_or_immediate(
                             user_ptr,
                             flags,
                             context_id);
+        /* makes last argument ptr point to the op in the queue */
         *op_pp = &(*q_op_pp)->op;
     }
     return 0;

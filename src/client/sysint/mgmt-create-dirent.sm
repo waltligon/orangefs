@@ -174,7 +174,7 @@ PVFS_error PVFS_mgmt_create_dirent(
 
 /****************************************************************/
 
-static int mgmt_create_dirent_init(
+static PINT_sm_action mgmt_create_dirent_init(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -195,7 +195,7 @@ static int mgmt_create_dirent_init(
     return SM_ACTION_COMPLETE;
 }
 
-static int mgmt_create_dirent_setup_msgpair(
+static PINT_sm_action mgmt_create_dirent_setup_msgpair(
     struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);

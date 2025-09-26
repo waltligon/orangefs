@@ -69,10 +69,9 @@ int delete_file_notexist(global_options *options, int fatal)
     char *file_name;
     int code;
 
-    /* delete existing file */
+    /* delete nonexistent file */
     file_name = randfile(options->root_dir);
 
-    /* delete nonexistent file */
     _unlink(file_name);
     code = errno;
     
@@ -162,8 +161,8 @@ int delete_dir_notempty(global_options *options, int fatal)
     report_result(options,
                   "delete-dir-notempty",
                   "main",
-                  RESULT_SUCCESS,
-                  0,
+                  RESULT_FAILURE,
+                  ENOTEMPTY,
                   OPER_EQUAL,
                   code);
 
@@ -327,7 +326,12 @@ int move_file_baddir(global_options *options, int fatal)
     /* move file */    
     new_name = (char *) malloc(strlen(dir_name) + strlen(file_name) + 4);
     sprintf(new_name, "%s%c%s", dir_name, SLASH_CHAR, strrchr(file_name, SLASH_CHAR)+1);
-    code = rename(file_name, new_name) == 0 ? 0 : errno;
+
+    errno = 0;
+    code = rename(file_name, new_name);
+    if (code != 0) {
+        code = errno;
+    }
 
     report_result(options,
                   "move-file-baddir",

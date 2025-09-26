@@ -106,7 +106,11 @@ typedef struct PINT_dist_s {
     } \
     /* later routines assume dist is a big contiguous thing, do so */ \
     *(x) = px = decode_malloc(PINT_DIST_PACK_SIZE(&tmp_dist)); \
-    memcpy(px, &tmp_dist, sizeof(*px)); \
+       px->dist_name = tmp_dist.dist_name; \
+       px->name_size = tmp_dist.name_size; \
+       px->param_size = tmp_dist.param_size; \
+       px->params = tmp_dist.params; \
+       px->methods = tmp_dist.methods; \
     px->dist_name = (char *) px + roundup8(sizeof(*px)); \
     memcpy(px->dist_name, tmp_dist.dist_name, tmp_dist.name_size); \
     px->params = (void *)(px->dist_name + roundup8(px->name_size)); \

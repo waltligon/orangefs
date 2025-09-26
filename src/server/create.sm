@@ -134,7 +134,7 @@ machine pvfs2_create_sm
 
 %%
 
-static int setup_final_response(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action setup_final_response(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TCREATE, &s_op->start_time);
@@ -149,7 +149,7 @@ static int setup_final_response(struct PINT_smcb *smcb, job_status_s *js_p)
     return(SM_ACTION_COMPLETE);
 }
 
-static int create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
 {
 
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -194,7 +194,7 @@ static int create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
     return(ret);
 }
 
-static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int server_type;
@@ -330,7 +330,7 @@ static int check_stuffed(struct PINT_smcb *smcb, job_status_s *js_p)
     return SM_ACTION_COMPLETE;
 }
 
-static int create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action create_local_datafiles(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
@@ -832,7 +832,7 @@ static PINT_sm_action setattr_setobj_attribs(
     return ret;
 }
 
-static int setup_resp(
+static PINT_sm_action setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {    
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -928,7 +928,7 @@ static int setup_resp(
  * Synopsis: free memory and return
  *           
  */
-static int cleanup(
+static PINT_sm_action cleanup(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -989,7 +989,7 @@ static inline int PINT_get_object_ref_create(
 
 PINT_GET_CREDENTIAL_DEFINE(create);
 
-static int perm_create(PINT_server_op *s_op)
+static PINT_sm_action perm_create(PINT_server_op *s_op)
 {
 #if 0
     /*** code not needed -- see below ***/

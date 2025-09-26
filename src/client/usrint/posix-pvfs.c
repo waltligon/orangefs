@@ -3132,49 +3132,49 @@ int pvfs_getdtablesize(void)
  * indicate it is not implemented
  */
 
-int pvfs_getfscreatecon(security_context_t *con)
+int pvfs_getfscreatecon(char *con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int pvfs_getfilecon(const char *path, security_context_t *con)
+int pvfs_getfilecon(const char *path, char *con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int pvfs_lgetfilecon(const char *path, security_context_t *con)
+int pvfs_lgetfilecon(const char *path, char *con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int pvfs_fgetfilecon(int fd, security_context_t *con)
+int pvfs_fgetfilecon(int fd, char *con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int pvfs_setfscreatecon(security_context_t con)
+int pvfs_setfscreatecon(char con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int pvfs_setfilecon(const char *path, security_context_t con)
+int pvfs_setfilecon(const char *path, char con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int pvfs_lsetfilecon(const char *path, security_context_t con)
+int pvfs_lsetfilecon(const char *path, char con)
 {
     errno = ENOTSUP;
     return -1;
 }
 
-int pvfs_fsetfilecon(int fd, security_context_t con)
+int pvfs_fsetfilecon(int fd, char con)
 {
     errno = ENOTSUP;
     return -1;

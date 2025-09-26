@@ -234,8 +234,12 @@ void print_entry_attr(
     time_t mtime, atime, ctime;
     struct tm *time;
     PVFS_size size = 0;
-    char scratch_owner[16] = {0}, scratch_group[16] = {0}, scratch_time[MAX_TIME_LENGTH] = {0}, scratch_big_time[MAX_TIME_LENGTH] = {0};
-    char scratch_size[16] = {0}, scratch_inode[21] = {0};
+    char scratch_owner[16] = {0}, 
+         scratch_group[16] = {0}, 
+         scratch_time[MAX_TIME_LENGTH] = {0}, 
+         scratch_big_time[MAX_TIME_LENGTH] = {0};
+
+    char scratch_size[22] = {0}, scratch_inode[21] = {0};
     char f_type = '-';
     char group_x_char = '-';
     int num_bytes = 0;
@@ -318,11 +322,11 @@ void print_entry_attr(
     if (opts->list_human_readable)
     {
         PVFS_util_make_size_human_readable(
-            size,scratch_size,16,opts->list_use_si_units);
+            size,scratch_size,22,opts->list_use_si_units);
     }
     else
     {
-        snprintf(scratch_size,16, "%lld", lld(size));
+        snprintf(scratch_size,22, "%lld", lld(size));
     }
     format_size_string(scratch_size,11,&formatted_size,1,1);
 

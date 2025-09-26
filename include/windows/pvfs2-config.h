@@ -602,7 +602,7 @@
 #define PVFS2_VERSION_MINOR 9
 
 /* sub version number */
-#define PVFS2_VERSION_SUB 3
+#define PVFS2_VERSION_SUB 8
 
 /* Should we have malloc zero freed memory */
 #define PVFS_MALLOC_FREE_ZERO 0

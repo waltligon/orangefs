@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2022 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  *

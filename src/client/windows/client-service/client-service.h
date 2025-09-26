@@ -1,5 +1,5 @@
 /*
- * (C) 2010-2013 Clemson University and Omnibond Systems, LLC
+ * (C) 2010-2022 Omnibond Systems, LLC
  *
  * See COPYING in top-level directory.
  */
@@ -25,6 +25,7 @@
 #define SECURITY_MODE_KEY     1
 #define SECURITY_MODE_CERT    2
 
+/*
 typedef struct
 {
     char host[256];
@@ -39,6 +40,7 @@ typedef struct
     char uid_attr[32];
     char gid_attr[32];
 } LDAP_OPTIONS, *PLDAP_OPTIONS;
+*/
 
 typedef struct
 {
@@ -59,10 +61,10 @@ typedef struct
     void *private_key;
     char cert_dir_prefix[MAX_PATH];
     char ca_file[MAX_PATH];
-    LDAP_OPTIONS ldap;
+    /* LDAP_OPTIONS ldap; */
 } ORANGEFS_OPTIONS, *PORANGEFS_OPTIONS;
 
-void DbgPrint(char *format, ...);
+void client_debug(char *format, ...);
 
 #define report_error(msg, err)            _report_error(msg, err, FALSE)
 

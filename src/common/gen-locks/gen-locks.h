@@ -127,11 +127,15 @@ typedef HANDLE gen_thread_t;
  * Copyright (C) 1998 John E. Bossom
  * Copyright (C) 1999,2005 Pthreads-win32 contributors
  */
+
+/* now defined in Windows CRT */
+#ifndef WIN32
 struct timespec
 {
     time_t tv_sec;
     long int tv_nsec;
 };
+#endif
 
 typedef struct gen_cond_t_ *gen_cond_t;
 struct gen_cond_t_ 

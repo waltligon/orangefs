@@ -10,8 +10,8 @@
 #include <stdlib.h>
 #ifndef WIN32
 #include <unistd.h>
-#endif
 #include <sys/sysmacros.h>
+#endif
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>

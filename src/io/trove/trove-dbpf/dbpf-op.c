@@ -23,15 +23,14 @@ dbpf_queued_op_t *dbpf_queued_op_alloc(void)
  * the next_p must still be handled.
  *
  */
-void dbpf_queued_op_init(
-    dbpf_queued_op_t *q_op_p,
-    enum dbpf_op_type type,
-    TROVE_handle handle,
-    struct dbpf_collection *coll_p,
-    int (*svc_fn)(struct dbpf_op *op),
-    void *user_ptr,
-    TROVE_ds_flags flags,
-    TROVE_context_id context_id)
+void dbpf_queued_op_init(dbpf_queued_op_t *q_op_p,
+                         enum dbpf_op_type type,
+                         TROVE_handle handle,
+                         struct dbpf_collection *coll_p,
+                         int (*svc_fn)(struct dbpf_op *op),
+                         void *user_ptr,
+                         TROVE_ds_flags flags,
+                         TROVE_context_id context_id)
 {
     assert(q_op_p);
     memset(q_op_p, 0, sizeof(dbpf_queued_op_t));

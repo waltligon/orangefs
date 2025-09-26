@@ -61,12 +61,17 @@ struct file_struct
     char *pathname;
 };
 
-static struct unlink_context dbpf_unlink_context;
+/* unlink_bstream is a thread that loops waiting for work
+ * in the global_list defined below. unlink_bstream is an
+ * infinite loop that does not halt unless forced to.
+ */
 static void* unlink_bstream(void *context);
-static int fast_unlink(
-    const char *pathname, 
-    TROVE_coll_id coll_id, 
-    TROVE_handle handle);
+
+static struct unlink_context dbpf_unlink_context;
+
+static int fast_unlink(const char *pathname,
+                       TROVE_coll_id coll_id,
+                       TROVE_handle handle);
 
 /* "used_list" is for active objects (ref_ct > 0) */
 static QLIST_HEAD(used_list);
@@ -91,9 +96,9 @@ static void close_fd(
     int fd, 
     enum open_cache_open_type type);
 
-inline static struct open_cache_entry * dbpf_open_cache_find_entry(
-    struct qlist_head * list, 
-    const char * list_name,
+inline static struct open_cache_entry *dbpf_open_cache_find_entry(
+    struct qlist_head *list, 
+    const char *list_name,
     TROVE_coll_id coll_id,
     TROVE_handle handle);
 
@@ -121,7 +126,11 @@ void dbpf_open_cache_initialize(void)
     INIT_QLIST_HEAD(&dbpf_unlink_context.global_list);
     pthread_mutex_init(&dbpf_unlink_context.mutex, NULL);
     pthread_cond_init(&dbpf_unlink_context.data_available, NULL);
-    ret = pthread_create(&dbpf_unlink_context.thread_id, NULL, unlink_bstream, (void*)&dbpf_unlink_context);
+
+    ret = pthread_create(&dbpf_unlink_context.thread_id,
+                         NULL,
+                         unlink_bstream,
+                         (void*)&dbpf_unlink_context);
     if(ret)
     {
         gossip_err("dbpf_open_cache_initialize: failed [%d]\n", ret);
@@ -162,11 +171,10 @@ void dbpf_open_cache_finalize(void)
  * files that don't exist should return ENOENT, but writes on files
  * that don't exist should create and open the file.
  */
-int dbpf_open_cache_get(
-    TROVE_coll_id coll_id,
-    TROVE_handle handle,
-    enum open_cache_open_type type,
-    struct open_cache_ref* out_ref)
+int dbpf_open_cache_get(TROVE_coll_id coll_id,
+                        TROVE_handle handle,
+                        enum open_cache_open_type type,
+                        struct open_cache_ref* out_ref)
 {
     struct qlist_head *tmp_link;
     struct open_cache_entry* tmp_entry = NULL;
@@ -180,24 +188,30 @@ int dbpf_open_cache_get(
 
     /* check already opened objects first, reuse ref if possible */
 
-    tmp_entry = dbpf_open_cache_find_entry(
-        &used_list, "used list", coll_id, handle);
+    tmp_entry = dbpf_open_cache_find_entry(&used_list,
+                                           "used list",
+                                           coll_id,
+                                           handle);
+
     if (tmp_entry && tmp_entry->remove_flag)
     {
-       gossip_err("DBPF_OPEN_CACHE_GET:  pulled EXISTING entry from the used-list with the "
-                  "remove flag set.\n");
+       gossip_err("%s: pulled EXISTING entry from the used-list with the "
+                  "remove flag set.\n", __func__);
        gossip_err("\t\thandle:%llu\n",llu(tmp_entry->handle));
        gossip_err("\t\tref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
     }
 
     if(!tmp_entry)
     {
-        tmp_entry = dbpf_open_cache_find_entry(
-            &unused_list, "unused list", coll_id, handle);
+        tmp_entry = dbpf_open_cache_find_entry(&unused_list,
+                                               "unused list",
+                                               coll_id,
+                                               handle);
+
         if (tmp_entry && tmp_entry->remove_flag)
         {
-           gossip_err("DBPF_OPEN_CACHE_GET:  pulled EXISTING entry from the UNused-list with the "
-                      "remove flag set.\n");
+           gossip_err("%s: pulled EXISTING entry from the UNused-list with the "
+                      "remove flag set.\n", __func__);
            gossip_err("\t\thandle:%llu\n",llu(tmp_entry->handle));
            gossip_err("\t\tref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
         }
@@ -207,14 +221,22 @@ int dbpf_open_cache_get(
 
     if (tmp_entry)
     {
+        gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                     "%s: found an entry, check it out\n", __func__);
+
 	if (tmp_entry->fd < 0)
 	{
+            gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                         "%s: no fd, try to open one\n", __func__);
 	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, type);
 	    if (ret < 0)
 	    {
 		gen_mutex_unlock(&cache_mutex);
+                gossip_err("open_cache_get failed to open fd\n");
 		return ret;
 	    }
+            gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                     "%s: opened new fd = %dd\n", __func__, tmp_entry->fd);
             tmp_entry->type = type;
 	}
         out_ref->fd = tmp_entry->fd;
@@ -223,11 +245,15 @@ int dbpf_open_cache_get(
 	out_ref->internal = tmp_entry;
 	tmp_entry->ref_ct++;
 
+        gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                     "%s: just uncached opened a new fd ref_cnt = %d\n",
+                     __func__, tmp_entry->ref_ct);
+
 	/* remove the entry and place it at the used head (assuming it
 	 * will be referenced again soon)
 	 */
-	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "dbpf_open_cache_get: "
-                     "moving to (or reordering in) used list.\n");
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                     "%s: moving to (or reordering in) used list.\n", __func__);
 	qlist_del(&tmp_entry->queue_link);
 	qlist_add(&tmp_entry->queue_link, &used_list);
 
@@ -241,19 +267,21 @@ int dbpf_open_cache_get(
      * in the cache. In order of priority we will now try: free list,
      * unused_list, and then bypass cache
      */
-    if (!qlist_empty(&free_list))
+    if (!qlist_empty(&free_list)) /* no cache slots aqailable */
     {
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                     "%s: resetting entry from free list.\n", __func__);
+
 	tmp_link = free_list.next;
-	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
-	    queue_link);
+	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry, queue_link);
+
 	qlist_del(&tmp_entry->queue_link);
 	found = 1;
-	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	    "dbpf_open_cache_get: resetting entry from free list.\n");
+
         if (tmp_entry->remove_flag)
         {
-           gossip_err("DBPF_OPEN_CACHE_GET:  pulled FIRST entry from the free-list with the "
-                      "remove flag turned on.\n");
+           gossip_err("%s: pulled FIRST entry from the free-list with the "
+                      "remove flag turned on.\n", __func__);
            gossip_err("\t\t\tSetting remove-flag to zero.\n");
            tmp_entry->remove_flag=0;
         }
@@ -262,23 +290,26 @@ int dbpf_open_cache_get(
     /* anything in unused list (still open, but ref_ct == 0)? */
     if (!found && !qlist_empty(&unused_list))
     {
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	             "%s: resetting entry from unused list.\n", __func__);
+
 	tmp_link = unused_list.next;
-	tmp_entry = qlist_entry(
-            tmp_link, struct open_cache_entry, queue_link);
+	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry, queue_link);
+
 	qlist_del(&tmp_entry->queue_link);
 	found = 1;
-	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	    "dbpf_open_cache_get: resetting entry from unused list.\n");
 
         if (tmp_entry->remove_flag)
         {
-           gossip_err("DBPF_OPEN_CACHE_GET:  pulled FIRST entry from the UNused-list with the "
-                      "remove flag turned on.\n");
+           gossip_err("%s:  pulled FIRST entry from the UNused-list with the "
+                      "remove flag turned on.\n", __func__);
            gossip_err("\t\t\tSetting remove-flag to zero.\n");
            tmp_entry->remove_flag=0;
         }
 	if (tmp_entry->fd > -1)
 	{
+	   gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	                "%s: bad fd, try something else\n", __func__);
             close_fd(tmp_entry->fd, tmp_entry->type);
 	    tmp_entry->fd = -1;
 	}
@@ -286,6 +317,9 @@ int dbpf_open_cache_get(
    
     if (found)
     {
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	             "%s: opening fd for found item.\n", __func__);
+
 	/* have an entry to work with; fill in and place in used list */
 	tmp_entry->ref_ct = 1;
 	tmp_entry->coll_id = coll_id;
@@ -296,8 +330,7 @@ int dbpf_open_cache_get(
         {
             qlist_add(&tmp_entry->queue_link, &free_list);
             gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                         "dbpf_open_cache_get: could not open "
-                         "(ret=%d)\n", ret);
+                         "%s: could not open (ret=%d)\n", __func__, ret);
 
             gen_mutex_unlock(&cache_mutex);
             return ret;
@@ -308,7 +341,7 @@ int dbpf_open_cache_get(
 
 	out_ref->internal = tmp_entry;
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	    "dbpf_open_cache_get: moving to used list.\n");
+	             "%s: moving found item to used list.\n", __func__);
 	qlist_add(&tmp_entry->queue_link, &used_list);
 	gen_mutex_unlock(&cache_mutex);
 	return 0;
@@ -323,7 +356,7 @@ int dbpf_open_cache_get(
     out_ref->fd = -1;
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-        "dbpf_open_cache_get: missed cache entirely.\n");
+                 "%s: missed cache entirely.\n", __func__);
     ret = open_fd(&(out_ref->fd), coll_id, handle, type);
     if (ret < 0)
     {
@@ -341,11 +374,12 @@ int dbpf_open_cache_get(
     return 0;
 }
     
-void dbpf_open_cache_put(
-    struct open_cache_ref* in_ref)
+void dbpf_open_cache_put(struct open_cache_ref *in_ref)
 {
-    struct open_cache_entry* tmp_entry = NULL;
-    int move = 0;
+    struct open_cache_entry *tmp_entry = NULL;
+
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "%s: called\n", __func__);
+
 
     gen_mutex_lock(&cache_mutex);
 
@@ -353,51 +387,59 @@ void dbpf_open_cache_put(
     if(in_ref->internal)
     {
 	tmp_entry = in_ref->internal;
+
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	             "%s: cached entry.\n", __func__);
+        gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                     "%s: ref_ct = %d\n", __func__, tmp_entry->ref_ct);
+        gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                     "%s: handle = %ld\n", __func__, tmp_entry->handle);
+
 	tmp_entry->ref_ct--;
 
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	    "dbpf_open_cache_put: cached entry.\n");
+	             "%s: entry decremented ref count = %d.\n", __func__,
+                     tmp_entry->ref_ct);
 
 	if(tmp_entry->ref_ct == 0)
 	{
 	    /* put this in unused list since ref ct hit zero */
-	    move = 1;
 	    qlist_del(&tmp_entry->queue_link);	    
-	}
-
-	if(move)
-	{
-	    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-		"dbpf_open_cache_put: move to unused list.\n");
 	    qlist_add_tail(&tmp_entry->queue_link, &unused_list);
+
+	    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+		         "%s: move to unused list.\n", __func__);
 	}
     }
     else
     {
-	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	    "dbpf_open_cache_put: uncached entry.\n");
 	/* this wasn't cached; go ahead and close up */
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	             "%s: uncached entry.\n", __func__);
+
 	if(in_ref->fd > -1)
 	{
+	    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	                 "%s: closing fd.\n", __func__);
             close_fd(in_ref->fd, in_ref->type);
 	    in_ref->fd = -1;
 	}
     }
     gen_mutex_unlock(&cache_mutex);
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	         "%s: open_cache_put complete.\n", __func__);
     return;
 }
 
-int dbpf_open_cache_remove(
-    TROVE_coll_id coll_id,
-    TROVE_handle handle)
+int dbpf_open_cache_remove(TROVE_coll_id coll_id, TROVE_handle handle)
 {
-    struct qlist_head* tmp_link;
-    struct open_cache_entry* tmp_entry = NULL;
+    struct qlist_head *tmp_link;
+    struct open_cache_entry *tmp_entry = NULL;
     int found = 0;
     char filename[PATH_MAX];
     int ret = -1;
     int tmp_error = 0;
-    struct qlist_head* scratch;
+    struct qlist_head *scratch;
     char open_type[32] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
@@ -411,19 +453,24 @@ int dbpf_open_cache_remove(
      */
 
     /* TODO: remove this search later when we have more confidence */
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "%s: Checking Used list\n", __func__);
     qlist_for_each(tmp_link, &used_list)
     {
-	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
-	    queue_link);
+	tmp_entry = qlist_entry(tmp_link,
+                                struct open_cache_entry,
+                                queue_link);
+
 	if ((tmp_entry->handle == handle) &&
             (tmp_entry->coll_id == coll_id))
 	{
-            gossip_err("DBPF_OPEN_CACHE_REMOVE:  BINGO! Entry found in the USED_list when trying to "
-                        "remove from the UNused_list.\n");
+            gossip_err("%s: BINGO! Entry found in the USED_list when trying to "
+                        "remove from the UNused_list.\n", __func__);
             gossip_err("\t\tused_list entry:\n");
             gossip_err("\t\t\t     handle:%llu\n",llu(tmp_entry->handle));
-            gossip_err("\t\t\t     ref-ct:%d \tfd:%d\n",tmp_entry->ref_ct,tmp_entry->fd);
-            gossip_err("\t\t\tremove-flag:%d\n",tmp_entry->remove_flag);
+            gossip_err("\t\t\t     ref-ct:%d\n", tmp_entry->ref_ct);
+            gossip_err("\t\t\t     fd:%d\n", tmp_entry->fd);
+            gossip_err("\t\t\t     remove-flag:%d\n", tmp_entry->remove_flag);
             switch(tmp_entry->type)
             {
                case DBPF_FD_BUFFERED_READ:
@@ -452,20 +499,30 @@ int dbpf_open_cache_remove(
                   break;
                }
             }/*end switch*/
-            gossip_err("\t\t\t  type:%s\n",open_type);
+            gossip_err("\t\t\t     type:%s\n",open_type);
 
             tmp_entry->remove_flag=1;
 
-            return (0);
+            gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                         "%s: returning -1\n", __func__);
+
+            gen_mutex_unlock(&cache_mutex);
+            return (-1);
 	    //assert(0);
 	}
     }
 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "%s: Checking Unused list\n", __func__);
     /* see if the item is in the unused list (ref_ct == 0) */    
     qlist_for_each_safe(tmp_link, scratch, &unused_list)
     {
-	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
-	    queue_link);
+	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	             "%s: search in unused list.\n", __func__);
+	tmp_entry = qlist_entry(tmp_link,
+                                struct open_cache_entry,
+	                        queue_link);
+
 	if ((tmp_entry->handle == handle) &&
              (tmp_entry->coll_id == coll_id))
         {
@@ -478,11 +535,12 @@ int dbpf_open_cache_remove(
     if (found)
     {
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	    "dbpf_open_cache_remove: unused entry.\n");
+	             "%s: found unused entry.\n", __func__);
         if (tmp_entry->remove_flag)
         {
-           gossip_err("DBPF_OPEN_CACHE_REMOVE: handle:%llu found in the UNused list with"
-                      " remove-flag turned on\n",llu(tmp_entry->handle));
+           gossip_err("DBPF_OPEN_CACHE_REMOVE: "
+                      "handle:%llu found in the UNused list with "
+                      "remove-flag turned on\n",llu(tmp_entry->handle));
         }
         tmp_entry->remove_flag = 0;
 	if (tmp_entry->fd > -1)
@@ -495,14 +553,21 @@ int dbpf_open_cache_remove(
     else
     {
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-	    "dbpf_open_cache_remove: uncached entry.\n");
+	             "%s: found uncached entry.\n", __func__);
     }
 
     tmp_error = 0;
 
-    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
-                              my_storage_p->data_path, coll_id, llu(handle));
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "%s: find bstram filename.\n", __func__);
+    DBPF_GET_BSTREAM_FILENAME(filename,
+                              PATH_MAX,
+                              my_storage_p->data_path,
+                              coll_id,
+                              llu(handle));
 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "%s: performing fast unlink\n", __func__);
     ret = fast_unlink(filename, coll_id, handle);
 
     if ((ret != 0) && (errno != ENOENT))
@@ -513,16 +578,15 @@ int dbpf_open_cache_remove(
     gen_mutex_unlock(&cache_mutex);
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                 "dbpf_open_cache_remove: returning %d\n", tmp_error);
+                 "%s: returning %d\n", __func__, tmp_error);
 
     return tmp_error;
 }
 
-static int open_fd(
-    int *fd, 
-    TROVE_coll_id coll_id,
-    TROVE_handle handle,
-    enum open_cache_open_type type)
+static int open_fd(int *fd, 
+                   TROVE_coll_id coll_id,
+                   TROVE_handle handle,
+                   enum open_cache_open_type type)
 {
     int flags = 0;
     int mode = 0;
@@ -596,8 +660,7 @@ inline static struct open_cache_entry * dbpf_open_cache_find_entry(
 
     qlist_for_each(tmp_link, list)
     {
-	tmp_entry = qlist_entry(
-            tmp_link, struct open_cache_entry, queue_link);
+	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry, queue_link);
         if((tmp_entry->handle == handle) &&
            (tmp_entry->coll_id == coll_id))
         {
@@ -612,7 +675,9 @@ inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     return NULL;
 }
 
-int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle)
+int fast_unlink(const char *pathname,
+                TROVE_coll_id coll_id,
+                TROVE_handle handle)
 {
     int ret;
     struct file_struct *tmp_item;
@@ -630,19 +695,22 @@ int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle
         free(tmp_item);
         return -TROVE_ENOMEM;
     }
-    DBPF_GET_STRANDED_BSTREAM_FILENAME(tmp_item->pathname, PATH_MAX,
+    DBPF_GET_STRANDED_BSTREAM_FILENAME(tmp_item->pathname,
+                                       PATH_MAX,
                                        my_storage_p->data_path, 
                                        coll_id,
                                        llu(handle));
     
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
-                 "Renaming [%s] to [%s] for threaded delete.\n", pathname, tmp_item->pathname);
+                 "Renaming [%s] to [%s] for threaded delete.\n",
+                 pathname, tmp_item->pathname);
 
     ret = rename(pathname, tmp_item->pathname);
     if(ret != 0)
     {
         gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
-            "Warning: During unlink, the rename failed on file [%s] with errno [%d] strerr [%s].\n", 
+            "Warning: During unlink, the rename failed on file [%s] "
+            "with errno [%d] strerr [%s].\n", 
             pathname, errno, strerror(errno));
         free(tmp_item->pathname);
         free(tmp_item);
@@ -652,9 +720,10 @@ int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle
     /* Add to the queue */
     pthread_mutex_lock(&dbpf_unlink_context.mutex); 
     qlist_add_tail(&tmp_item->list_link, &dbpf_unlink_context.global_list);
-    /* Moved gossip_debug BEFORE pthread_cond_signal; otherwise, tmp_item->pathname caused a seg fault 
+    /* Moved gossip_debug BEFORE pthread_cond_signal; otherwise,
+     * tmp_item->pathname caused a seg fault 
      * if the unlink signal processed BEFORE the debug statement.
-    */
+     */
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, 
         "Added [%s] to the queue.\n", tmp_item->pathname);
     pthread_cond_signal(&dbpf_unlink_context.data_available);
@@ -663,7 +732,11 @@ int fast_unlink(const char *pathname, TROVE_coll_id coll_id, TROVE_handle handle
     return(0);
 }
 
-static void* unlink_bstream(void *context)
+/* unlink_bstream is a thread that loops waiting for work
+ * in the global_list defined below. unlink_bstream is an
+ * infinite loop that does not halt unless forced to.
+ */
+static void *unlink_bstream(void *context)
 {
     struct unlink_context *loc_context = (struct unlink_context *) context;
     int ret;
@@ -677,7 +750,8 @@ static void* unlink_bstream(void *context)
         /* If there is no work to do, go into a condition wait */
         if(qlist_empty(&loc_context->global_list))
         {
-            pthread_cond_wait(&loc_context->data_available, &loc_context->mutex);
+            pthread_cond_wait(&loc_context->data_available,
+                              &loc_context->mutex);
         }
         
         if(!qlist_empty(&loc_context->global_list))
@@ -708,9 +782,8 @@ static void* unlink_bstream(void *context)
     return NULL;
 }
 
-static void close_fd(
-    int fd, 
-    enum open_cache_open_type type)
+static void close_fd(int fd, 
+                     enum open_cache_open_type type)
 {
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
         "dbpf_open_cache closing fd %d of type %d\n", fd, type);
@@ -725,8 +798,10 @@ void clear_stranded_bstreams(TROVE_coll_id coll_id)
     struct stat file_info;
     struct file_struct *tmp_item;
 
-    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX,
-                                      my_storage_p->data_path, coll_id);
+    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name,
+                                      PATH_MAX,
+                                      my_storage_p->data_path,
+                                      coll_id);
 
     /* remove entries in the stranded bstreams directory */
     current_dir = opendir(path_name);

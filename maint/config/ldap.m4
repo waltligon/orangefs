@@ -26,7 +26,7 @@
 AC_DEFUN([AX_LDAP],
 [
     AC_ARG_WITH([ldap],
-                AC_HELP_STRING([--with-ldap=DIR],
+                AS_HELP_STRING([--with-ldap=DIR],
                                [Location of OpenLDAP installation (for certificate-based security)]),
                 [ if test "$withval" = "no"; then
                       want_ldap="no"

@@ -54,7 +54,7 @@ machine pvfs2_mgmt_get_dirdata_handle_sm
 
 %%
 
-static int mgmt_get_dirdata_handle_from_parent(
+static PINT_sm_action mgmt_get_dirdata_handle_from_parent(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -120,7 +120,7 @@ static PINT_sm_action mgmt_get_dirdata_handle_cleanup(
 
 PINT_GET_OBJECT_REF_DEFINE(mgmt_get_dirdata_handle);
 
-static int perm_mgmt_get_dirdata_handle(PINT_server_op *s_op)
+static PINT_sm_action perm_mgmt_get_dirdata_handle(PINT_server_op *s_op)
 {
     int ret;
 

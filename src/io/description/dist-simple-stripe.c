@@ -16,23 +16,23 @@
 #include "pvfs2-internal.h"
 
 static PVFS_offset logical_to_physical_offset (void* params,
-                                               PINT_request_file_data* fd,
+                                               PINT_request_file_data *fd,
                                                PVFS_offset logical_offset)
 {
     PVFS_offset ret_offset = 0;
-    int full_stripes = 0;
+    PVFS_size full_stripes = 0;
     PVFS_size leftover = 0;
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    PVFS_simple_stripe_params *dparam = (PVFS_simple_stripe_params *)params;
     uint32_t server_nr = fd->server_nr;
     uint32_t server_ct = fd->server_ct;
     
     /* how many complete stripes are in there? */
-    full_stripes = logical_offset / (dparam->strip_size*server_ct);
+    full_stripes = logical_offset / (dparam->strip_size * server_ct);
     ret_offset += full_stripes * dparam->strip_size;
     
     /* do the leftovers fall within our region? */
     leftover = logical_offset - full_stripes * dparam->strip_size * server_ct;
-    if(leftover >= server_nr*dparam->strip_size)
+    if(leftover >= server_nr * dparam->strip_size)
     {
         /* if so, tack that on to the physical offset as well */
         if(leftover < (server_nr + 1) * dparam->strip_size)
@@ -44,7 +44,7 @@ static PVFS_offset logical_to_physical_offset (void* params,
 }
 
 static PVFS_size physical_to_logical_size(void * params,
-                                          PINT_request_file_data * fd,
+                                          PINT_request_file_data *fd,
                                           PVFS_size physical_size)
 {
     PVFS_simple_stripe_params * dparam = (PVFS_simple_stripe_params *)params;
@@ -79,11 +79,11 @@ static PVFS_size physical_to_logical_size(void * params,
            strips_mod;
 }
 
-static PVFS_offset physical_to_logical_offset (void* params,
-                                               PINT_request_file_data* fd,
+static PVFS_offset physical_to_logical_offset (void *params,
+                                               PINT_request_file_data *fd,
                                                PVFS_offset physical_offset)
 {
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    PVFS_simple_stripe_params *dparam = (PVFS_simple_stripe_params *)params;
     uint32_t server_nr = fd->server_nr;
     uint32_t server_ct = fd->server_ct;
     PVFS_size strips_div = physical_offset / dparam->strip_size;
@@ -94,14 +94,14 @@ static PVFS_offset physical_to_logical_offset (void* params,
            strips_mod;
 }
 
-static PVFS_offset next_mapped_offset (void* params,
-                                       PINT_request_file_data* fd,
+static PVFS_offset next_mapped_offset (void *params,
+                                       PINT_request_file_data *fd,
                                        PVFS_offset logical_offset)
 {
     PVFS_offset diff; /* distance of loff from beginning of strip in this stripe */
     PVFS_size   stripe_size; /* not to be confused with strip size */
     PVFS_offset server_starting_offset; /* offset of strip from start of stripe */
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    PVFS_simple_stripe_params *dparam = (PVFS_simple_stripe_params *)params;
     uint32_t server_nr = fd->server_nr;
     uint32_t server_ct = fd->server_ct;
 
@@ -120,15 +120,15 @@ static PVFS_offset next_mapped_offset (void* params,
             return logical_offset;
 }
 
-static PVFS_size contiguous_length(void* params,
-                                   PINT_request_file_data* fd,
+static PVFS_size contiguous_length(void *params,
+                                   PINT_request_file_data *fd,
                                    PVFS_offset physical_offset)
 {
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    PVFS_simple_stripe_params *dparam = (PVFS_simple_stripe_params*)params;
     return dparam->strip_size - (physical_offset % dparam->strip_size);
 }
 
-static PVFS_size logical_file_size(void* params,
+static PVFS_size logical_file_size(void *params,
                                    uint32_t server_ct,
                                    PVFS_size *psizes)
 {
@@ -159,19 +159,19 @@ static PVFS_size logical_file_size(void* params,
     return max;
 }  
 
-static void encode_lebf(char **pptr, void* params)
+static void encode_lebf(char **pptr, void *params)
 {
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params *)params;
     encode_PVFS_size(pptr, &dparam->strip_size);
 }
 
-static void decode_lebf(char **pptr, void* params)
+static void decode_lebf(char **pptr, void *params)
 {
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    PVFS_simple_stripe_params *dparam = (PVFS_simple_stripe_params *)params;
     decode_PVFS_size(pptr, &dparam->strip_size);
 }
 
-static void registration_init(void* params)
+static void registration_init(void *params)
 {
     PINT_dist_register_param(PVFS_DIST_SIMPLE_STRIPE_NAME, "strip_size",
                              PVFS_simple_stripe_params, strip_size);
@@ -186,7 +186,7 @@ static void unregister(void)
 static char *params_string(void *params)
 {
     char param_string[1024];
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    PVFS_simple_stripe_params *dparam = (PVFS_simple_stripe_params *)params;
 
     sprintf(param_string, "strip_size:%llu\n", llu(dparam->strip_size));
     return strdup(param_string);
@@ -196,9 +196,9 @@ static PVFS_simple_stripe_params simple_stripe_params = {
     PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE /* strip size */
 };
 
-static PVFS_size get_blksize(void* params, int dfile_count)
+static PVFS_size get_blksize(void *params, int dfile_count)
 {
-    PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    PVFS_simple_stripe_params *dparam = (PVFS_simple_stripe_params *)params;
     /* report the strip size as the block size */
     return(dparam->strip_size * dfile_count);
 }

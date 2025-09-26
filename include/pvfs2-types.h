@@ -974,17 +974,17 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error)        \
     int32_t positive = ((error > -1) ? 1 : 0);             \
     if (IS_PVFS_NON_ERRNO_ERROR((positive? error: -error)))\
     {                                                      \
-    mask = (PVFS_NON_ERRNO_ERROR_BIT | PVFS_ERROR_BIT |    \
-            PVFS_ERROR_CLASS_BITS);                        \
-    ret = PVFS_NON_ERRNO_ERROR_CODE(                       \
-          ((positive ? error : abs(error))) & ~mask);      \
+        mask = (PVFS_NON_ERRNO_ERROR_BIT | PVFS_ERROR_BIT |\
+                PVFS_ERROR_CLASS_BITS);                    \
+        ret = PVFS_NON_ERRNO_ERROR_CODE(                   \
+              ((positive ? error : abs(error))) & ~mask);  \
     }                                                      \
     else if (IS_PVFS_ERROR((positive? error: -error)))     \
     {                                                      \
-    mask = (PVFS_ERROR_BIT | PVFS_ERROR_CLASS_BITS);       \
-    ret = PINT_errno_mapping[                              \
-        PVFS_ERROR_CODE(((positive ? error :               \
-                             abs(error))) & ~mask)];       \
+        mask = (PVFS_ERROR_BIT | PVFS_ERROR_CLASS_BITS);   \
+        ret = PINT_errno_mapping[                          \
+            PVFS_ERROR_CODE(((positive ? error :           \
+                                 abs(error))) & ~mask)];   \
     }                                                      \
     return ret;                                            \
 }                                                          \

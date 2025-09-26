@@ -134,6 +134,7 @@ build_shared = @build_shared@
 build_static = @build_static@
 build_threaded = @build_threaded@
 build_usrint = @build_usrint@
+build_olib = @build_olib@
 build_symbolic = @build_symbolic@
 
 # Eliminate all default suffixes.  We want explicit control.
@@ -662,6 +663,11 @@ LIBRARIES_STATIC += lib/libofs.a lib/liborangefsposix.a
 LIBRARIES_SHARED += lib/libofs.so lib/liborangefsposix.so
 endif
 
+ifeq ($(build_olib),yes)
+LIBRARIES_STATIC += lib/liborangefs.a
+LIBRARIES_SHARED += lib/liborangefs.so
+endif
+
 ifneq ($(build_static),yes)
 LIBRARIES_STATIC := 
 LIBRARIES_THREADED_STATIC :=
@@ -691,6 +697,7 @@ all::
 
 # this is how we pull build information from all of the project
 #    subdirectories, make sure to catch top level module.mk as well
+include module.mk
 include $(patsubst %, %/module.mk, $(MODULES))
 
 ################################################################
@@ -1348,8 +1355,8 @@ cleaner: clean
 	rm -rf autom4te*.cache
 	rm -f pvfs2-config.h.in~
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
-	cp -p config.status config.save
-	rm -f config.log config.status config.cache 
+	if [ -e config.status ]; then cp -p config.status config.save; fi
+	rm -f config.log config.status config.cache
 	rm -f pvfs-@PVFS2_VERSION@.tar.gz
 
 # _really_ clean the tree; should go back to pristine state

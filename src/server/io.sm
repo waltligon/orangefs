@@ -89,7 +89,7 @@ machine pvfs2_io_sm
  *           send either positive or negative acknowledgements.
  *           
  */
-static int io_send_ack(
+static PINT_sm_action io_send_ack(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     gossip_debug(GOSSIP_MIRROR_DEBUG,"Executing io_send_ack (io.sm)....\n");
@@ -421,7 +421,7 @@ static PINT_sm_action io_send_completion_ack(
     return err;
 }
 
-static int perm_io(PINT_server_op *s_op)
+static PINT_sm_action perm_io(PINT_server_op *s_op)
 {
     int ret = -PVFS_EINVAL;
     int mask = 0;
