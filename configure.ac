@@ -996,7 +996,9 @@ test_for_epoll()
 {
   AC_CHECK_HEADERS(sys/epoll.h)
   AC_MSG_CHECKING(for epoll functions)
-  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/epoll.h>]], [[
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <sys/epoll.h>
+	#include <unistd.h>
+	]], [[
 	int fd;
 	fd = epoll_create(1);
 	close(fd);
@@ -1289,7 +1291,7 @@ AC_MSG_CHECKING(if dlfns needs explicit library request)
 AC_LINK_IFELSE([AC_LANG_SOURCE([
 #define _GNU_SOURCE 1
 #include <dlfcn.h>
-main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
+int main(void) {void *p = dlsym(RTLD_DEFAULT,"sym");}
 ])],[
     AC_MSG_RESULT(no)
 ],[
