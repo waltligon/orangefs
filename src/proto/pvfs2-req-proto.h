@@ -754,7 +754,7 @@ do {                                                        \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->handle_count, int32_t);     \
-        PVFS_debug_afield(treq->handles, &PVFS_handle);     \
+        PVFS_debug_afield(treq->handles, PVFS_handle);      \
         gossip_lsadebug("Batch Remove End:\n");             \
     }                                                       \
     gossip_end;                                             \
@@ -864,7 +864,7 @@ do {                                                        \
         gossip_lsadebug("Remove Request:\n");               \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(&treq->handle, PVFS_handle);       \
-        PVFS_debug_afield(treq->dirent_handle, PVFS_handle);\
+        PVFS_debug_afield(&treq->dirent_handle, PVFS_handle);\
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, &sid_array);     \
@@ -945,7 +945,7 @@ do {                                                        \
         PVFS_debug_afield(treq->attr, PVFS_object_attr);    \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
         PVFS_debug_afield(treq->handle_count, uint32_t);    \
-        PVFS_debug_afield(treq->handle_array, &PVFS_handle);\
+        PVFS_debug_afield(treq->handle_array, PVFS_handle);\
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, &sid_array);     \
         gossip_lsadebug("Tree setattr End:\n");             \
@@ -1058,7 +1058,7 @@ do {                                                        \
         DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
         PVFS_debug_afield(treq->handle_count, uint32_t);    \
-        PVFS_debug_afield(treq->handle_array, &PVFS_handle);\
+        PVFS_debug_afield(treq->handle_array, PVFS_handle);\
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, &sid_array);     \
         gossip_lsadebug("Tree Remove End:\n");              \
@@ -1166,7 +1166,7 @@ do {                                                        \
         PVFS_debug_afield(treq->credential, PVFS_credential);\
         DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
         PVFS_debug_afield(treq->num_data_files, uint32_t);  \
-        PVFS_debug_afield(treq->handle_array, &PVFS_handle);\
+        PVFS_debug_afield(treq->handle_array, PVFS_handle);\
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, &sid_array);     \
         gossip_lsadebug("Tree Get File Size End:\n");       \
@@ -1510,7 +1510,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Tree MGMT Get Dirdata Handle Request:\n");\
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(treq->handle, PVFS_handle);       \
+        PVFS_debug_afield(&treq->handle, PVFS_handle);       \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         gossip_lsadebug("Tree MGMT Get Dirdata Handle End:\n");\
     }                                                       \
@@ -1554,7 +1554,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("MGMT Get Dirdata Handle Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->handle, PVFS_handle);\
+        PVFS_debug_afield(&tresp->handle, PVFS_handle);\
         PVFS_debug_afield(tresp->sid_count, int32_t);    \
         PVFS_debug_afield(tresp->sid_array, PVFS_SID);    \
         gossip_lsadebug("MGMT Get Dirdata Handle End:\n");                   \
@@ -1592,7 +1592,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Flush Request:\n");                \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(treq->handle, PVFS_handle);       \
+        PVFS_debug_afield(&treq->handle, PVFS_handle);       \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->flags, int32_t);            \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
@@ -1738,7 +1738,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Unstuff Request:\n");              \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(treq->handle, PVFS_handle);       \
+        PVFS_debug_afield(&treq->handle, PVFS_handle);       \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->attrmask, uint64_t);        \
         DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
@@ -2404,7 +2404,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Rmdirent Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->entry_handle, PVFS_handle);\
+        PVFS_debug_afield(&tresp->entry_handle, PVFS_handle);\
         PVFS_debug_afield(tresp->sid_count, int32_t);    \
         PVFS_debug_afield(tresp->sid_array, PVFS_SID);    \
         gossip_lsadebug("Rmdirent End:\n");                   \
@@ -2456,9 +2456,9 @@ do {                                                        \
         gossip_lsadebug("Chdirent Request:\n");             \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(treq->entry, char);               \
-        PVFS_debug_afield(treq->directory_handle, PVFS_handle);\
-        PVFS_debug_afield(treq->new_dirent_handle, PVFS_handle);\
-        PVFS_debug_afield(treq->dirdata_handle, PVFS_handle);\
+        PVFS_debug_afield(&treq->directory_handle, PVFS_handle);\
+        PVFS_debug_afield(&treq->new_dirent_handle, PVFS_handle);\
+        PVFS_debug_afield(&treq->dirdata_handle, PVFS_handle);\
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, PVFS_SID);       \
@@ -2527,7 +2527,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Chdirent Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->old_dirent_handle, PVFS_handle);\
+        PVFS_debug_afield(&tresp->old_dirent_handle, PVFS_handle);\
         PVFS_debug_afield(tresp->sid_count, int32_t);    \
         PVFS_debug_afield(tresp->sid_array, PVFS_SID);    \
         gossip_lsadebug("Chdirent End:\n");                   \
@@ -2565,7 +2565,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Readdir Request:\n");              \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(treq->dirdata_handle, PVFS_handle);\
+        PVFS_debug_afield(&treq->dirdata_handle, PVFS_handle);\
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->token, uint64_t);   \
         PVFS_debug_afield(treq->dirent_count, uint32_t);    \
@@ -2710,7 +2710,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Mirror Request:\n");               \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(treq->src_handle, PVFS_handle);   \
+        PVFS_debug_afield(&treq->src_handle, PVFS_handle);   \
         PVFS_debug_afield(treq->dst_handle, PVFS_handle);   \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->dist, PINT_dist);           \
@@ -2789,7 +2789,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Mirror Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->src_handle, PVFS_handle);\
+        PVFS_debug_afield(&tresp->src_handle, PVFS_handle);\
         PVFS_debug_afield(tresp->src_server_nr, uint32_t);    \
         PVFS_debug_afield(tresp->bytes_written, uint32_t);    \
         PVFS_debug_afield(tresp->write_status_code, uint32_t);    \
@@ -2864,7 +2864,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Truncate Request:\n");             \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(treq->src_handle, PVFS_handle);   \
+        PVFS_debug_afield(&treq->src_handle, PVFS_handle);   \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->size, PVFS_size);           \
         PVFS_debug_afield(treq->flags, int32_t);            \
@@ -3015,7 +3015,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("IO Request:\n");                   \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(treq->src_handle, PVFS_handle);   \
+        PVFS_debug_afield(&treq->src_handle, PVFS_handle);   \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->io_type, PVFS_io_type);     \
         PVFS_debug_afield(treq->flow_type, PVFS_flowproto_type);\
@@ -3196,7 +3196,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Small IO Request:\n");             \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(treq->src_handle, PVFS_handle);   \
+        PVFS_debug_afield(&treq->src_handle, PVFS_handle);   \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->io_type, PVFS_io_type);     \
         PVFS_debug_afield(treq->server_nr, uint32_t);       \
@@ -3701,7 +3701,7 @@ do {                                                        \
 struct PVFS_servreq_mgmt_dspace_info_list
 {
     PVFS_fs_id fs_id;
-    PVFS_handle* handle_array;
+    PVFS_handle *handle_array;
     int32_t handle_count;
 };
 endecode_fields_1a_struct(
@@ -4463,7 +4463,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("MGMT Get Dirent Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->handle, PVFS_handle);\
+        PVFS_debug_afield(&tresp->handle, PVFS_handle);\
         PVFS_debug_afield(tresp->sid_count, int32_t);    \
         PVFS_debug_afield(tresp->sid_array, PVFS_SID);    \
         PVFS_debug_afield(tresp->error, PVFS_error);    \
@@ -4549,7 +4549,7 @@ do {                                                        \
         PVFS_debug_afield(treq->undo, int32_t);             \
         PVFS_debug_afield(treq->nentries, int32_t);         \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
-        PVFS_debug_afield(treq->dest_dirent_handle, PVFS_handle);\
+        PVFS_debug_afield(&treq->dest_dirent_handle, PVFS_handle);\
         PVFS_debug_afield(treq->dest_dirent_sids, PVFS_SID);\
         PVFS_debug_afield(treq->entry_handles, PVFS_handle);\
         PVFS_debug_afield(treq->entry_names, char);         \
