@@ -154,9 +154,6 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "s_op (%p) %s (prelude sm)\n", s_op,
                    PINT_map_server_op_to_string(s_op->req->op));
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                   "\tbase frame:%d\tframe count:%d\n",
-                   smcb->base_frame, smcb->frame_count);
 
     PINT_server_req_get_credential(s_op->req, &cred);
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "cred ptr (%p)\n", cred);
@@ -339,9 +336,18 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     PVFS_error error_code = 0;
     DECLARE_PROFILER(profiler);
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm)\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+    gossip_if(GOSSIP_SERVER_DEBUG)
+    {
+       gossip_lsadebug("Finish getattr_if_needed js_p %d\n",
+                       js_p->error_code);
+       gossip_lsadebug("s_op.attr objtype %d owner %d group %d\n",
+                       s_op->attr.objtype, s_op->attr.owner, s_op->attr.group);
+       gossip_lsadebug("s_op.ds_attr objtype %d owner %d group %d\n",
+                       s_op->ds_attr.type, s_op->ds_attr.uid, s_op->ds_attr.gid);
+       gossip_lsadebug("s_op (%p) %s (prelude sm)\n", s_op,
+                       PINT_map_server_op_to_string(s_op->req->op));
+    }
+    gossip_end;
 
     /* Profile validate operation */
     INIT_PROFILER(profiler);
@@ -538,6 +544,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     else
     {
         /* Translate the dspace attributes read from db into object attributes */
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "Translating attributes into s_op->attr\n");
         PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
         s_op->target_object_attr = &s_op->attr;
     }
@@ -766,9 +774,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     js_p->error_code = ret;
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (req=%d) (prelude sm) state: %s (status = %d)\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op),s_op->req->op,
-                 __func__, js_p->error_code);
+                   "s_op (%p) %s (req %d) (prelude sm) status %d\n",
+                   s_op, PINT_map_server_op_to_string(s_op->req->op),s_op->req->op,
+                   js_p->error_code);
 
 complete:
 

@@ -244,6 +244,11 @@ nested machine pvfs2_get_attr_with_prelude_sm
 
 nested machine pvfs2_get_attr_sm
 {
+    state debug
+    {
+        run getattr_debug;
+        default => work;
+    }
     state work
     {
         jump pvfs2_get_attr_with_prelude_sm;
@@ -322,6 +327,13 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
 } /* end getattr_datafile_getattr_comp_fn */
 
 /******************** ACTION FUNCTIONS *********************/
+static PINT_sm_action getattr_debug(struct PINT_smcb *smcb,
+                                    job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_debug_servreq_getattr(GOSSIP_GETATTR_DEBUG, s_op->req);
+    return SM_ACTION_COMPLETE;
+}
 
 /* getattr_verify_attribs()
  *
@@ -2806,6 +2818,11 @@ static PINT_sm_action getattr_setup_op(struct PINT_smcb *smcb,
     s_op->u.getattr.mirror_dfile_status_array = NULL;
 #endif
     /* DEBUG_attr_mask(s_op->req->u.getattr.attrmask); makes a lot of ouput */
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                   "handle %s fs_id %d attrmask %ld credential\n",
+                   PVFS_OID_str(&s_op->u.getattr.handle),
+                   s_op->u.getattr.fs_id,
+                   s_op->u.getattr.attrmask);
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;

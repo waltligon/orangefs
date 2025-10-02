@@ -426,8 +426,8 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
             PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_MSGPAIR_DEBUG, &(msg_p->req));
         }
 
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "&msg_p->req (%p) &msg_p->encoded_req (%p)\n",
-                       &(msg_p->req), &(msg_p->encoded_req));
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "&msg_p->req (%p) &msg_p->encoded_req (%p) msg_p->svr_addr %ld msg_p->enc_type %d\n",
+                       &(msg_p->req), &(msg_p->encoded_req), msg_p->svr_addr, msg_p->enc_type);
 
         ret = PINT_encode(&msg_p->req,
                           PINT_ENCODE_REQ,

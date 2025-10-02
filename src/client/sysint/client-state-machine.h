@@ -140,15 +140,32 @@ typedef struct PINT_sm_getattr_state
     
 } PINT_sm_getattr_state;
 
+#define PVFS_debug_getattr_state(mask, state)                     \
+do {                                                              \
+    gossip_if (mask)                                              \
+    {                                                             \
+        gossip_lsadebug("Getattr State:\n");                      \
+        gossip_lsadebug("state = (%p)\n", (state));               \
+        PVFS_debug_afield((state)->object_ref, PVFS_object_ref); \
+        PVFS_debug_afield((state)->req_attrmask, PVFS_object_attrmask); \
+        PVFS_debug_afield((state)->ref_type, uint32_t);           \
+        gossip_lsadebug("Getattr State End:\n");                  \
+    }                                                             \
+    gossip_end;                                                   \
+} while (0)
+
 #define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
-    do { \
-        PINT_free_object_attr(&(_state).attr); \
-        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-        (_state).object_ref = _objref; \
-        (_state).req_attrmask = _mask; \
-        (_state).ref_type = _reftype; \
-        (_state).flags = _flags; \
-        (_state).keep_size_array = 0; \
+    do {                                                        \
+        PINT_free_object_attr(&(_state).attr);                  \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state));    \
+        (_state).object_ref = _objref;                          \
+        (_state).req_attrmask = _mask;                          \
+        (_state).ref_type = _reftype;                           \
+        (_state).keep_size_array = 0;                           \
+        (_state).active_dirdata_index = NULL;                   \
+        (_state).size_array = NULL;                             \
+        (_state).size = 0;                                      \
+        (_state).flags = _flags;                                \
     } while(0)
 
 #define PINT_SM_GETATTR_STATE_CLEAR(_state) \

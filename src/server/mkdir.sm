@@ -136,6 +136,12 @@ nested machine pvfs2_mkdir_work_sm
 
 machine pvfs2_mkdir_sm
 {
+    state debug
+    {
+        run mkdir_debug;
+        default => prelude;
+    }
+
     state prelude
     {
         jump pvfs2_prelude_sm;
@@ -163,6 +169,13 @@ machine pvfs2_mkdir_sm
 }
 
 %%
+
+static PINT_sm_action mkdir_debug(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_debug_servreq_mkdir(GOSSIP_MKDIR_DEBUG, s_op->req);
+    return SM_ACTION_COMPLETE;
+}
 
 /*
  * Function: mkdir_prep_sm

@@ -145,6 +145,12 @@ nested machine pvfs2_crdirent_work_sm
 
 machine pvfs2_crdirent_sm
 {
+    state debug
+    {
+        run crdirent_debug;
+        default => work;
+    }
+
     state work
     {
         jump pvfs2_crdirent_work_sm;
@@ -165,6 +171,14 @@ machine pvfs2_crdirent_sm
 }
 
 %%
+
+static PINT_sm_action crdirent_debug(struct PINT_smcb *smcb,
+                                    job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_debug_servreq_crdirent(GOSSIP_MKDIR_DEBUG, s_op->req);
+    return SM_ACTION_COMPLETE;
+}
 
 static PINT_sm_action crdirent_init(struct PINT_smcb *smcb, job_status_s *js_p)
 {
