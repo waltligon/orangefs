@@ -604,10 +604,10 @@ do {                                                        \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(treq->object_type, PVFS_ds_type); \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
-        PVFS_debug_afield(treq->parent_oid, PVFS_handle);   \
+        PVFS_debug_afield(&treq->parent_oid, PVFS_handle);   \
         PVFS_debug_afield(treq->parent_sid, PVFS_SID);      \
         PVFS_debug_afield(treq->handle_count, uint32_t);    \
-        PVFS_debug_afield(treq->handle_array, &PVFS_handle);\
+        PVFS_debug_afield(treq->handle_array, PVFS_handle);\
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, &sid_array);     \
         gossip_lsadebug("Batch Create End:\n");             \
@@ -3015,7 +3015,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("IO Request:\n");                   \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(&treq->src_handle, PVFS_handle);   \
+        PVFS_debug_afield(&treq->handle, PVFS_handle);   \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->io_type, PVFS_io_type);     \
         PVFS_debug_afield(treq->flow_type, PVFS_flowproto_type);\
@@ -3196,7 +3196,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Small IO Request:\n");             \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(&treq->src_handle, PVFS_handle);   \
+        PVFS_debug_afield(&treq->handle, PVFS_handle);   \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->io_type, PVFS_io_type);     \
         PVFS_debug_afield(treq->server_nr, uint32_t);       \
@@ -3379,7 +3379,7 @@ do {                                                        \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->attrmask, PVFS_object_attrmask);\
         PVFS_debug_afield(treq->nhandles, uint32_t);        \
-        PVFS_debug_afield(&treq->handles, PVFS_handle);      \
+        PVFS_debug_afield(treq->handles, PVFS_handle);      \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, PVFS_SID);       \
         gossip_lsadebug("Listattr End:\n");                 \
