@@ -733,6 +733,8 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
 
     gossip_ldebug(GOSSIP_CLIENT_DEBUG, "++++++++++++++++++++ Beginning lookup comp_fn +++++++++++++++++\n");
 
+    PVFS_debug_servresp_lookup_path(GOSSIP_LOOKUP_DEBUG, resp_p);
+
     assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
 
     if (resp_p->status != 0)
@@ -946,6 +948,8 @@ static PINT_sm_action lookup_segment_setup_parent_getattr(
                                PVFS_TYPE_DIRECTORY,
                                0);
 
+    PVFS_debug_getattr_state(GOSSIP_LOOKUP_DEBUG, &sm_p->getattr);
+
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }
@@ -1003,8 +1007,14 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
                                   PVFS_ATTR_COMMON_ALL,
                                   sm_p->hints);
 
+    PVFS_debug_servreq_lookup_path(GOSSIP_LOOKUP_DEBUG, &msg_p->req);
+
+#if 0
     gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Looking up segment %s parent %s\n",
                  seg_to_lookup, PVFS_OID_str(&cur_seg->seg_starting_refn.handle));
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Looking up on meta server %s\n",
+                   PVFS_SID_str(&cur_seg->seg_starting_refn.sid_array[0]));
+#endif
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_READ;
@@ -1063,6 +1073,9 @@ static PINT_sm_action lookup_segment_verify_attr_present(
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
     assert(cur_seg);
 
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "cur_seg handle %s\n", 
+                   PVFS_OID_str(&cur_seg->seg_starting_refn.handle));
+
     /*
       NOTE: there are two cases here where we need to fetch the attrs.
 
@@ -1083,7 +1096,7 @@ static PINT_sm_action lookup_segment_verify_attr_present(
     {
         /* if we don't have the attr, direct sm to fetch the attr */
         gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "NO attrs for %s\n",
-                      cur_seg->seg_name);
+                       cur_seg->seg_name);
 
         PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,  
                                    cur_seg->seg_resolved_refn,
@@ -1092,12 +1105,14 @@ static PINT_sm_action lookup_segment_verify_attr_present(
                                    PVFS_TYPE_NONE,
                                    0);
 
+        PVFS_debug_getattr_state(GOSSIP_LOOKUP_DEBUG, &sm_p->getattr);
+
         js_p->error_code = 1; /* defaults to getattr */
     }
     else
     {
         gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "we have the attrs for %s\n",
-                     cur_seg->seg_name);
+                       cur_seg->seg_name);
 
         js_p->error_code = 0; /* success, continue to next state */
     }
@@ -1112,7 +1127,7 @@ static PINT_sm_action lookup_segment_check_attr_type(struct PINT_smcb *smcb,
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
     gossip_lsdebug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
-                 "lookup state: lookup_segment_check_attr_type\n");
+                   "sm_p (%p)\n", sm_p);
 
     cur_seg = GET_CURRENT_SEGMENT(sm_p);
     assert(cur_seg);

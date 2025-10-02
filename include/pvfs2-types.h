@@ -1603,28 +1603,31 @@ typedef PVFS_credential PVFS_credentials;
 #define DEBUG_PVFS_CREDENTIAL(mask,cred) \
 do { \
     gossip_if(mask) \
-    { \
-        if (cred) { \
-            gossip_ladebug("DEBUG_PVFS_CREDENTIAL\n"); \
-            gossip_ladebug("userid:       %d\n", (cred)->userid); \
-            gossip_ladebug("num_groups:   %d\n", (cred)->num_groups);   \
-            gossip_ladebug("group_array (%p):\n", (cred)->group_array);  \
-            if((cred)->num_groups > 0 && (cred)->group_array) { \
-                int g; \
-                for(g = 0; g < (cred)->num_groups; g++) { \
-                    gossip_ladebug("    group %d\n", (cred)->group_array[g]); \
-                } \
-            }  \
-            if((cred)->issuer) { \
-                gossip_ladebug("issuer:  %s\n", (cred)->issuer); \
-            } \
-            gossip_ladebug("sig_size:     %d\n", (cred)->sig_size);  \
-            gossip_ladebug("DEBUG_PVFS_CREDENTIAL End\n"); \
-        } else { \
-            gossip_ladebug("Credential pointer is NULL\n"); \
-        } \
-    } \
+        PVFS_debug_credential(cred); \
     gossip_end; \
+} while (0)
+
+#define PVFS_debug_credential(cred) \
+do { \
+    if (cred) { \
+        gossip_ladebug("PVFS_debug_credential\n"); \
+        gossip_ladebug("userid:       %d\n", (cred)->userid); \
+        gossip_ladebug("num_groups:   %d\n", (cred)->num_groups);   \
+        gossip_ladebug("group_array (%p):\n", (cred)->group_array);  \
+        if((cred)->num_groups > 0 && (cred)->group_array) { \
+            int g; \
+            for(g = 0; g < (cred)->num_groups; g++) { \
+                gossip_ladebug("    group %d\n", (cred)->group_array[g]); \
+            } \
+        }  \
+        if((cred)->issuer) { \
+                gossip_ladebug("issuer:  %s\n", (cred)->issuer); \
+        } \
+        gossip_ladebug("sig_size:     %d\n", (cred)->sig_size);  \
+        gossip_ladebug("PVFS_debug_credential End\n"); \
+    } else { \
+        gossip_ladebug("Credential pointer is NULL\n"); \
+    } \
 } while(0)
 
 #define COPY_PVFS_CREDENTIAL(dst,src) \

@@ -152,6 +152,11 @@ machine pvfs2_set_attr_with_prelude_sm
 /* normal SM for setattr called for a request */
 machine pvfs2_set_attr_sm
 {
+    state debug
+    {
+        run setattr_debug;
+        default => work;
+    }
     state work
     {
         jump pvfs2_set_attr_with_prelude_sm;
@@ -172,6 +177,14 @@ machine pvfs2_set_attr_sm
 }
 
 %%
+
+static PINT_sm_action setattr_debug(struct PINT_smcb *smcb,
+                                    job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_debug_servreq_setattr(GOSSIP_SETATTR_DEBUG, s_op->req);
+    return SM_ACTION_COMPLETE;
+}
 
 /*
  */

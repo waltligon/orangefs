@@ -323,7 +323,7 @@ static inline int DBG_TRUE(PVFS_debug_mask mask)
 
 #define PVFS_to_string_PVFS_credential(cred, string) \
 do { \
-    /*sprintf(string, "(%p)", (cred));*/ \
+    PVFS_debug_credential(cred); \
 } while (0)
 
 #define PVFS_to_string_ptr(ptr, string) \
@@ -341,6 +341,16 @@ do { \
     PVFS_OID_bin2str(handle, string); \
 } while (0)
 
+#define PVFS_to_string_int64_t(longint, string) \
+do { \
+    sprintf(string, "%ld", (longint)); \
+} while (0)
+
+#define PVFS_to_string_uint64_t(longuint, string) \
+do { \
+    sprintf(string, "%lu", (longuint)); \
+} while (0)
+
 #define PVFS_to_string_int32_t(integer, string) \
 do { \
     sprintf(string, "%d", (integer)); \
@@ -349,6 +359,11 @@ do { \
 #define PVFS_to_string_uint32_t(integer, string) \
 do { \
     sprintf(string, "%u", (integer)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_OID(oid, string) \
+do { \
+    PVFS_OID_bin2str(oid, string); \
 } while (0)
 
 #define PVFS_to_string_PVFS_SID(sid, string) \
@@ -363,12 +378,17 @@ do { \
 
 #define PVFS_to_string_PVFS_object_ref(ref, string) \
 do { \
-    /*PVFS_debug_object_ref(ref);*/ \
-    strcpy(string, ""); \
+    PVFS_OID_bin2str(&((ref).handle), string); \
 } while (0)
 
 #define PVFS_to_string_PVFS_object_attr(ref, string) \
 do { \
+    string[0] = 0; \
+} while (0)
+
+#define PVFS_to_string_PVFS_object_attrmask(mask, string) \
+do { \
+    string[0] = 0; \
 } while (0)
 
 #define PVFS_debug_afield(field, type) \

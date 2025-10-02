@@ -253,9 +253,13 @@ static PINT_sm_action final_response_cleanup(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
 
+    if (s_op->req && s_op->req->op)
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
                  "s_op (%p) %s (FR sm) state cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
+    else
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
+                 "s_op (%p) (FR sm) state cleanup\n", s_op);
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
     PINT_ACCESS_DEBUG(s_op,

@@ -41,6 +41,12 @@
 
 machine pvfs2_mgmt_get_dirent_sm
 {
+    state debug
+    {
+        run get_dirent_debug;
+        default => prelude;
+    }
+
     state prelude
     {
         jump pvfs2_prelude_sm;
@@ -93,6 +99,14 @@ machine pvfs2_mgmt_get_dirent_sm
 }
 
 %%
+
+static PINT_sm_action get_dirent_debug(struct PINT_smcb *smcb,
+                                       job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_debug_servreq_mgmt_get_dirent(GOSSIP_SERVER_DEBUG, s_op->req);
+    return SM_ACTION_COMPLETE;
+}
 
 #if 0
 static PINT_sm_action mgmt_get_dirent_get_dist_dir_attr(

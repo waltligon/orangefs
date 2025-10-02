@@ -130,6 +130,50 @@ typedef struct PINT_sm_msgpair_state_s
 
 } PINT_sm_msgpair_state;
 
+#define PVFS_debug_msgpair_state(mask, state) \
+do {                                       \
+    gossip_if(mask)                                       \
+    {                                       \
+        gossip_lsadebug("MsgPair Op:\n");          \
+        gossip_lsadebug("state = (%p)\n", (state));             \
+        PVFS_debug_afield((state)->msgclass, int);           \
+        PVFS_debug_afield((state)->msgdir, int);           \
+        PVFS_debug_afield((state)->server_nr, int);           \
+        PVFS_debug_afield((state)->fs_id, int);           \
+        PVFS_debug_afield((state)->handle, PVFS_handle);           \
+        PVFS_debug_afield((state)->retry_flag, int);           \
+        PVFS_debug_afield((state)->retry_count, int);           \
+        PVFS_debug_afield((state)->comp_fn, pointer);           \
+        PVFS_debug_afield((state)->svr_addr, int);           \
+        PVFS_debug_afield((state)->sid_count, int);           \
+        PVFS_debug_afield((state)->sid_index, int);           \
+        PVFS_debug_afield((state)->sid_array, pointer);           \
+        PVFS_debug_afield((state)->session_tag, int);           \
+        PVFS_debug_afield((state)->req, pointer);           \
+        PVFS_debug_afield((state)->encoded_req, pointer);           \
+        PVFS_debug_afield((state)->enc_type, int);           \
+        PVFS_debug_afield((state)->max_resp_sz, int);           \
+        PVFS_debug_afield((state)->encoded_resp_p, pointer);           \
+        PVFS_debug_afield((state)->job_id, int);           \
+        PVFS_debug_afield((state)->send_id, int);           \
+        PVFS_debug_afield((state)->recv_id, int);           \
+        PVFS_debug_afield((state)->flow_id, int);           \
+        PVFS_debug_afield((state)->ack_id, int);           \
+        PVFS_debug_afield((state)->job_status_s, int);           \
+        PVFS_debug_afield((state)->send_status, int);           \
+        PVFS_debug_afield((state)->recv_status, int);           \
+        PVFS_debug_afield((state)->flow_status, int);           \
+        PVFS_debug_afield((state)->ack_status, int);           \
+        PVFS_debug_afield((state)->flow_desc, int);           \
+        PVFS_debug_afield((state)->op_status, int);           \
+        PVFS_debug_afield((state)->op_action, int);           \
+        PVFS_debug_afield((state)->complete, int);           \
+        PVFS_debug_afield((state)->dfile_size, int);           \
+        PVFS_debug_afield(gossip_lsadebug("MsgPair Op End:\n");          \
+    }           \
+    gossip_end;           \
+} while (0)
+
 /* used to pass in parameters that apply to every entry in a msgpair array */
 typedef struct PINT_sm_msgpair_params
 {   
