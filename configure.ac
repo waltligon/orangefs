@@ -1289,7 +1289,7 @@ AC_MSG_CHECKING(if dlfns needs explicit library request)
 AC_LINK_IFELSE([AC_LANG_SOURCE([
 #define _GNU_SOURCE 1
 #include <dlfcn.h>
-main() {void *p = dlsym(RTLD_DEFAULT,"sym");}
+int main(void) {void *p = dlsym(RTLD_DEFAULT,"sym");}
 ])],[
     AC_MSG_RESULT(no)
 ],[
