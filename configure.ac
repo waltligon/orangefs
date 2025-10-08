@@ -1579,6 +1579,16 @@ dnl
 dnl Configure bmi_ib, if --with-ib or a variant given.
 dnl
 AX_IB
+AC_ARG_ENABLE([ib-exp],
+  [AS_HELP_STRING([--enable-ib-exp], [Use experimental IB module instead of standard [default=no]])],
+  [],
+  [enable_ib_exp=no])
+
+if test "x$enable_ib_exp" = xyes; then
+  IB_MODULE_MK="src/io/bmi/bmi_ib_exp/module.mk"
+else
+  IB_MODULE_MK="src/io/bmi/bmi_ib/module.mk"
+fi
 
 dnl
 dnl Configure bmi_rdma, if --with-rdma or a variant given.
@@ -1906,8 +1916,7 @@ src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
 src/io/bmi/bmi_mx/module.mk
-src/io/bmi/bmi_ib/module.mk
-src/io/bmi/bmi_ib_exp/module.mk
+$IB_MODULE_MK
 src/io/bmi/bmi_rdma/module.mk
 src/io/bmi/bmi_portals/module.mk
 src/io/bmi/bmi_zoid/module.mk

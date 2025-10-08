@@ -3048,7 +3048,7 @@ static int BMI_ib_finalize(void)
     return 0;
 }
 
-const struct bmi_method_ops bmi_ib_exp_ops =
+const struct bmi_method_ops bmi_ib_ops =
 {
     .method_name = "bmi_ib_exp",
     .flags = 0,
