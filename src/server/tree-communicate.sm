@@ -892,8 +892,8 @@ static PINT_sm_action tree_communicate_partition_handles(
                               s_op, s_op->op, &msg_p->req, msg_p->req.op);
 
                 PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &msg_p->req);
-                PINT_debug_capability(&capability, "from dirent request");
-                DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG, &(s_op->req->u.tree_get_dirent_count.credential));       
+                PVFS_debug_PVFS_capability(GOSSIP_SERVER_DEBUG, &capability);
+                PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG, &(s_op->req->u.tree_get_dirent_count.credential));       
 
                 msg_p->comp_fn = tree_get_dirent_count_comp_fn;
                 msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;

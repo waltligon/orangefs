@@ -330,7 +330,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                    s_op->addr, s_op->tag, s_op);
 
     PINT_server_req_get_credential(s_op->req, &cred);
-    DEBUG_PVFS_CREDENTIAL(GOSSIP_UNEXP_DEBUG, cred);
+    PVFS_debug_PVFS_credential(GOSSIP_UNEXP_DEBUG, cred);
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG,
                    "s_op (%p) s_op->req (%p) smcb->op %d s_op->op %d s_op->req->op %d\n",
                    s_op, s_op->req, smcb->op, s_op->op, s_op->req->op);

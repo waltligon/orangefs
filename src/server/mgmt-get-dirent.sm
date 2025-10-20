@@ -338,7 +338,7 @@ static int mgmt_get_dirent(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->val.buffer_sz = OSASZ(1, s_op->metasidcnt);
     
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "  reading dirent handle (coll_id = %d, handle = %s\n\t"
+                 "  reading dirent handle (fs_id = %d, handle = %s\n\t"
                  "key = %s (%d), val_buf = %p (%d))\n",
                  s_op->req->u.mgmt_get_dirent.fs_id,
                  PVFS_OID_str(&s_op->req->u.mgmt_get_dirent.handle),
@@ -375,17 +375,17 @@ static PINT_sm_action mgmt_get_dirent_setup_resp(struct PINT_smcb *smcb,
                 (PVFS_SID *) &(s_op->u.mgmt_get_dirent.keyval_temp_store[1]);
         s_op->resp.u.mgmt_get_dirent.sid_count = s_op->metasidcnt;
 
-        gossip_debug(GOSSIP_SERVER_DEBUG, "  Found dirent handle %s\n",
-                     PVFS_OID_str(&s_op->resp.u.mgmt_get_dirent.handle));
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Found dirent handle %s\n",
+                       PVFS_OID_str(&s_op->resp.u.mgmt_get_dirent.handle));
         if (s_op->resp.u.mgmt_get_dirent.sid_array)
         {
-            gossip_debug(GOSSIP_LOOKUP_DEBUG, "  Found %d SIDs [0] = %s\n",
-                         s_op->resp.u.mgmt_get_dirent.sid_count,
-                         PVFS_SID_str(&s_op->resp.u.mgmt_get_dirent.sid_array[0]));
+            gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Found %d SIDs [0] = %s\n",
+                           s_op->resp.u.mgmt_get_dirent.sid_count,
+                           PVFS_SID_str(&s_op->resp.u.mgmt_get_dirent.sid_array[0]));
         }
         else
         {
-            gossip_debug(GOSSIP_LOOKUP_DEBUG, "  Found NO SIDs\n");
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "Found NO SIDs\n");
         }
     }
     else

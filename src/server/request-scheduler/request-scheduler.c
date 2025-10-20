@@ -358,8 +358,6 @@ int PINT_req_sched_post(enum PVFS_server_op op,
     struct qlist_head *iterator;
     int tmp_flag;
 
-
-
     if(sched_policy == PINT_SERVER_REQ_BYPASS)
     {
         if(access_type == PINT_SERVER_REQ_MODIFY && !PVFS_SERV_IS_MGMT_OP(op))
@@ -555,17 +553,15 @@ int PINT_req_sched_post(enum PVFS_server_op op,
     tmp_element->list_head = tmp_list;
     qlist_add_tail(&(tmp_element->list_link), &(tmp_list->req_list));
 
-    gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
-		 "POSTING, handle: %s, queue_element: (%p)\n",
-                 PVFS_OID_str(&handle),
-                 tmp_element);
+    gossip_ldebug(GOSSIP_REQ_SCHED_DEBUG,
+                  "POSTING, handle: %s, queue_element: (%p)\n",
+                  PVFS_OID_str(&handle), tmp_element);
 
     if (ret == 1)
     {
 	gossip_ldebug(GOSSIP_REQ_SCHED_DEBUG, "SCHEDULING, "
                       "handle: %s, queue_element: (%p)\n",
-	 	     PVFS_OID_str(&handle),
-                      tmp_element);
+	 	      PVFS_OID_str(&handle), tmp_element);
     }
     gossip_ldebug(GOSSIP_SERVER_DEBUG, "Posting %ld\n", *out_id);
     sched_count++;

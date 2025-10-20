@@ -19,6 +19,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-server.h"
 #include "state-machine.h"
+#include "pvfs2-req-proto.h"
 #include "job.h"
 #include "pvfs2-attr.h"
 #include "gossip.h"
@@ -36,6 +37,9 @@
 static int lookup_get_dirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
+static int read_remote_metadata_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
+
 enum 
 {
     LOOKUP_LOCAL_METAFILE_KEYVALS = 21,
@@ -45,7 +49,8 @@ enum
     LOOKUP_CHECK_PERMS            = 25,
     LOCAL_DIRENT                  = 26,
     REMOTE_DIRENT                 = 27,
-    REMOTE_SEGMENT                = 28
+    LOCAL_SEGMENT                 = 28,
+    REMOTE_SEGMENT                = 29
 };
 
 %%
@@ -113,7 +118,9 @@ machine pvfs2_lookup_sm
     state read_object_metadata
     {
         run lookup_read_object_metadata;
-        success => initiate_read_object_metadata;
+        LOCAL_SEGMENT => initiate_read_object_metadata;
+        REMOTE_SEGMENT => setup_remote_metadata_request;
+        /* success => initiate_read_object_metadata; */
         default => setup_resp;
     }
 
@@ -121,6 +128,18 @@ machine pvfs2_lookup_sm
     {
         /* jump pvfs2_get_attr_work_sm; */
         jump pvfs2_get_attr_with_prelude_sm;
+        default => verify_object_metadata;
+    }
+
+    state setup_remote_metadata_request
+    {
+        run remote_metadata_request;
+        default => initiate_remote_request;
+    }
+
+    state initiate_remote_request
+    {
+        jump pvfs2_msgpairarray_sm;
         default => verify_object_metadata;
     }
 
@@ -847,8 +866,9 @@ static int lookup_get_dirent_comp_fn(void *v_p,
 
         s_op->u.lookup.temp_dirent_sid_count = resp_p->u.mgmt_get_dirent.sid_count;
 
-        gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                     "lookup_get_dirent_comp_fn: got dirent.handle %s dirent.sid_array %s\n",
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                     "Got dirent.handle %s\n"
+                     "Got dirent.sid_array %s\n",
                      PVFS_OID_str(&resp_p->u.mgmt_get_dirent.handle),
                      PVFS_SID_str(&resp_p->u.mgmt_get_dirent.sid_array[0]));
     }
@@ -873,7 +893,7 @@ static PINT_sm_action lookup_read_object_metadata(
                                     job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *getattr_op;
+    /*struct PINT_server_op *getattr_op;*/
     int ret = -PVFS_EINVAL;
     /* job_id_t j_id; */
     PVFS_handle handle = PVFS_HANDLE_NULL;
@@ -909,10 +929,13 @@ static PINT_sm_action lookup_read_object_metadata(
     start_index = ((s_op->u.lookup.array_index) * (s_op->metasidcnt));
     end_index   = start_index + s_op->metasidcnt;
     gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
-                   "start_index %d  end_index %d  lookup_path.sid_count %d \n"
-                   , start_index ,end_index
-                   ,s_op->resp.u.lookup_path.sid_count); /* this is 0 - should not be */
+                   "start_index %d  end_index %d  lookup_path.sid_count %d \n",
+                   start_index, end_index,
+                   s_op->resp.u.lookup_path.sid_count); /* this is 0 - should not be */
  
+    /* This is hard coded to 1 - I assume position 0 is an OID?  not sure
+     * what's up with this, needs to be much clearer
+     */
     gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "sid[0] = %s\n", 
                    PVFS_SID_str(&s_op->u.lookup.temp_dirent_store[1].sid));
 
@@ -936,6 +959,7 @@ static PINT_sm_action lookup_read_object_metadata(
         if (PINT_cached_config_server_local(
                                 &(s_op->u.lookup.temp_dirent_store[j].sid)))
         {
+            s_op->u.lookup.handle_ct = 1;
             /* this object is on this server */
             gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Local Segment s_op->lookup.handle_ct = %u\n",
                            s_op->u.lookup.handle_ct);
@@ -968,30 +992,86 @@ static PINT_sm_action lookup_read_object_metadata(
 
     /* get the dspace attributes for this object - WBL why?
      * (could be a directory or a metafile) should we cal SM? */
-#if 0
     ret = job_trove_dspace_getattr(s_op->req->u.lookup_path.fs_id,
                                    handle,
                                    smcb,
-                                   ds_attr,
+                                   &s_op->ds_attr,
                                    0,
                                    js_p,
-                                   &j_id,
+                                   &(s_op->u.lookup.j_id),
                                    server_job_context,
                                    s_op->req->hints);
-#endif
-/*********** BEGIN New code ************/
-    /* getattr_op is an s_op we are going to push for the
-     * getattr operation.  Does it get the right values?
+
+    js_p->error_code = LOCAL_SEGMENT;
+    return ret; /* complete or deferred */
+}
+
+static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PINT_sm_msgarray_op *getattr_op;
+    PINT_sm_msgpair_state *msg_p;
+    int ret = -PVFS_EINVAL;
+    /* job_id_t j_id; */
+    /* PVFS_handle handle = PVFS_HANDLE_NULL; */
+    PVFS_capability temp_cap;
+    /* PVFS_ds_attributes *ds_attr = NULL; */
+
+    /* not an s_op, but a mop that needs to be setup for MPA
+     * Including a request for the getattr.  The mop will
+     * hold the SIDs, etc.
      */
     js_p->error_code = 0;
 
-    getattr_op = calloc(1,sizeof(*getattr_op));
-    if (!getattr_op)
+    getattr_op = &s_op->msgarray_op;
+    PINT_msgpair_init(getattr_op);
+    getattr_op->count = 1;
+    getattr_op->index = 0;
+
+    getattr_op->total_size = 0;  /* for now */
+    msg_p = &getattr_op->msgpair;
+
+    PINT_server_to_server_capability(&temp_cap,
+                                     s_op->req->u.lookup_path.fs_id,
+                                     1,
+                                     &s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.array_index]);
+
+    PINT_SERVREQ_GETATTR_FILL((getattr_op->msgpair.req),
+                              PVFS_REQ_OTHER,
+                              temp_cap,
+                              s_op->req->u.lookup_path.credential,
+                              s_op->req->u.lookup_path.fs_id,
+                              s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.array_index],
+                              PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | PVFS_ATTR_CAPABILITY,
+                              NULL);
+
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_READ;
+    msg_p->fs_id = s_op->req->u.lookup_path.fs_id;
+    msg_p->handle = s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.array_index];
+    msg_p->sid_count = s_op->resp.u.lookup_path.sid_count; /* ??? */
+    msg_p->sid_index = 0;
+    msg_p->sid_array = &(s_op->u.lookup.temp_dirent_store[1].sid);
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = read_remote_metadata_comp_fn;
+
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
+    if (ret)
     {
-        js_p->error_code = -PVFS_ENOMEM;
+        gossip_lerr("Failed to map meta server address\n");
+        js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
     }
 
+    PVFS_debug_servreq_getattr(GOSSIP_LOOKUP_DEBUG, &getattr_op->msgpair.req);
+    PVFS_debug_msgpair_state(GOSSIP_LOOKUP_DEBUG, msg_p);
+
+    PINT_sm_push_frame(smcb, 0, getattr_op);
+    return SM_ACTION_COMPLETE;
+
+
+#if 0
     /*This seems to copy the attr on front of array to the getattr
      * Why?  As far as I know getattr doesn't use this and will only
      * overwrite it.  We will let getattr place results in the standard place
@@ -1001,11 +1081,16 @@ static PINT_sm_action lookup_read_object_metadata(
     getattr_op->attr = s_op->resp.u.lookup_path.attr_array[
                                                s_op->u.lookup.array_index];
 
-    getattr_op->req = s_op->req;
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->req (%p) getattr_op->req (%p)\n",
+                   s_op->req, getattr_op->req);
 
+    memcpy(getattr_op->req, s_op->req, sizeof(*s_op->req));
+    getattr_op->req->op = PVFS_SERV_GETATTR; /* this will be a getattr subreq */
+                                     
     getattr_op->u.getattr.fs_id      = s_op->req->u.lookup_path.fs_id;
     getattr_op->u.getattr.handle     = s_op->resp.u.lookup_path.handle_array[
                                                     s_op->u.lookup.array_index ];
+
     getattr_op->u.getattr.attrmask   = PVFS_ATTR_META_DIST          |
                                        PVFS_ATTR_META_DFILES        |
                                        PVFS_ATTR_META_MIRROR_MODE   |
@@ -1013,8 +1098,23 @@ static PINT_sm_action lookup_read_object_metadata(
 
     getattr_op->u.getattr.credential = s_op->req->u.lookup_path.credential;
 
+    /* setup for prelude - not here but in the request */
+
+    getattr_op->req->u.getattr.handle = getattr_op->u.getattr.handle;
+    getattr_op->req->u.getattr.fs_id = getattr_op->u.getattr.fs_id;
+    getattr_op->req->u.getattr.credential = getattr_op->u.getattr.credential;
+    PINT_server_to_server_capability(&getattr_op->req->capability,
+                                     getattr_op->u.getattr.fs_id,
+                                     1,
+                                     &getattr_op->u.getattr.handle);
+#if 0
+    getattr_op->target_sid_array = &(s_op->u.lookup.temp_dirent_store[j].sid);
+    getattr_op->target_object_attr = &getattr_op->attr;
+#endif
+
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "getattr_op.handle %s\n getattr_op.fsid %d\n",
-                   PVFS_OID_str(&(getattr_op->u.getattr.handle)), getattr_op->u.getattr.fs_id);
+                   PVFS_OID_str(&(getattr_op->req->u.getattr.handle)),
+                   getattr_op->req->u.getattr.fs_id);
 
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
     js_p->error_code = ret;
@@ -1022,6 +1122,7 @@ static PINT_sm_action lookup_read_object_metadata(
     if ( ret < 0 )
     {
         gossip_err("Error pushing getattr frame onto lookup stack:ret %d \n", ret);
+        free(getattr_op->req);
         free(getattr_op);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
@@ -1031,7 +1132,13 @@ static PINT_sm_action lookup_read_object_metadata(
     return SM_ACTION_COMPLETE;
 /************** END of new code ***************/
 
-/*    return ret; */
+    return ret;
+#endif
+}
+
+static int read_remote_metadata_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
+{
+    return 0;
 }
 
 /*
@@ -1558,12 +1665,12 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
      * continue with the path (attr) lookup.  otherwise, we're returning 
      * N handles, N*metasidcnt, and  N attrs.
      */
-    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Begin: s_op (%p) s_op->decoded.enc_type %d\n",
-                   s_op, s_op->decoded.enc_type);
-    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op->lookup.handle_ct %u\n",
-                   s_op->u.lookup.handle_ct);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "Begin: s_op (%p) s_op->lookup.handle_ct %u s_op->decoded.enc_type %d\n",
+                   s_op, s_op->u.lookup.handle_ct, s_op->decoded.enc_type);
     s_op->resp.u.lookup_path.handle_count = s_op->u.lookup.handle_ct;
     s_op->resp.u.lookup_path.attr_count   = s_op->u.lookup.attr_ct;
+    s_op->resp.op = s_op->req->op;
 
     if (s_op->resp.u.lookup_path.handle_count ||
         s_op->resp.u.lookup_path.attr_count)
@@ -1580,11 +1687,11 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
         js_p->error_code = -PVFS_ENOENT;
     }
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "sending '%s' response with %u handle(s) and %u attr(s)\n",
-                 (js_p->error_code ? "error" : "success"),
-                 s_op->resp.u.lookup_path.handle_count,
-                 s_op->resp.u.lookup_path.attr_count);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "sending '%s' response with %u handle(s) and %u attr(s)\n",
+                   (js_p->error_code ? "error" : "success"),
+                   s_op->resp.u.lookup_path.handle_count,
+                   s_op->resp.u.lookup_path.attr_count);
 
     /* end timer */
     PINT_perf_timer_end(PINT_server_tpc, PINT_PERF_TLOOKUP, &s_op->start_time);
@@ -1610,21 +1717,7 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
             s_op->req->u.lookup_path.path);
     }
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG
-                 ,"%s:\n\t\tPVFS_servresp_lookup_path (all in s_op->resp.u.lookup_path)\n"
-                  "\t\thandle_count=%u\n"
-                  "\t\thandle=%s\n"
-                  "\t\tattr_count=%u\n"
-                  "\t\tattr_array=%p\n"
-                  "\t\tsid_count=%d\n"
-                 ,__func__
-                 ,s_op->resp.u.lookup_path.handle_count
-                 ,s_op->resp.u.lookup_path.handle_count > 0 ?
-                      PVFS_OID_str(&s_op->resp.u.lookup_path.handle_array[0]) :
-                      "none"
-                 ,s_op->resp.u.lookup_path.attr_count
-                 ,s_op->resp.u.lookup_path.attr_array
-                 ,s_op->resp.u.lookup_path.sid_count);
+    PVFS_debug_servresp_lookup_path(GOSSIP_LOOKUP_DEBUG, &s_op->resp);
 
     int i;
     for (i = 0; i < s_op->resp.u.lookup_path.sid_count; i++)

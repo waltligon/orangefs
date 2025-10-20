@@ -552,8 +552,8 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
         return -PVFS_ENOMEM;
     }
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "Generating server-to-server "
-                 "capability...\n");
+    gossip_debug(GOSSIP_SECURITY_DEBUG,
+                 "Generating server-to-server capability...\n");
     capability->issuer = (char *) malloc(strlen(config->server_alias) + 3);
     if (capability->issuer == NULL)
     {
@@ -570,7 +570,7 @@ int PINT_server_to_server_capability(PVFS_capability *capability,
     capability->num_handles = num_handles;
     capability->handle_array = handle_array;
 
-    ret = PINT_sign_capability(capability,NULL);
+    ret = PINT_sign_capability(capability, NULL);
     if (ret < 0)
     {
         PINT_cleanup_capability(capability);
@@ -623,7 +623,7 @@ int PINT_verify_capability(const PVFS_capability *cap)
         return 1;
     }
 
-    PINT_debug_capability(cap, "Verifying");
+    PINT_debug_PVFS_capability(GOSSIP_SECURITY_DEBUG, cap);
 
     /* Are we suppose to check for timeouts? */
     if ( !config->bypass_timeout_check )

@@ -68,21 +68,31 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
     int ret = -1;
     int i = 0;
     job_id_t tmp_id;
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op (%p) s_op->decoded.enc_type %d\n",
-                   s_op, s_op->decoded.enc_type);
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
-                   "s_op (%p) %s (FR sm) state release (error_code = %d)\n",
-                   s_op, PINT_map_server_op_to_string(s_op->resp.op),
+    gossip_if(GOSSIP_SERVER_DEBUG);
+    {
+    gossip_lsadebug("s_op (%p) %s (FR sm) s_op->decoded.enc_type %d error_code %d\n",
+                   s_op,
+                   PINT_map_server_op_to_string(s_op->resp.op),
+                   s_op->decoded.enc_type, 
                    js_p->error_code);
+
+    gossip_lsadebug( "s_op (%p)\n", s_op);
+    gossip_lsadebug( "s_op->op %d\n", s_op->op);
+    gossip_lsadebug( "s_op->req (%p)\n", s_op->req);
+    gossip_lsadebug( "s_op->req->op %d\n", s_op->req->op);
+    gossip_lsadebug( "s_op->resp (%p)\n", &s_op->resp);
+    }
+    gossip_end;
 
     gossip_if(GOSSIP_SERVER_DEBUG)
     {
         for (i = 0; i < smcb->frame_count; i++)
         {
             struct PINT_server_op *top = PINT_sm_frame(smcb, PINT_FRAME_CURRENT - i);
-            gossip_lsadebug("frame %d top (%p) op %d resp_op %d\n",
-                          PINT_FRAME_CURRENT - i, top, top->op, top->resp.op);
+            gossip_lsadebug("frame %d top (%p) op %d resp_op %d req->op %d sched_id %ld\n",
+                          PINT_FRAME_CURRENT - i, top, top->op, top->resp.op,
+                          s_op->req->op, s_op->scheduled_id);
             if (top->op == 52)
             {
                 gossip_lsadebug("handle count %d ",
@@ -221,6 +231,7 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "calling job_bmi_send_list with addr %ld tag %d\n",
                    s_op->addr, s_op->tag);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, ">>>>> SENDING RESPONSE <<<<< \n");
     /* send the response */
     ret = job_bmi_send_list(s_op->addr,
                             s_op->encoded.buffer_list,

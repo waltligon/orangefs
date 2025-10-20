@@ -2121,7 +2121,6 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
     new_op->key_a = NULL;
     new_op->val_a = NULL;
 
-    //DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG, &new_op->orig_cred);
     /* This op now has its own frame, req, and resp to work with.
      * Data may need to be copied back before removal
      * other values are the same as the start of this func
@@ -2161,7 +2160,7 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
                    //(void *)getattr_p->dirent_array);
 
     /* set up the tree op */
-    DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &(s_op->req->u.getattr.credential));
+    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(s_op->req->u.getattr.credential));
     PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
                                     msg_p->req, /* dest is new_op */
                                     capability,
@@ -2475,7 +2474,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
 
     /* map credential based on credential certificate */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "mapping credentials\n");
-    DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
+    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
     ret = PINT_map_credential(&s_op->u.getattr.credential, 
                               &uid, 
                               &num_groups,

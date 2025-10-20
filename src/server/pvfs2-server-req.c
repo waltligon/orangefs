@@ -9,6 +9,8 @@
 #include "pvfs2-internal.h"
 #include "assert.h"
 
+static int check_op(int op); /* tries to check for a valid op value */
+
 /* server operation state machines */
 extern struct PINT_server_req_params pvfs2_get_config_params;
 extern struct PINT_server_req_params pvfs2_get_attr_params;
@@ -136,7 +138,23 @@ struct PINT_server_req_entry PINT_server_req_table[] =
  * to avoid long switch statements.  Examples include the prelude code.
  */
 
-#define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)
+/*#define CHECK_OP(_op_) assert(_op_ == PINT_server_req_table[_op_].op_type)*/
+static int check_op(int op)
+{
+    if (op < 0 ||
+            op > (sizeof(PINT_server_req_table) / sizeof(struct PINT_server_req_entry)))
+    {
+        gossip_lerr("OP %d out of range\n", op);
+        return -1; /* error */
+    }
+
+    if (PINT_server_req_table[op].params == NULL)
+    {
+        gossip_lerr("OP %d has no params\n", op);
+        return -1; /* error */
+    }
+    return 0; /* OK */
+}
 
 enum PINT_server_req_access_type PINT_server_req_readonly(
                                     struct PVFS_server_req *req)
@@ -153,14 +171,18 @@ enum PINT_server_req_access_type PINT_server_req_modify(
 PINT_server_req_perm_fun
 PINT_server_req_get_perm_fun(struct PVFS_server_req *req)
 {
-    CHECK_OP(req->op);
+    int ret;
+    if (0 > (ret = check_op(req->op)))
+        return NULL;
     return PINT_server_req_table[req->op].params->perm;
 }
 
 enum PINT_server_req_access_type
 PINT_server_req_get_access_type(struct PVFS_server_req *req)
 {
-    CHECK_OP(req->op);
+    int ret;
+    if (0 > (ret = check_op(req->op)))
+        return 0;
 
     if(!PINT_server_req_table[req->op].params->access_type)
     {
@@ -172,14 +194,19 @@ PINT_server_req_get_access_type(struct PVFS_server_req *req)
 enum PINT_server_sched_policy
 PINT_server_req_get_sched_policy(struct PVFS_server_req *req)
 {
-    CHECK_OP(req->op);
+    int ret;
+    if (0 > (ret = check_op(req->op)))
+        return 0;
+
     return PINT_server_req_table[req->op].params->sched_policy;
 }
 
 int PINT_server_req_get_attr(struct PVFS_server_req *req,
                              PVFS_object_attr *attr)
 {
-    CHECK_OP(req->op);
+    int ret;
+    if (0 > (ret = check_op(req->op)))
+        return 0;
 
     if(!PINT_server_req_table[req->op].params->get_attr)
     {
@@ -195,7 +222,9 @@ int PINT_server_req_get_object_ref(struct PVFS_server_req *req,
                                    PVFS_fs_id *fs_id,
                                    PVFS_handle *handle)
 {
-    CHECK_OP(req->op);
+    int ret;
+    if (0 > (ret = check_op(req->op)))
+        return 0;
 
     if(!PINT_server_req_table[req->op].params->get_object_ref)
     {
@@ -215,7 +244,9 @@ int PINT_server_req_get_credential(struct PVFS_server_req *req,
                                    PVFS_credential **cred)
 {
     int ret;
-    CHECK_OP(req->op);
+    if (0 > (ret = check_op(req->op)))
+        return 0;
+
     gossip_ldebug(GOSSIP_SERVER_DEBUG, "req->op %d\n", req->op);
 
     if (!PINT_server_req_table[req->op].params->get_credential)
@@ -234,7 +265,9 @@ int PINT_server_req_get_credential(struct PVFS_server_req *req,
 void PINT_server_req_get_ctrl(struct PVFS_server_req *req,
                               struct PINT_server_req_ctrl *req_ctrl)
 {
-    CHECK_OP(req->op);
+    int ret;
+    if (0 > (ret = check_op(req->op)))
+        return;
 
     if (!req_ctrl)
     {
@@ -263,15 +296,12 @@ void PINT_server_req_get_ctrl(struct PVFS_server_req *req,
  * returns a pointer to a static string (DONT FREE IT) on success,
  * null on failure
  */
-const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
+const char *PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "First checking op %d\n", op);
+    int ret;
+    if (0 > (ret = check_op(op)))
+        return NULL;
 
-    CHECK_OP(op);
-
-    gossip_log("%s: map server with op %d and params (%p)\n", __func__,
-               op, PINT_server_req_table[op].params);
-    
     if (PINT_server_req_table[op].params == NULL)
     {
         gossip_lerr("Error: params missing for this op\n");
