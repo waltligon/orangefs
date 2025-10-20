@@ -298,7 +298,6 @@ do {                                                        \
         gossip_lsadebug("Create Request:\n");               \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(&(treq->credential), PVFS_credential);\
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
         PVFS_debug_afield(treq->attr, PVFS_object_attr);    \
         PVFS_debug_afield(treq->parent, PVFS_object_ref);   \
         PVFS_debug_afield(treq->object, PVFS_object_ref);   \
@@ -700,7 +699,6 @@ do {                                                        \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, &sid_array);     \
         PVFS_debug_afield(treq->credential, PVFS_credential);\
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
         gossip_lsadebug("Remove End:\n");                   \
     }                                                       \
     gossip_end;                                             \
@@ -940,7 +938,6 @@ do {                                                        \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->credential, PVFS_credential);\
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
         PVFS_debug_afield(treq->objtype, PVFS_ds_type);     \
         PVFS_debug_afield(treq->attr, PVFS_object_attr);    \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
@@ -1055,7 +1052,6 @@ do {                                                        \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->credential, PVFS_credential);\
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
         PVFS_debug_afield(treq->handle_count, uint32_t);    \
         PVFS_debug_afield(treq->handle_array, PVFS_handle);\
@@ -1164,7 +1160,6 @@ do {                                                        \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
         PVFS_debug_afield(treq->retry_msgpair_at_leaf, uint32_t);\
         PVFS_debug_afield(treq->credential, PVFS_credential);\
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
         PVFS_debug_afield(treq->num_data_files, uint32_t);  \
         PVFS_debug_afield(treq->handle_array, PVFS_handle);\
         PVFS_debug_afield(treq->sid_count, int32_t);        \
@@ -1277,7 +1272,7 @@ do {                                                                 \
         gossip_lsadebug("\treq = (%p)\n", (req));                      \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);      \
         PVFS_debug_afield(treq->retry_msgpair_at_leaf, int32_t);     \
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));  \
+        PVFS_debug_afield(&((treq)->credential), PVFS_credential);  \
         PVFS_debug_afield(treq->num_dirdata, uint32_t);              \
         PVFS_debug_afield(treq->handle_array, PVFS_handle);          \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);                  \
@@ -1398,7 +1393,7 @@ do {                                                        \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
         PVFS_debug_afield(treq->retry_msgpair_at_leaf, int32_t);\
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
+        PVFS_debug_afield(&((treq)->credential), PVFS_credential);\
         PVFS_debug_afield(treq->attrmask, PVFS_object_attrmask);\
         PVFS_debug_afield(treq->handle_count, uint32_t);    \
         PVFS_debug_afield(treq->handle_array, PVFS_handle); \
@@ -1653,7 +1648,7 @@ do {                                                        \
         PVFS_debug_afield(&treq->handle, PVFS_handle);      \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->attrmask, uint64_t);        \
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
+        PVFS_debug_afield(&((treq)->credential), PVFS_credential);\
         gossip_lsadebug("Getattr End:\n");                  \
     }                                                       \
     gossip_end;                                             \
@@ -1741,7 +1736,7 @@ do {                                                        \
         PVFS_debug_afield(&treq->handle, PVFS_handle);       \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->attrmask, uint64_t);        \
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
+        PVFS_debug_afield(&((treq)->credential), PVFS_credential);\
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, PVFS_SID);       \
         gossip_lsadebug("Unstuff End:\n");                  \
@@ -1832,7 +1827,7 @@ do {                                                        \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(&treq->handle, PVFS_handle);       \
         PVFS_debug_afield(treq->attr, PVFS_object_attr);    \
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
+        PVFS_debug_afield(&((treq)->credential), PVFS_credential);\
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, PVFS_SID);       \
@@ -2033,7 +2028,6 @@ do {                                                        \
         gossip_lsadebug("Mkdir Request:\n");                \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
-        /*DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));*/ \
         PVFS_debug_afield(&((treq)->credential), PVFS_credential); \
         PVFS_debug_afield(treq->attr, PVFS_object_attr);    \
         PVFS_debug_afield(&treq->newdir_handle, PVFS_handle);\
@@ -2274,7 +2268,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Crdirent Request:\n");             \
         gossip_lsadebug("req = (%p)\n", (req));             \
-        DEBUG_PVFS_CREDENTIAL((mask), &((treq)->credential));\
+        PVFS_debug_PVFS_credential((mask), &((treq)->credential));\
         PVFS_debug_afield(treq->name, string);              \
         PVFS_debug_afield(treq->new_ref, PVFS_object_ref);  \
         PVFS_debug_afield(treq->parent_ref, PVFS_object_ref);\
