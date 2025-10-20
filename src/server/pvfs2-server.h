@@ -386,6 +386,8 @@ struct PINT_server_lookup_op
     int dirdata_sid_index;
 
     int array_index;
+    /* temp job id holder for sub jobs */
+    job_id_t j_id;
 };
 
 struct PINT_server_readdir_op
