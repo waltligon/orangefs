@@ -364,6 +364,34 @@ do { \
     sprintf(_string, "%lu", (_longuint)); \
 } while (0)
 
+#define PVFS_to_string_PVFS_size(_size, _string) \
+        PVFS_to_string_int64_t(_size, _string)
+
+#define PVFS_to_string_PVFS_uid(_uid, _string) \
+        PVFS_to_string_uint32_t(_uid, _string)
+
+#define PVFS_to_string_PVFS_gid(_gid, _string) \
+        PVFS_to_string_uint32_t(_gid, _string)
+        
+#define PVFS_to_string_PVFS_permissions(_perms, _string) \
+        PVFS_to_string_uint32_t(_perms, _string)
+
+#define PVFS_to_string_PVFS_time(_time, _string) \
+        PVFS_to_string_uint64_t(_time, _string)
+
+#define PVFS_to_string_char(_char, _string) \
+do { \
+    sprintf(_string, "%s", (_char)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_dist_dir_bitmap(_bitmap, _string) \
+        PVFS_to_string_uint32_t(*(_bitmap), _string)
+
+#define PVFS_to_string_PVFS_ds_type(_dstype, _string) \
+do { \
+    sprintf(_string, "%d", (_dstype)); \
+} while (0)     
+        
 #define PVFS_to_string_int32_t(_integer, _string) \
 do { \
     sprintf(_string, "%d", (_integer)); \
