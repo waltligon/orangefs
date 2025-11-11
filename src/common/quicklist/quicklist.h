@@ -208,6 +208,27 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
          &pos->member != (head); 				\
          pos = qlist_entry(pos->member.next, typeof(*pos), member))	
 #endif
+
+/**
+ * qlist_for_each_prev_entry - iterate over list of given type
+ * in prev order
+ * @pos:	the type * to use as a loop counter.
+ * @head:	the head for your list.
+ * @member:	the name of the list_struct within the struct.
+ * NOTE: DO NOT REMOVE files from a list this way!!!
+ */
+#ifdef WIN32
+#define qlist_for_each_prev_entry(pos, head, member, type)   \
+    for (pos = qlist_entry((head)->prev, type, member);	     \
+         &pos->member != (head);                             \
+         pos = qlist_entry(pos->member.prev, type, member))  
+#else
+#define qlist_for_each_prev_entry(pos, head, member)		\
+    for (pos = qlist_entry((head)->prev, typeof(*pos), member);	\
+         &pos->member != (head); 				\
+         pos = qlist_entry(pos->member.prev, typeof(*pos), member))	
+#endif
+
 /**
  * qlist_for_each_entry_safe - iterate over list of given type
  *                             safe against removal of list entry
@@ -229,6 +250,7 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
          &pos->member != (head); 					\
          pos = n, n = qlist_entry(n->member.next, typeof(*n), member))
 #endif
+
 static inline int qlist_exists(struct qlist_head *list, struct qlist_head *qlink)
 {
     struct qlist_head *pos;

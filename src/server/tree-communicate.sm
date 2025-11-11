@@ -187,6 +187,12 @@ nested machine pvfs2_tree_get_file_size_work_sm
 
 machine pvfs2_tree_get_dirent_count_sm
 {
+    state debug
+    {
+        run tree_get_dirent_count_debug;
+        default => tree_get_dirent_count_do_work;
+    }
+
     state tree_get_dirent_count_do_work
     {
         jump pvfs2_tree_get_dirent_count_work_sm;
@@ -881,9 +887,13 @@ static PINT_sm_action tree_communicate_partition_handles(
                         s_op->req->u.tree_get_dirent_count.retry_msgpair_at_leaf,
                         s_op->req->hints);
 
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                               "s_op (%p) s_op->op %d msg_p->req (%p) msg_p->req.op %d\n",
+                              s_op, s_op->op, &msg_p->req, msg_p->req.op);
+
                 PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &msg_p->req);
-                PINT_debug_capability(&capability, "from dirent request");
-                DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG, &(s_op->req->u.tree_get_dirent_count.credential));       
+                PVFS_debug_PVFS_capability(GOSSIP_SERVER_DEBUG, &capability);
+                PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG, &(s_op->req->u.tree_get_dirent_count.credential));       
 
                 msg_p->comp_fn = tree_get_dirent_count_comp_fn;
                 msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
@@ -1846,6 +1856,15 @@ static int tree_get_file_size_cleanup(struct PINT_smcb *smcb,
 }
 
 /*--------------------------------------------------------------------------*/
+
+static PINT_sm_action tree_get_dirent_count_debug(struct PINT_smcb *smcb,
+                                    job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, s_op->req);
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action tree_get_dirent_count_local_setup(struct PINT_smcb *smcb,
                                                         job_status_s *js_p)
 {
@@ -1862,11 +1881,13 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
                                        job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PVFS_server_req *req = &s_op->msgarray_op.msgpair.req;
+    /* struct PVFS_server_req *req = &s_op->msgarray_op.msgpair.req; */
+    struct PVFS_server_req *req = s_op->req;
     struct PVFS_server_resp *resp = &s_op->resp;
-    /* PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgpair; */
+    PINT_sm_msgpair_state *msg_p GCC_UNUSED = &s_op->msgarray_op.msgpair;
 
-    DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &(req->u.tree_get_dirent_count.credential));
+    /* DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &(req->u.tree_get_dirent_count.credential)); */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "frame (%p) req->op %d smcb->op %d\n", s_op, req->op, smcb->op);
 
 
     /* assert(s_op->req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT); */
@@ -1950,13 +1971,11 @@ static int tree_get_dirent_count_comp_fn(void *v_p,
     PINT_smcb *smcb = v_p;
     PINT_smcb *parent_smcb = smcb->parent_smcb;
     PINT_server_op *s_op = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
-    /*PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));*/
-    struct PVFS_server_resp *op_resp = &(s_op->resp); /*op resp structure*/
-    struct PVFS_server_resp *m_resp = resp_p;         /*msgpair resp structure*/
+    struct PVFS_server_resp *s_op_resp = &(s_op->resp); /*op resp structure*/
     struct PVFS_servresp_tree_get_dirent_count *op_tree =
-                                      &(op_resp->u.tree_get_dirent_count);
+                                      &(s_op_resp->u.tree_get_dirent_count);
     struct PVFS_servresp_tree_get_dirent_count *m_tree  =
-                                      &(m_resp->u.tree_get_dirent_count);
+                                      &(resp_p->u.tree_get_dirent_count);
     struct PINT_server_tree_communicate_op *s_tree_comm GCC_UNUSED =
                                       &(s_op->u.tree_communicate);
     int i;
@@ -1964,21 +1983,25 @@ static int tree_get_dirent_count_comp_fn(void *v_p,
              error_array_index=0;
 
     gossip_ldebug(GOSSIP_SERVER_DEBUG,
+                  "smcb (%p) s_op (%p) resp_p (%p) resp_p->op %d\n",
+                  smcb, s_op, resp_p, resp_p->op);
+
+    gossip_ldebug(GOSSIP_SERVER_DEBUG,
                  "index %d caller_handle_index %u\n", index,
                  resp_p->u.tree_get_dirent_count.caller_handle_index);
 
-    assert(m_resp->op == PVFS_SERV_TREE_GET_FILE_SIZE);
+    assert(resp_p->op == PVFS_SERV_TREE_GET_DIRENT_COUNT);
 
-    if (m_resp->status != 0)
+    if (resp_p->status != 0)
     {
-        PVFS_perror_gossip("get_dirent_count failure", m_resp->status);
+        PVFS_perror_gossip("get_dirent_count failure", resp_p->status);
         return resp_p->status;
     }
 
     /* stash the sizes and error codes for each file handle */
     gossip_ldebug(GOSSIP_SERVER_DEBUG,
                   "m_resp->u.tree_get_dirent_count.handle_count is %d\n",
-                  m_resp->u.tree_get_dirent_count.handle_count);
+                  resp_p->u.tree_get_dirent_count.handle_count);
 
     for (i = 0; i < m_tree->handle_count; i++)
     {

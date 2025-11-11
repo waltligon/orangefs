@@ -310,11 +310,10 @@ int PINT_perm_check(struct PINT_server_op *s_op)
             }
             if (i == cap->num_handles)
             {
-                 gossip_err("%s: attempted to perform a %s operation on target "
-                           "handle %s that was not in the capability\n", 
-                           __func__,
-                           PINT_map_server_op_to_string(s_op->req->op), 
-                           PVFS_OID_str(&handle));
+                 gossip_lerr("attempted to perform a %s operation on target "
+                             "handle %s that was not in the capability\n", 
+                             PINT_map_server_op_to_string(s_op->req->op), 
+                             PVFS_OID_str(&handle));
                  ret = -PVFS_EACCES;
                  goto PINT_perm_check_exit;
             }

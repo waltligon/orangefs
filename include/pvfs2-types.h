@@ -806,6 +806,20 @@ do { \
     memset((oref), 0, sizeof(PVFS_object_ref)); \
 } while (0)
 
+/* This is meant to be called from another debug macro that checks the mask
+ */
+#define PVFS_debug_object_ref(oref) \
+do { \
+        gossip_lsadebug("Object ref Debug (" #oref "):\n"); \
+        gossip_lsadebug("Handle    %s\n", PVFS_OID_str(&((oref)->handle))); \
+        gossip_lsadebug("FS_id     %d\n", (oref)->fs_id); \
+        gossip_lsadebug("SID count %d\n", (oref)->sid_count); \
+        if ((oref)->sid_count > 0) \
+        { \
+           gossip_lsadebug("SID %s\n", PVFS_SID_str((oref)->sid_array)); \
+        } \
+} while (0)     
+
 /* kernel compatibility version of a PVFS_handle */
 typedef struct PVFS_khandle_s
 {
@@ -1548,6 +1562,64 @@ endecode_fields_3a2a_struct (
                                     PVFS_SYS_LIMIT_ISSUER        + \
                                     PVFS_SYS_LIMIT_SIGNATURE)
 
+#define PVFS_debug_PVFS_capability(mask, cap) \
+do { \
+    gossip_if(mask) \
+    { \
+        PVFS_debug_PVFS_capability_nomask(cap); \
+    } \
+    gossip_end; \
+} while (0)
+
+#define PVFS_debug_PVFS_capability_nomask(cap) \
+do { \
+    char sig_buf[16] GCC_UNUSED; \
+    char mask_buf[16] GCC_UNUSED; \
+    int fail = 0; \
+    int i; \
+    if (!cap) \
+    { \
+        gossip_ladebug("capability pointer is NULL\n"); \
+        fail = 1; \
+    } \
+    else \
+    { \
+        if (!(cap)->issuer) \
+        { \
+            gossip_ladebug("capability issuer is NULL\n"); \
+        } \
+        else \
+        { \
+            if (strlen((cap)->issuer) == 0) \
+            { \
+                gossip_ladebug("null capability\n"); \
+            } \
+            else \
+            { \
+                gossip_ladebug("\tissuer: %s\n", (cap)->issuer); \
+            } \
+        } \
+    } \
+    if (!fail) \
+    { \
+        gossip_ladebug("fsid: %u\n", (cap)->fsid); \
+        gossip_ladebug("sig_size: %u\n", (cap)->sig_size); \
+        gossip_ladebug("signature: %s\n", \
+                 PINT_util_bytes2str((cap)->signature, sig_buf, 4)); \
+        gossip_ladebug("timeout: %d\n", (int) (cap)->timeout); \
+        gossip_ladebug("op_mask: %s\n", \
+                 PINT_print_op_mask((cap)->op_mask, mask_buf)); \
+        gossip_ladebug("num_handles: %u\n", (cap)->num_handles); \
+        gossip_ladebug("first handle: %s\n", \
+                 (cap)->num_handles > 0 ? PVFS_OID_str(&(cap)->handle_array[0]) : 0LL); \
+        for (i = 1; i < (cap)->num_handles; i++) \
+        { \
+            gossip_ladebug("handle %d: %s\n", \
+                         i + 1, PVFS_OID_str(&(cap)->handle_array[i])); \
+        } \
+    } \
+} while (0)
+
 /* A credential identifies a user and is signed by the client/user 
    private key. */
 typedef struct PVFS_credential PVFS_credential;
@@ -1580,40 +1652,44 @@ endecode_fields_3a2a1_struct (
                                     PVFS_SYS_LIMIT_SIGNATURE + \
                                     extra_size_PVFS_certificate)
 
-/* 
- * NOTE: for backwards compatibility only. 
- * For all new code use PVFS_credential.
- */
 typedef PVFS_credential PVFS_credentials;
 
-#define DEBUG_PVFS_CREDENTIAL(mask,cred) \
+#define PVFS_debug_PVFS_credential(mask, cred) \
 do { \
     gossip_if(mask) \
     { \
-        if (cred) { \
-            gossip_ladebug("DEBUG_PVFS_CREDENTIAL\n"); \
-            gossip_ladebug("userid:       %d\n", (cred)->userid); \
-            gossip_ladebug("num_groups:   %d\n", (cred)->num_groups);   \
-            gossip_ladebug("group_array (%p):\n", (cred)->group_array);  \
-            gossip_ladebug("1\n");  \
-            if((cred)->num_groups > 0 && (cred)->group_array) { \
-                int g; \
-                for(g = 0; g < (cred)->num_groups; g++) { \
-                    gossip_ladebug("    group %d\n", (cred)->group_array[g]); \
-                } \
-            }  \
-            gossip_ladebug("2\n");  \
-            if((cred)->issuer) { \
-                gossip_ladebug("issuer:  %s\n", (cred)->issuer); \
-            } \
-            gossip_ladebug("3\n");  \
-            gossip_ladebug("sig_size:     %d\n", (cred)->sig_size);  \
-            gossip_ladebug("DEBUG_PVFS_CREDENTIAL End\n"); \
-        } else { \
-            gossip_ladebug("Credential pointer is NULL\n"); \
-        } \
+        PVFS_debug_PVFS_credential_nomask(cred); \
     } \
     gossip_end; \
+} while (0)
+
+#define PVFS_debug_PVFS_credential_nomask(cred) \
+do { \
+    if (cred) \
+    { \
+        gossip_ladebug("PVFS_debug_credential\n"); \
+        gossip_ladebug(" userid:       %d\n", (cred)->userid); \
+        gossip_ladebug(" num_groups:   %d\n", (cred)->num_groups);   \
+        gossip_ladebug(" group_array (%p):\n", (cred)->group_array);  \
+        if((cred)->num_groups > 0 && (cred)->group_array) \
+        { \
+            int g; \
+            for(g = 0; g < (cred)->num_groups; g++) \
+            { \
+                gossip_ladebug("    group %d\n", (cred)->group_array[g]); \
+            } \
+        }  \
+        if((cred)->issuer) \
+        { \
+            gossip_ladebug(" issuer:  %s\n", (cred)->issuer); \
+        } \
+        gossip_ladebug(" sig_size:     %d\n", (cred)->sig_size);  \
+        gossip_ladebug("PVFS_debug_credential End\n"); \
+    } \
+    else \
+    { \
+        gossip_ladebug("Credential pointer is NULL\n"); \
+    } \
 } while(0)
 
 #define COPY_PVFS_CREDENTIAL(dst,src) \

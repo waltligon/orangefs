@@ -152,11 +152,8 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                   "s_op (%p) %s (prelude sm)\n", s_op,
-                   PINT_map_server_op_to_string(s_op->req->op));
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                   "\tbase frame:%d\tframe count:%d\n",
-                   smcb->base_frame, smcb->frame_count);
+                   "s_op (%p) %s (prelude sm) s_op->req (%p)\n", s_op,
+                   PINT_map_server_op_to_string(s_op->req->op), s_op->req);
 
     PINT_server_req_get_credential(s_op->req, &cred);
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "cred ptr (%p)\n", cred);
@@ -164,7 +161,7 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     if (cred)
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "copying credentials to s_op\n");
-        DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG, cred);
+        PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG, cred);
         COPY_PVFS_CREDENTIAL(&s_op->orig_cred, cred);
     }
 
@@ -339,9 +336,21 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     PVFS_error error_code = 0;
     DECLARE_PROFILER(profiler);
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm)\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+    gossip_if(GOSSIP_SERVER_DEBUG)
+    {
+        gossip_lsadebug("s_op (%p) %s (prelude sm)\n", s_op,
+                        PINT_map_server_op_to_string(s_op->req->op));
+        gossip_lsadebug("Finish getattr_if_needed js_p %d\n",
+                        js_p->error_code);
+        gossip_lsadebug("s_op.ds_attr objtype %d owner %d group %d\n",
+                        s_op->ds_attr.type, s_op->ds_attr.uid, s_op->ds_attr.gid);
+        /* we have not translated yet */
+        /*
+        gossip_lsadebug("s_op.attr objtype %d owner %d group %d\n",
+                        s_op->attr.objtype, s_op->attr.owner, s_op->attr.group);
+        */
+    }
+    gossip_end;
 
     /* Profile validate operation */
     INIT_PROFILER(profiler);
@@ -459,8 +468,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          */
         case PVFS_SERV_CREATE :
         case PVFS_SERV_MKDIR :
-            gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                         "create or mkdir of object\n");
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "create or mkdir of object\n");
             create_object = 0;
             js_p->error_code = 0;
             break;
@@ -493,8 +501,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         s_op->attr.ctime = current_time;
         s_op->attr.ntime = current_time;
     
-
-        /* DIRDATA needs a set of dist_dir_data fields for distributed diretories
+        /* We are creating a DIRDATA on the fly.
+         * DIRDATA needs a set of dist_dir_data fields for distributed diretories
          * and such.  This needs to be passed by the caller, which is normally a server
          * in the midst of MKDIR operation so mkdir needs to have this info in its
          * attributes, which it does - just be sure its filled in.  Theoretically this
@@ -538,6 +546,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     else
     {
         /* Translate the dspace attributes read from db into object attributes */
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "Translating attributes into s_op->attr\n");
         PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
         s_op->target_object_attr = &s_op->attr;
     }
@@ -558,7 +568,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
     /* keeping this one to see the state of cap field after getattr
      */
-    PINT_debug_capability(&s_op->req->capability, "Received");
+    PVFS_debug_PVFS_capability(GOSSIP_SECURITY_DEBUG, &s_op->req->capability);
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
@@ -586,7 +596,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     PINT_server_req_get_credential(s_op->req, &cred);
     /* keeping this one to see the state of cred field after getattr
      */
-    DEBUG_PVFS_CREDENTIAL(GOSSIP_SECURITY_DEBUG, cred);
+    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     if (cred != NULL)
     {
 #ifdef ENABLE_CREDCACHE
@@ -766,9 +776,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     js_p->error_code = ret;
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (req=%d) (prelude sm) state: %s (status = %d)\n",
-                 s_op, PINT_map_server_op_to_string(s_op->req->op),s_op->req->op,
-                 __func__, js_p->error_code);
+                   "s_op (%p) %s (req %d) (prelude sm) status %d\n",
+                   s_op, PINT_map_server_op_to_string(s_op->req->op),s_op->req->op,
+                   js_p->error_code);
 
 complete:
 

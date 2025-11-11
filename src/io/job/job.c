@@ -4339,7 +4339,9 @@ int job_testcontext(job_id_t *out_id_array_p,
     /* use this as a chance to do a cheap test on the request
      * scheduler
      */
+    /*
     gossip_ldebug(GOSSIP_JOB_DEBUG, "Calling do_one_test_cycle_req_sched\n");
+    */
     if ((ret = do_one_test_cycle_req_sched()) < 0)
     {
         return (ret);
@@ -4367,7 +4369,9 @@ int job_testcontext(job_id_t *out_id_array_p,
     gen_mutex_lock(&completion_mutex);
     pthread_ret = 0;
 
+    /*
     gossip_ldebug(GOSSIP_JOB_DEBUG, "Calling completion_query_context\n");
+    */
 
         gossip_if(GOSSIP_SM_JOBQ_DEBUG)
         {
@@ -4383,9 +4387,11 @@ int job_testcontext(job_id_t *out_id_array_p,
                              context_id)) == 0) &&
                   ((pthread_ret == EINTR) || (pthread_ret == 0)))
     {
+        /*
         gossip_ldebug(GOSSIP_JOB_DEBUG,
                       "completion_query_context return inout_count_p %d\n",
                       *inout_count_p);
+        */
  
         gossip_if(GOSSIP_SM_JOBQ_DEBUG)
         {
@@ -4412,7 +4418,9 @@ int job_testcontext(job_id_t *out_id_array_p,
                                             &completion_mutex);
         }
     }
+    /*
     gossip_ldebug(GOSSIP_JOB_DEBUG, "completion_query_context exits loop\n");
+    */
     gen_mutex_unlock(&completion_mutex);
 
     if(ret == 0)

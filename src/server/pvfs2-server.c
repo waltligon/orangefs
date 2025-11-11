@@ -525,7 +525,7 @@ int main(int argc, char **argv)
              * processing, so it is defined in the src/common/misc
              * directory.
              */
-            gossip_ldebug(GOSSIP_SERVER_DEBUG, "continuing smcb (%p)\n", smcb);
+            gossip_ldebug(GOSSIP_SERVER_DEBUG, "continuing smcb (%p) op %d\n", smcb, smcb->op);
             ret = PINT_state_machine_continue(smcb,
                                               &server_job_status_array[i]);
 
@@ -2811,14 +2811,17 @@ int server_state_machine_complete(PINT_smcb *smcb)
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_id_gen_t tmp_id;
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Starting frame (%p)\n", s_op);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "Starting frame (%p) smcb->op %d\n", s_op, s_op->op);
 
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
 
     if(s_op->req)
     {
+        /*
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling PINT_EVENT_END\n");
+        */
         PINT_EVENT_END(PINT_sm_event_id,
                        server_controlling_pid,
                        NULL,
@@ -2829,17 +2832,15 @@ int server_state_machine_complete(PINT_smcb *smcb)
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling PVFS_hint_free\n");
         PVFS_hint_free(&s_op->decoded.stub_dec.req.hints);
 
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling PINT_decode_release\n");
         PINT_decode_release(&(s_op->decoded), PINT_DECODE_REQ);
     }
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "smcb op code (%d).\n", s_op->op);
-
+    /*
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->unexp_bmi_buff.buffer (%p)\n", 
                                         s_op->unexp_bmi_buff.buffer);
+    */
 
     /* BMI_unexpected_free MUST execute BEFORE BMI_set_info,
      * because BMI_set_info will remove the addr info from the
@@ -2847,7 +2848,6 @@ int server_state_machine_complete(PINT_smcb *smcb)
      * become zero.  The addr info holds the "unexpected-free"
      * function pointer.
      */
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling BMI_unexpected_free\n");
     BMI_unexpected_free(s_op->unexp_bmi_buff.addr, 
                         s_op->unexp_bmi_buff.buffer);
 

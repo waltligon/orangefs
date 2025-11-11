@@ -68,31 +68,49 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
     int ret = -1;
     int i = 0;
     job_id_t tmp_id;
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op (%p) s_op->decoded.enc_type %d\n",
-                   s_op, s_op->decoded.enc_type);
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
-                   "s_op (%p) %s (FR sm) state release (error_code = %d)\n",
-                   s_op, PINT_map_server_op_to_string(s_op->resp.op),
+    gossip_if(GOSSIP_SERVER_DEBUG);
+    {
+    gossip_lsadebug("s_op (%p) %s (FR sm) s_op->decoded.enc_type %d error_code %d\n",
+                   s_op,
+                   PINT_map_server_op_to_string(s_op->resp.op),
+                   s_op->decoded.enc_type, 
                    js_p->error_code);
+
+    gossip_lsadebug( "s_op (%p)\n", s_op);
+    gossip_lsadebug( "s_op->op %d\n", s_op->op);
+    gossip_lsadebug( "s_op->req (%p)\n", s_op->req);
+    gossip_lsadebug( "s_op->req->op %d\n", s_op->req->op);
+    gossip_lsadebug( "s_op->resp (%p)\n", &s_op->resp);
+    }
+    gossip_end;
 
     gossip_if(GOSSIP_SERVER_DEBUG)
     {
         for (i = 0; i < smcb->frame_count; i++)
         {
             struct PINT_server_op *top = PINT_sm_frame(smcb, PINT_FRAME_CURRENT - i);
-            gossip_log("final_response_release (%p): frame %d top (%p) op %d resp_op %d\n",
-                       smcb, PINT_FRAME_CURRENT - i, top, top->op, top->resp.op);
+            gossip_lsadebug("frame %d top (%p) op %d resp_op %d req->op %d sched_id %ld\n",
+                          PINT_FRAME_CURRENT - i, top, top->op, top->resp.op,
+                          s_op->req->op, s_op->scheduled_id);
             if (top->op == 52)
             {
-                gossip_log("final_response_release (%p): handle count %d dirent_count %ld\n",
-                       smcb, top->resp.u.tree_get_dirent_count.handle_count,
-                       *top->resp.u.tree_get_dirent_count.dentcnt);
+                gossip_lsadebug("handle count %d ",
+                                top->resp.u.tree_get_dirent_count.handle_count);
+                if (top->resp.u.tree_get_dirent_count.dentcnt)
+                {
+                    gossip_adebug("dirent_count %ld\n",
+                                  *top->resp.u.tree_get_dirent_count.dentcnt);
+                }
+                else
+                {
+                    gossip_adebug("\n");
+                }
             }
-            if (top->op == 4)
+            else if (top->op == 4)
             {
-                gossip_log("final_response_release (%p): handle count %d dirent_count %ld attr type %d\n",
-                       smcb, top->resp.u.getattr.attr.u.dir.dist_dir_attr.dirdata_count,
+                gossip_lsadebug("handle count %d dirent_count %ld attr type %d\n",
+                       top->resp.u.getattr.attr.u.dir.dist_dir_attr.dirdata_count,
                        top->resp.u.getattr.attr.u.dir.dirent_count, top->resp.u.getattr.attr.objtype);
             }
         }
@@ -213,6 +231,7 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "calling job_bmi_send_list with addr %ld tag %d\n",
                    s_op->addr, s_op->tag);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, ">>>>> SENDING RESPONSE <<<<< \n");
     /* send the response */
     ret = job_bmi_send_list(s_op->addr,
                             s_op->encoded.buffer_list,
@@ -245,9 +264,13 @@ static PINT_sm_action final_response_cleanup(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char status_string[64] = {0};
 
+    if (s_op->req && s_op->req->op)
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
                  "s_op (%p) %s (FR sm) state cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
+    else
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
+                 "s_op (%p) (FR sm) state cleanup\n", s_op);
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
     PINT_ACCESS_DEBUG(s_op,

@@ -315,6 +315,134 @@ static inline int DBG_TRUE(PVFS_debug_mask mask)
     return mask.mask1 || mask.mask2;
 }
 
+/*
+ * These make it easier to define complex debug routines and are used
+ * in src/proto/pvfs2-req.proto.h src/proto/pvfs2-attr.h
+ * src/server/pvfs2-server.h and others.
+ */
+
+#define PVFS_to_string_PVFS_error(_error, _string, _print) \
+do { \
+    sprintf(_string, "%d", (_error)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_credential(_cred, _string, _print) \
+do { \
+    PVFS_debug_PVFS_credential_nomask(_cred); \
+    _print = 'N';                             \
+} while (0)
+
+#define PVFS_to_string_PVFS_capability(_cap, _string, _print) \
+do { \
+    PVFS_debug_PVFS_capability_nomask(_cap); \
+    _print = 'N';                            \
+} while (0)
+
+#define PVFS_to_string_pointer(_ptr, _string, _print) \
+do { \
+    sprintf(_string, "(%p)", (_ptr)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_fs_id(_fsid, _string, _print) \
+do { \
+    sprintf(_string, "%d", (_fsid)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_handle(_handle, _string, _print) \
+do { \
+    PVFS_OID_bin2str(_handle, _string); \
+} while (0)
+
+#define PVFS_to_string_int64_t(_longint, _string, _print) \
+do { \
+    sprintf(_string, "%ld", (_longint)); \
+} while (0)
+
+#define PVFS_to_string_job_id_t(_longint, _string, _print) \
+        PVFS_to_string_int64_t(_longint, _string, _print)
+
+#define PVFS_to_string_uint64_t(_longuint, _string, _print) \
+do { \
+    sprintf(_string, "%lu", (_longuint)); \
+} while (0)
+
+#define PVFS_to_string_int32_t(_integer, _string, _print) \
+do { \
+    sprintf(_string, "%d", (_integer)); \
+} while (0)
+
+#define PVFS_to_string_int(_integer, _string, _print) \
+        PVFS_to_string_int32_t(_integer, _string, _print)
+
+#define PVFS_to_string_uint32_t(_integer, _string, _print) \
+do { \
+    sprintf(_string, "%u", (_integer)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_OID(_oid, _string, _print) \
+do { \
+    PVFS_OID_bin2str(_oid, _string); \
+} while (0)
+
+#define PVFS_to_string_PVFS_SID(_sid, _string, _print) \
+do { \
+    PVFS_SID_bin2str(_sid, _string); \
+} while (0)
+
+#define PVFS_to_string_string(_stringin, _stringout, _print) \
+do { \
+    strcpy(_stringout, _stringin); \
+} while (0)
+
+#define PVFS_to_string_PVFS_object_ref(_ref, _string, _print) \
+do { \
+    PVFS_OID_bin2str(&((_ref).handle), _string); \
+} while (0)
+
+#define PVFS_to_string_PVFS_object_attr(_ref, _string, _print) \
+do { \
+    _string[0] = 0; \
+} while (0)
+
+#define PVFS_to_string_PVFS_object_attrmask(_mask, _string, _print) \
+do { \
+    _string[0] = 0; \
+} while (0)
+
+#define PVFS_to_string_job_status_s(_stat_p, _string, _print) \
+do { \
+    sprintf(_string, "%p", _stat_p); \
+} while (0)
+
+#define PVFS_debug_afield(_field, _type) \
+do { \
+    char _string[100]; \
+    char _print = 'Y'; \
+    PVFS_to_string_##_type(_field, _string, _print); \
+    if (_print == 'Y') \
+    {                  \
+        gossip_lsadebug("\t" #_field ": %s\n", _string); \
+    }                  \
+} while (0) 
+
+#define PVFS_debug_areqfield(_field, _type) \
+        PVFS_debug_afield(_field, _type)
+
+#define PVFS_debug_field(_mask, _field, _type) \
+do { \
+    char _string[100]; \
+    char _print = 'Y'; \
+    PVFS_to_string_##_type(_field, _string, _print); \
+    if (_print == 'Y') \
+    {                  \
+        gossip_lsdebug((_mask), "\t" #_field ": %s\n", _string); \
+    }                  \
+} while (0)
+
+#define PVFS_debug_reqfield(_field, _type) \
+        PVFS_debug_field(_field, _type)
+
+
 #endif /* __PVFS2_DEBUG_H */
 
 /*

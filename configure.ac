@@ -977,6 +977,12 @@ AC_ARG_ENABLE(strict,
     STRICT_CFLAGS=1)
 AC_SUBST(STRICT_CFLAGS)
 
+ASSERT_CFLAGS=
+AC_ARG_ENABLE(assert,
+[  --enable-assert         Turn on compiler asserts],
+    ASSERT=1)
+AC_SUBST(ASSERT_CFLAGS)
+
 dnl Check if user actually wants to see all our build output (compiles, links, etc.).
 AC_ARG_ENABLE(verbose-build,
 [  --enable-verbose-build  Enables full output during build process],

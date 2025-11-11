@@ -381,11 +381,14 @@ struct PINT_server_lookup_op
 
     PVFS_ID *temp_dirent_store;
     int32_t temp_dirent_sid_count;
+    PINT_sm_msgarray_op *temp_getattr_op;
 
     int dirdata_server_index;
     int dirdata_sid_index;
 
     int array_index;
+    /* temp job id holder for sub jobs */
+    job_id_t j_id;
 };
 
 struct PINT_server_readdir_op
@@ -700,6 +703,51 @@ struct PINT_server_perf_update_op
     struct PINT_perf_counter *tpc;
 };
 
+#define PVFS_debug_s_op_common (mask, __s_op) \\
+do { \
+    gossip_if(mask) \
+    { \
+        gossip_lsadebug("S_OP common fields (%p)", s_op); \
+        PVFS_debug_afield(op_cancelled, int); \
+        PVFS_debug_afield(unexp_id, job_id_t); \
+        PVFS_debug_afield(op, int /* enum PVFS_server_op */); \
+        PVFS_debug_afield(event_id, PINT_event_id); \
+        PVFS_debug_afield(start_time, struct timespec); \
+        PVFS_debug_afield(scheduled_id, job_id_t); \
+        PVFS_debug_afield(key, PVFS_ds_keyval); \
+        PVFS_debug_afield(val, PVFS_ds_keyval); \
+        PVFS_debug_afield(key_a, ptr /* PVFS_ds_keyval */); /* ptr */ \
+        PVFS_debug_afield(val_a, ptr /* PVFS_ds_keyval */); /* ptr */ \
+        PVFS_debug_afield(error_a, ptr /* int */); /* ptr */ \
+        PVFS_debug_afield(keyval_count, int); \
+        PVFS_debug_afield(free_val, int); \
+        PVFS_debug_afield(local_index, uint32_t); \
+        PVFS_debug_afield(ds_attr, PVFS_ds_attributes); \
+        PVFS_debug_afield(attr, PVFS_object_attr); \
+        PVFS_debug_afield(orig_mask, PVFS_object_attrmask); \
+        PVFS_debug_afield(addr, PVFS_BMI_addr_t); \
+        PVFS_debug_afield(tag, bmi_msg_tag_t); \
+        PVFS_debug_afield(unexpected_bmi_buff, struct BMI_unexpected_info); \
+        PVFS_debug_afield(req, PVFS_server_req); /* ptr */ \
+        PVFS_debug_afield(encoded, struct PINT_encoded_msg); \
+        PVFS_debug_afield(decoded, struct PINT_decoded_msg); \
+        PVFS_debug_afield(msgarray_op, PINT_sm_msgarray_op); \
+        PVFS_debug_afield(new_target_object, int32_t); \
+        PVFS_debug_afield(target_handle, PVFS_handle); \
+        PVFS_debug_afield(target_sid_array, PVFS_SID); /* ptr */ \
+        PVFS_debug_afield(target_fs_id, PVFS_fs_id); \
+        PVFS_debug_afield(prelude_mask, PINT_prelude_flag); \
+        PVFS_debug_afield(access_type, int /* enum PINT_server_req_access_type */); \
+        PVFS_debug_afield(sched_policy, int /* enum PINT_server_sched_policy */); \
+        PVFS_debug_afield(orig_cred, PVFS_credential); \
+        PVFS_debug_afield(num_pjmp_frames, int); \
+        PVFS_debug_afield(join, struct PINT_mpa_join); /* ptr */ \
+        PVFS_debug_afield(metasidcnt, int32_t); \
+        gossip_lsadebug("S_OP common END"); \
+    } \
+    gossip_end; \
+} while (0)
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -750,7 +798,7 @@ typedef struct PINT_server_op
     struct BMI_unexpected_info unexp_bmi_buff;
 
     /* decoded request and response structures */
-    struct PVFS_server_req    *req;      /* usually points to decoded */
+    struct PVFS_server_req    *req;      /* usually points to s_op->decoded.buffer */
     struct PVFS_server_resp    resp;     /* non-encoded */
 
     /* encoded request and response structures */
@@ -860,54 +908,6 @@ do {                                                                            
           PINT_serv_init_msgarray_params(__s_op, __fs_id);                          \
       }                                                                             \
 } while (0)
-
-#if 0
-/* OLD VERSION */
-/* This creates  new frame in __s_op and pushes it for a subsequent PJMP
- *
- * In the big if :
- * a __location value of LOCAL will result in LOCAL
- * and a __location value of REMOTE will result in REMOTE
- * any other avlue will check the __sid against the local server
- */
-#define PINT_CREATE_SUBORDINATE_SERVER_FRAME(__smcb,                                \
-                                             __s_op,                                \
-                                             __sid,                                 \
-                                             __fs_id,                               \
-                                             __location,                            \
-                                             __req,                                 \
-                                             __task_id)                             \
-do {                                                                                \
-      struct server_configuration_s *__config = PINT_server_config_mgr_get_config();\
-      __s_op = (PINT_server_op *)malloc(sizeof(struct PINT_server_op));             \
-      if(!__s_op)                                                                   \
-      {                                                                             \
-          gossip_err("%s:Error allocating subordinate server frame\n"               \
-                    ,__func__);                                                     \
-          return -PVFS_ENOMEM;                                                      \
-      }                                                                             \
-      memset(__s_op, 0, sizeof(struct PINT_server_op));                             \
-      __s_op->req = &__s_op->decoded.stub_dec.req;                                  \
-      PINT_sm_push_frame(__smcb, __task_id, __s_op);                                \
-      if ((__location != NEXT_STATE_REMOTE) &&                                       \
-           ((__location == NEXT_STATE_LOCAL) ||                                      \
-             (!PVFS_SID_is_null(&(__sid)) &&                                        \
-              !PVFS_SID_cmp(&(__sid), &(__config->host_sid))                        \
-             )                                                                      \
-           )                                                                        \
-         )                                                                          \
-      {                                                                             \
-          __location = NEXT_STATE_LOCAL;                                             \
-      }                                                                             \
-      else                                                                          \
-      {                                                                             \
-          __location = NEXT_STATE_REMOTE;                                            \
-          memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));             \
-          PINT_serv_init_msgarray_params(__s_op, __fs_id);                          \
-      }                                                                             \
-      __req = __s_op->req;                                                          \
-} while (0)
-#endif
 
 #define PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(__s_op)      \
     do {                                                   \

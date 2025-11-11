@@ -174,9 +174,6 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairs %d\n", mop->count);
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"base frame %d frame count %d\n"
-                                    ,smcb->base_frame, smcb->frame_count);
-
     /* PVFS_perror_gossip_verbose(); */
 
     assert(mop->count > 0);
@@ -341,6 +338,13 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     int must_loop_encodings = 0;
     int local_enc_and_alloc = 0;
 
+#if 0
+    if (msg_p->req.op == PVFS_SERV_CRDIRENT)
+    {
+        PVFS_debug_servreq_crdirent(GOSSIP_SERVER_DEBUG, &msg_p->req);
+    }
+#endif
+
     /* are these asserts appropriate or poor job of error
      * handling?
      */
@@ -418,6 +422,9 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
             //DEBUG_PVFS_CREDENTIAL(GOSSIP_MSGPAIR_DEBUG,&(msg_p->req.u.tree_get_dirent_count.credential));
             PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_MSGPAIR_DEBUG, &(msg_p->req));
         }
+
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "&msg_p->req (%p) &msg_p->encoded_req (%p) msg_p->svr_addr %ld msg_p->enc_type %d\n",
+                       &(msg_p->req), &(msg_p->encoded_req), msg_p->svr_addr, msg_p->enc_type);
 
         ret = PINT_encode(&msg_p->req,
                           PINT_ENCODE_REQ,
@@ -1091,12 +1098,14 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
                                 msg_p->recv_status.actual_size,
                                 &resp_p);
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
-                 "PINT_serv_decode_resp: return code: (%d)\n", ret);
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
-                 "PINT_serv_decode_resp: msg_p op_status: (%d)\n", msg_p->op_status);
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
-                 "PINT_serv_decode_resp: resp_p->status: (%d)\n", resp_p->status);
+    gossip_if(GOSSIP_MSGPAIR_DEBUG)
+    {
+        gossip_lsadebug("PINT_serv_decode_resp: return code: (%d)\n", ret);
+        gossip_lsadebug("PINT_serv_decode_resp: msg_p op_status: (%d)\n", msg_p->op_status);
+        gossip_lsadebug("PINT_serv_decode_resp: resp_p->status: (%d)\n", resp_p->status);
+        gossip_lsadebug("mop (%p) resp_p->op %d\n", mop, resp_p->op);
+    }
+    gossip_end;
     if (resp_p->status != 0)
     {
         char buf[256];
