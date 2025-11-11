@@ -140,6 +140,12 @@ machine pvfs2_lookup_sm
     state initiate_remote_request
     {
         jump pvfs2_msgpairarray_sm;
+        default => cleanup_remote_request;
+    }
+
+    state cleanup_remote_request
+    {
+        run cleanup_remote_request;
         default => verify_object_metadata;
     }
 
@@ -338,7 +344,7 @@ static PINT_sm_action lookup_init(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->u.lookup.handle_ct = 0;
     s_op->u.lookup.attr_ct = 0;
     gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "s_op lookup handle ct = %u\n", s_op->u.lookup.handle_ct);
+                 "s_op lookup.handle_ct = %u\n", s_op->u.lookup.handle_ct);
 
     /* temp memory block for moving around dirents */
     s_op->u.lookup.temp_dirent_store = (PVFS_ID *)malloc(OSASZ(1, s_op->metasidcnt));
@@ -853,6 +859,15 @@ static int lookup_get_dirent_comp_fn(void *v_p,
 
     if (resp_p->status == 0 && resp_p->u.mgmt_get_dirent.error == 0)
     {
+        /* copy resp into the s_op - we will overwrite it later
+         * this gives us many things not copied below such as
+         * dirdata handles and sids, timestamps and permissions
+         */
+        /* we are completing a mgmt_get_dirent which does NOT return an attr
+         * so this makes no sense
+         */
+        /* PINT_copy_object_attr(&s_op->resp.u.getattr.attr, &resp_p->u.getattr.attr); */
+
         /* copy handle from the request's response to lookup area */
         s_op->u.lookup.temp_dirent_store[0].oid = resp_p->u.mgmt_get_dirent.handle;
 
@@ -867,9 +882,10 @@ static int lookup_get_dirent_comp_fn(void *v_p,
         s_op->u.lookup.temp_dirent_sid_count = resp_p->u.mgmt_get_dirent.sid_count;
 
         gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
-                     "Got dirent.handle %s\n"
+                     "Got dirent.handle %s\n",
+                     PVFS_OID_str(&resp_p->u.mgmt_get_dirent.handle));
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
                      "Got dirent.sid_array %s\n",
-                     PVFS_OID_str(&resp_p->u.mgmt_get_dirent.handle),
                      PVFS_SID_str(&resp_p->u.mgmt_get_dirent.sid_array[0]));
     }
     return resp_p->u.mgmt_get_dirent.error;
@@ -893,14 +909,30 @@ static PINT_sm_action lookup_read_object_metadata(
                                     job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    /*struct PINT_server_op *getattr_op;*/
-    int ret = -PVFS_EINVAL;
-    /* job_id_t j_id; */
     PVFS_handle handle = PVFS_HANDLE_NULL;
-    /* PVFS_ds_attributes *ds_attr = NULL; */
-    int i,j,start_index,end_index;
+    int i,j,start_index,end_index /*, error_code*/;
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
+
+    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
+
+    PINT_sm_pop_top_frames(smcb);
+
+    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
+#if 0
+    /* there should be a frame on the tos that isn't needed so we should
+     * pop it! right now no error checking is done, but we should add it
+     * OK, this might work in one situation, but does not in another.
+     * One way to fix this is look at the stack detail to decide.
+     */
+    if (smcb->base_frame < smcb->frame_count - 1)
+    {
+        /* so this says if there is a frame after the base pop it
+         * I don't know if that's right - if we should pop multiples
+         */
+        PINT_sm_pop_frame(smcb, NULL, &error_code, NULL);
+    }
+#endif
 
     /* A dirent object was found in the keyval db 
      * OR we read a dirent from the keyval of another server
@@ -959,9 +991,18 @@ static PINT_sm_action lookup_read_object_metadata(
         if (PINT_cached_config_server_local(
                                 &(s_op->u.lookup.temp_dirent_store[j].sid)))
         {
+            struct PINT_server_op *g_op = malloc(sizeof(*g_op));
+            /* set up getattr frame */
+            g_op->req = s_op->req;
+            g_op->target_handle = handle;
+            g_op->target_fs_id = s_op->req->u.lookup_path.fs_id;
+            g_op->target_sid_array = s_op->resp.u.lookup_path.sid_array;
             s_op->u.lookup.handle_ct = 1;
+            /* push getattr frame */
+            PINT_sm_push_frame(smcb, 999, g_op);
             /* this object is on this server */
-            gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Local Segment s_op->lookup.handle_ct = %u\n",
+            gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                           "Local Segment s_op->lookup.handle_ct = %u\n",
                            s_op->u.lookup.handle_ct);
             break;
         }
@@ -984,26 +1025,14 @@ static PINT_sm_action lookup_read_object_metadata(
         return SM_ACTION_COMPLETE;
     }
 
-    /* Copy the fsid and handle to the s_op structure for the acl check */
+    /* LOCAL */
+    /* Copy the fsid and handle to the s_op structure for prelude/getattr */
     s_op->target_handle = handle;
     s_op->target_fs_id = s_op->req->u.lookup_path.fs_id;
 
     /* local handle dspace */
-
-    /* get the dspace attributes for this object - WBL why?
-     * (could be a directory or a metafile) should we cal SM? */
-    ret = job_trove_dspace_getattr(s_op->req->u.lookup_path.fs_id,
-                                   handle,
-                                   smcb,
-                                   &s_op->ds_attr,
-                                   0,
-                                   js_p,
-                                   &(s_op->u.lookup.j_id),
-                                   server_job_context,
-                                   s_op->req->hints);
-
     js_p->error_code = LOCAL_SEGMENT;
-    return ret; /* complete or deferred */
+    return SM_ACTION_COMPLETE; /* complete or deferred */
 }
 
 static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
@@ -1032,6 +1061,9 @@ static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
     getattr_op->total_size = 0;  /* for now */
     msg_p = &getattr_op->msgpair;
 
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op (%p) getattr_op (%p) msg_p (%p)\n",
+                   s_op, getattr_op, msg_p);
+
     PINT_server_to_server_capability(&temp_cap,
                                      s_op->req->u.lookup_path.fs_id,
                                      1,
@@ -1043,7 +1075,7 @@ static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
                               s_op->req->u.lookup_path.credential,
                               s_op->req->u.lookup_path.fs_id,
                               s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.array_index],
-                              PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES | PVFS_ATTR_CAPABILITY,
+                              PVFS_ATTR_FASTEST | PVFS_ATTR_CAPABILITY, /* suppress dirent count */
                               NULL);
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -1067,7 +1099,9 @@ static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
     PVFS_debug_servreq_getattr(GOSSIP_LOOKUP_DEBUG, &getattr_op->msgpair.req);
     PVFS_debug_msgpair_state(GOSSIP_LOOKUP_DEBUG, msg_p);
 
-    PINT_sm_push_frame(smcb, 0, getattr_op);
+    PINT_sm_push_frame(smcb, 0, getattr_op); /* this is a mop */
+    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
+
     return SM_ACTION_COMPLETE;
 
 
@@ -1136,9 +1170,64 @@ static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
 #endif
 }
 
+/* completes a REMOTE call by copying the attributes into the parent frame
+ */
 static int read_remote_metadata_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
+    PINT_smcb *smcb = v_p;
+    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_server_op *p_op = PINT_sm_frame(parent_smcb, PINT_FRAME_PARENT);
+
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "parent frame (%p)\n", p_op);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "resp_p (%p)\n", resp_p);
+
+    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
+    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, parent_smcb);
+
+    PINT_copy_object_attr(&p_op->attr, &resp_p->u.getattr.attr);
+
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "resp_p->u.getattr.attr.objtype %d\n", resp_p->u.getattr.attr.objtype);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "p_op->attr.objtype %d\n", p_op->attr.objtype);
+
     return 0;
+}
+
+/* Function: cleanup_remote_request
+ *
+ * Synopsis: This function pops the mop on the stack after a MPA
+ * call to getattr.  Any useful data in the mo should be handled
+ * by the comp_fn.
+ */
+static PINT_sm_action cleanup_remote_request(struct PINT_smcb *smcb,
+                                             job_status_s *js_p)
+{
+    PINT_sm_msgarray_op *getattr_op = NULL;
+    PINT_server_op *s_op = NULL;
+    int task_id;
+    int remaining;
+
+    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
+
+    /* pop the mop on top */
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+    /* now grab the parent s_op */
+    s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* save the mop ?
+     * we already copied the resp from the mop to the sop
+     * and the mop is actually part of the sop? yes
+     * maybe we don't need to do this - no I don't think so
+     */
+    /*s_op->u.lookup.temp_getattr_op = getattr_op;*/
+
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op (%p) getattr_op (%p)\n",
+                  s_op, getattr_op);
+
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op->attr.objtype %d\n",
+                  s_op->attr.objtype);
+
+    return SM_ACTION_COMPLETE;
 }
 
 /*
@@ -1159,29 +1248,36 @@ static int read_remote_metadata_comp_fn(void *v_p, struct PVFS_server_resp *resp
 static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
                                                     job_status_s *js_p)
 {
-    struct PINT_server_op *getattr_op;
-    struct PINT_server_op *s_op;
-    int task_id;
-    int remaining;
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_sm_msgarray_op *getattr_op;
+    PVFS_object_attr *a_p = NULL; /* convenience for debug */
 
-    /* struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT); */
+    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
 
-    PVFS_object_attr *a_p = NULL;
+    /* remove getattr frame - already removed */
+    /* getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining); */
+    /* getattr_op = &s_op->msgarray_op; - didn't save mop */
 
-    /* remove getattr frame */
-    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+    getattr_op = &s_op->msgarray_op;
 
     if ( js_p->error_code )
     {
         goto errorout;
     }
 
-    /* get current fram for this SM */
+    /* get current frame for this SM */
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op (%p) getattr_op (%p)\n",
+                   s_op, getattr_op);
+
+
     /* update our successful handle read count */
-    s_op->u.lookup.handle_ct++;
-    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op lookup handle ct = %u\n",
+    /* is this a dup handle_ct incr?  This is done during read_object_meetadata
+     * and we are getting 2x the correct count
+     */
+    /* s_op->u.lookup.handle_ct++; */
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op lookup.handle_ct = %u\n",
                    s_op->u.lookup.handle_ct);
 
     /* setup local variables. 
@@ -1192,26 +1288,31 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
 /************/
 /* Both forms of attr are in s_op now using SM getattr.
  * We can copy the ds_attr into this array if its needed
- * The attr needs similar treatment we should also do that here
- *     (see stmt above and below)
- *  s_op->attr and s_op->ds_attr should have each type.
- *  attr should be copied to the lookup resp attr array,
- *  ds_attr to lookup storage array s_op as shown below.
+ * The object attr needs to be copied as well, we should
+ * also do that here  (see stmt above and below)
+ * s_op->attr and s_op->ds_attr should have each type.
+ * attr should be copied to the lookup resp attr array,
+ * ds_attr to lookup storage array s_op as shown below.
  */
 /************/
 
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "index %d attr_array (%p) ds_attr_array (%p)\n",
+                   s_op->u.lookup.array_index,
+                   s_op->resp.u.lookup_path.attr_array,
+                   s_op->u.lookup.ds_attr_array);
+
     /* copy return from attr into resp attr array */
-    s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index] = getattr_op->attr;
+    PINT_copy_object_attr(&(s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index]),
+                          &(s_op->attr));
     /* a_p now points to this copy */
     a_p = &(s_op->resp.u.lookup_path.attr_array[s_op->u.lookup.array_index]); 
 
-    s_op->u.lookup.ds_attr_array[s_op->u.lookup.array_index] = getattr_op->ds_attr; 
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "a_p (%p) a_p->objtype %d\n",
+                   a_p, a_p->objtype);
 
-    /* this frees the getattr s_op, invcluding the attr and ds_attr, which we have
-     * already copied. the things pointed to by the objattr are still live.
-     */
-    free(getattr_op);
-     
+    /* I don't think we need this */
+    /*s_op->u.lookup.ds_attr_array[s_op->u.lookup.array_index] = getattr_op->ds_attr; */
+
     /* set target_object_attr for processing in permissions checks, if 
      * this check is needed.
      */
@@ -1232,7 +1333,7 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
     if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
         gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "object is a metafile; "
-                     "gathering keyval attributes from local server.....\n");
+                       "gathering keyval attributes from local server.....\n");
 
         js_p->error_code = LOOKUP_LOCAL_METAFILE_KEYVALS;
         goto errorout;
@@ -1273,8 +1374,8 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
                         a_p->u.dir.dirdata_sids,
                         a_p->u.dir.dist_dir_bitmap);
    
-        gossip_lsadebug("s_op lookup handle_ct = %u\n", s_op->u.lookup.handle_ct);
-        gossip_lsadebug("s_op lookup attr_ct = %u\n", s_op->u.lookup.attr_ct);
+        gossip_lsadebug("s_op lookup.handle_ct = %u\n", s_op->u.lookup.handle_ct);
+        gossip_lsadebug("s_op lookup.attr_ct = %u\n", s_op->u.lookup.attr_ct);
     }
     gossip_end;
 
@@ -1400,6 +1501,9 @@ static PINT_sm_action lookup_verify_getattr_results(struct PINT_smcb *smcb,
     }
 
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "s_op (%p) getattr_op (%p)\n",
+                   s_op, getattr_op);
 
     resp_attr = &(getattr_op->resp.u.getattr.attr);
 

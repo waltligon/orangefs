@@ -174,9 +174,6 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairs %d\n", mop->count);
 
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,"base frame %d frame count %d\n"
-                                    ,smcb->base_frame, smcb->frame_count);
-
     /* PVFS_perror_gossip_verbose(); */
 
     assert(mop->count > 0);

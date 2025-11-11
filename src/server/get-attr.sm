@@ -281,7 +281,7 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
     PINT_server_op *s_op = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     struct PINT_server_getattr_op *getattr = &(s_op->u.getattr);
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_ldebug(GOSSIP_GETATTR_DEBUG, "(%p)\n", s_op);
 
     int i = 0;
 
@@ -292,27 +292,21 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_TREE_GET_FILE_SIZE);
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "%s:handle_count(%u)\n", __func__,
-                 resp_p->u.tree_get_file_size.handle_count);
+    gossip_ldebug(GOSSIP_GETATTR_DEBUG, "handle_count(%u)\n",
+                  resp_p->u.tree_get_file_size.handle_count);
 
     getattr->size = 0;
     for (i = 0; i < resp_p->u.tree_get_file_size.handle_count; i++)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG
-                    ,"%s: error[%d]:%d\tsize[%d]:%d\n"
-                    ,__func__
-                    ,i
-                    ,(int)resp_p->u.tree_get_file_size.error[i]
-                    ,i
-                    ,(int)resp_p->u.tree_get_file_size.size[i]);
+        gossip_ldebug(GOSSIP_GETATTR_DEBUG, "error[%d]:%d\tsize[%d]:%d\n",
+                      i, (int)resp_p->u.tree_get_file_size.error[i],
+                      i, (int)resp_p->u.tree_get_file_size.size[i]);
 
        if (resp_p->u.tree_get_file_size.error[i] != 0)
        {
-           gossip_debug(GOSSIP_GETATTR_DEBUG
-                        ,"%s: error[%d] is %d\n"
-                        ,__func__
-                        ,i
-                        ,resp_p->u.tree_get_file_size.error[i]);
+           gossip_ldebug(GOSSIP_GETATTR_DEBUG, "error[%d] is %d\n",
+                         i, resp_p->u.tree_get_file_size.error[i]);
+
            memset(getattr->size_array, 0, sizeof(*getattr->size_array));
            getattr->size = 0;
            return (resp_p->u.tree_get_file_size.error[i]);
@@ -1463,6 +1457,7 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
        !attr->u.dir.dirdata_handles ||
        !attr->parent)
     {
+        gossip_err("Failed to allocate memory in getattr(dir)\n");
         free(attr->u.dir.dist_dir_bitmap);
         free(attr->u.dir.dirdata_handles);
         free(attr->parent);
@@ -1472,12 +1467,12 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
         attr->parent = NULL;
         attr->parent_sids = NULL;
         js_p->error_code = -PVFS_ENOMEM;
-        gossip_err("Failed to allocate memory in getattr(dir)\n");
         return SM_ACTION_COMPLETE;
     }
 
     /* total 3 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES, OBJECT_PARENT  */
 
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "setup keyval request\n");
     free_keyval_buffers(s_op);
 
     /* allocate space for keys and values */
@@ -2380,6 +2375,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     void *acl_buf;
     size_t acl_size;
     int ret = 0;
+    PVFS_credential *cred;
     PVFS_uid uid;
     uint32_t num_groups;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
@@ -2474,7 +2470,9 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
 
     /* map credential based on credential certificate */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "mapping credentials\n");
-    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
+    PINT_server_req_get_credential(s_op->req, &cred);
+    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
+
     ret = PINT_map_credential(&s_op->u.getattr.credential, 
                               &uid, 
                               &num_groups,
@@ -2560,11 +2558,10 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
                                  
     respattr->mask |= PVFS_ATTR_CAPABILITY;
 
-    PINT_debug_credential(&s_op->u.getattr.credential, 
-                          "getattr: using credential",
-                          uid, num_groups, group_array);
+    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
+                          /*uid, num_groups, group_array);*/
 
-    PINT_debug_capability(&respattr->capability, "Created");
+    PVFS_debug_PVFS_capability(GOSSIP_GETATTR_DEBUG, &respattr->capability);
 
 #ifdef ENABLE_CAPCACHE
     /* Cache the new capability */

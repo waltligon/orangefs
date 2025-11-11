@@ -90,6 +90,78 @@ struct PINT_state_stack_s
     int prev_base_frame;
 };
 
+/* these structures are for the frame stack used by the SMCB.
+ * The frame stack defines memory areas used by different SMs.
+ * and can be manually pushed and pop'd when one SM calls a
+ * different SM.  Frames can be of different types and sizes.
+ * currently it is up to the code to keep it straight, but 
+ * hopefully a new revision will use existing fields to keep up
+ * with the type and size of each frame.  This was recently
+ * moved from state-machine-fns.c to state-machine.h.
+ */
+
+/* a mod to facilitate sharing of frames for housekeeping
+ * not for normal use.  Addind a struct which points to
+ * each frame with fields.  Frame functions have both usual
+ * and frame_info versions.  The frame_info version let the
+ * code have access to attributes such as frame type and
+ * size.  Right now we don't use these, but we will.
+ */
+
+/* Every frame has a frame_info that hold generic data for
+ * the frame independent of the scmb's it is linked to.
+ * The frame_info points to the frame.
+ */
+
+struct PINT_frame_info_s
+{
+    int ftype;   /* 0 unknown, 1 s_op, 2 mop, 3 sm_p */
+    int fsize;   /* in bytes */
+    int frefcnt; /* manages sharing */
+    void *frame;
+};
+
+/* Each smcb has a stack of frames inplemented into a
+ * linked list.  These are the items in the list. These
+ * have a pointer to the frame_info for each frame, which
+ * in turn point to the actual frames.
+ */
+struct PINT_frame_s
+{
+    int task_id;
+    struct PINT_frame_info_s *frame_info;
+    int error;
+    struct qlist_head link;
+};
+
+#define PVFS_debug_frame_stack(mask, smcb) \
+do { \
+    gossip_if(mask) \
+    { \
+        struct PINT_frame_s *pos = NULL; \
+        int cnt = 0; \
+        gossip_lsadebug("Debug Frame Stack " #smcb " (%p):\n", smcb); \
+        qlist_for_each_prev_entry(pos, &smcb->frames, link) \
+        { \
+            char str[2] = ""; \
+            if(cnt - smcb->base_frame == 0) \
+            { \
+                sprintf(str, "*"); \
+            } \
+            gossip_lsadebug("Frame %d%s:\n", cnt, str); \
+            gossip_lsadebug("  task id %d\n", pos->task_id); \
+            gossip_lsadebug("  ftype %d\n", pos->frame_info->ftype); \
+            gossip_lsadebug("  fsize %d\n", pos->frame_info->fsize); \
+            gossip_lsadebug("  frefcnt %d\n", pos->frame_info->frefcnt); \
+            gossip_lsadebug("  frame (%p)\n", pos->frame_info->frame); \
+            gossip_lsadebug("  error %d\n", pos->error); \
+            cnt++; \
+        } \
+        gossip_lsadebug("End Debug Frame Stack\n"); \
+    } \
+    gossip_end; \
+} while (0)
+
 /* State machine control block - one per running instance of a state
  * machine
  */
@@ -108,6 +180,9 @@ typedef struct PINT_smcb
                                /* different from pjmp_frame_count because */
                                /* this decrements as tasks finish */
 
+    /* Official copies of credentials and capability */
+    PVFS_credential *credential;
+    PVFS_capability *capability;
     /* usage specific routine to look up SM from OP */
     struct PINT_state_machine_s *(*op_get_state_machine)(int, int);
     /* state machine context and control variables */
@@ -276,6 +351,7 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
 
 PINT_sm_action PINT_sm_pop_old_pjmp_frames(struct PINT_smcb *smcb, int child_count);
 
+int PINT_sm_pop_top_frames(struct PINT_smcb *smcb);
 
 /* This macro is used in calls to PINT_sm_frame() */
 #define PINT_FRAME_CURRENT 0

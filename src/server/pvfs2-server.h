@@ -381,6 +381,7 @@ struct PINT_server_lookup_op
 
     PVFS_ID *temp_dirent_store;
     int32_t temp_dirent_sid_count;
+    PINT_sm_msgarray_op *temp_getattr_op;
 
     int dirdata_server_index;
     int dirdata_sid_index;

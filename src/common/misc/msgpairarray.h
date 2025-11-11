@@ -134,8 +134,8 @@ typedef struct PINT_sm_msgpair_state_s
 do {                                       \
     gossip_if(mask)                                       \
     {                                       \
-        gossip_lsadebug("MsgPair Op:\n");          \
-        gossip_lsadebug("state = (%p)\n", (state));             \
+        gossip_lsadebug("MsgPair Op State:\n");          \
+        gossip_lsadebug(#state " = (%p)\n", (state));             \
         PVFS_debug_afield((state)->msgclass, int);           \
         PVFS_debug_afield((state)->msgdir, int);           \
         PVFS_debug_afield((state)->server_nr, int);           \

@@ -18,6 +18,9 @@
 #include "state-machine.h"
 #include "client-state-machine.h"
 
+#if 0
+/* moved to state-machine.h
+ */
 
 /* a mod to facilitate sharing of frames for housekeeping
  * not for normal use.  Addind a struct which points to
@@ -49,11 +52,11 @@ struct PINT_frame_info_s
 struct PINT_frame_s
 {
     int task_id;
-    /*void *frame;*/
     struct PINT_frame_info_s *frame_info;
     int error;
     struct qlist_head link;
 };
+#endif
 
 static struct PINT_state_s *PINT_pop_state(struct PINT_smcb *);
 static void PINT_push_state(struct PINT_smcb *, struct PINT_state_s *);
@@ -1035,10 +1038,10 @@ struct PINT_frame_info_s *PINT_sm_frame_info(struct PINT_smcb *smcb, int index)
             gossip_if(GOSSIP_SM_FRMSTK_DEBUG)
             {
                 struct PINT_frame_s *fr_entry;
-                gossip_log("F: %d prev: (%p)\n", f, prev);
-                gossip_log("    prev.n: (%p) prev.p: (%p)\n", prev->next, prev->prev);
+                gossip_adebug("F: %d prev: (%p)\n", f, prev);
+                gossip_adebug("    prev.n: (%p) prev.p: (%p)\n", prev->next, prev->prev);
                 fr_entry = qlist_entry(prev, struct PINT_frame_s, link);
-                gossip_log("    info (%p) frame (%p)\n",
+                gossip_adebug("    info (%p) frame (%p)\n",
                              fr_entry->frame_info, fr_entry->frame_info->frame);
             }
             gossip_end;
@@ -1293,10 +1296,10 @@ struct PINT_frame_info_s *PINT_sm_pop_frame_info(struct PINT_smcb *smcb,
 }
 
 /* Function: PINT_sm_pop_frame
- * Params: smcb - pointer to an smcb pointer
- *         task_id - the task id of this frame
- *         error_code - the frame's error if there was one.
- *         remaining - count of remaining frames on the smcb.
+ * Params: IN smcb - pointer to an smcb pointer
+ *         OUT task_id - the task id of this frame
+ *         OUT error_code - the frame's error if there was one.
+ *         OUT remaining - count of remaining frames on the smcb.
  * Returns: frame pointer
  * Synopsis: pops a frame pointer from the frame_stack and returns it
  */
@@ -1346,100 +1349,31 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
     return frame;
 }
 
-#if 0
-    if(qlist_empty(&smcb->frames))
-    {
-        return NULL;
-    }
-
-    frame_entry = qlist_entry(smcb->frames.next, struct PINT_frame_s, link);
-    qlist_del(smcb->frames.next);
-    smcb->frame_count--;
-
-    if(remaining)
-    {
-        *remaining = smcb->frame_count;
-    }
-
-    if (--frame_entry->frame_info->frefcnt <= 0)
-    {
-        free(frame_entry->frame_info);
-        /* in this case the frame persists and is returned */
-    }
-    frame = frame_entry->frame_info->frame;
-    *error_code = frame_entry->error;
-    *task_id = frame_entry->task_id;
-
-    free(frame_entry);
-
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM pop_frame] smcb (%p) frame (%p) op-id %d st-stk-ptr %d base-frm %d frm-cnt %d\n",
-                 smcb, frame, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count);
-    /* we return the frame and let user free it */
-    return frame;
-}
-#endif
-
-#ifdef FRAME_STACK_DEBUG
-static void PINT_sm_debug_stack ()
+/* Function: PINT_sm_pop_top_frames
+ * Params: IN smcb - pointer to an smcb pointer
+ * Returns: frame pointer
+ * Synopsis: pops all frames above the current frame.
+ *           May be useful for cleaning up JUMPs and PJMPs.
+ */
+int PINT_sm_pop_top_frames(struct PINT_smcb *smcb)
 {
-    struct PINT_smcb smcb;
-    int task_id = 1;
-    //struct PINT_frame_info_s *fip;
-    struct PINT_frame_s *frame_entry;
-    void *frame;
-    int i = 0;
-    struct qlist_head *prev;
-    int target = 0;
-    int index = 5;
+    struct PINT_frame_info_s *fip;
 
-    memset(&smcb, 0, sizeof(struct PINT_smcb));
-    INIT_QLIST_HEAD(&smcb.frames);
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "=======================================\n");
-
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "loop building stack\n");
-    for (i = 0; i < 5; i++)
+    while(smcb->frame_count - 1 > smcb->base_frame)
     {
-        frame = malloc(100);
-        //*((int *)frame) = i;
-        PINT_sm_push_frame(&smcb, task_id, frame);
+        fip = PINT_sm_pop_frame_info(smcb, NULL, NULL, NULL);
+        if (--(fip->frefcnt) <= 0)
+        {
+            if (PINT_check_malloc(fip->frame))
+            {
+                /* don't free mops that were not malloc'd */
+                free(fip->frame);
+            }
+            free(fip);
+        }
     }
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "loop dumping stack\n");
-    target = (smcb.base_frame + index) - 1; /* adj for end of loop */
-
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "smcb.prames (%p) smcb.n: (%p) smbc.p: (%p)\n",
-                 &smcb.frames, smcb.frames.next, smcb.frames.prev);
-
-    prev = smcb.frames.prev;
-    while(target)
-    {
-        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "prev (%p) target %d\n",
-                     prev, target);
-
-        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "    prev.n: (%p) prev.p: (%p)\n",
-                     prev->next, prev->prev);
-
-        frame_entry = qlist_entry(prev, struct PINT_frame_s, link);
-
-        gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "    info (%p) frame (%p)\n",
-                     frame_entry->frame_info, frame_entry->frame_info->frame);
-
-        target--;
-        prev = prev->prev;
-    }
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "LAST prev (%p) target %d\n",
-                 prev, target);
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "    prev.n: (%p) prev.p: (%p)\n",
-                 prev->next, prev->prev);
-
-    frame_entry = qlist_entry(prev, struct PINT_frame_s, link);
-
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "    info (%p) frame (%p)\n",
-                 frame_entry->frame_info, frame_entry->frame_info->frame);
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "=======================================\n");
-
-}
-#endif
+    return 0;
+}       
 
 /* Function: PINT_sm_task_map
  * Params: smcb and an integer task_id
