@@ -203,6 +203,23 @@ struct PINT_server_create_op
     int handle_index;
 };
 
+#define PVFS_debug_create_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_create_op *ts_op =                      \
+                                  &((_s_op)->u.create);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Create Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->handle_array_local, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->handle_array_local_count, int);    \
+        PVFS_debug_afield(ts_op->saved_error_code, PVFS_error);    \
+        PVFS_debug_afield(ts_op->handle_index, int);    \
+        gossip_lsadebug("Server Create Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 /*MIRROR structures*/
 typedef struct 
 {
@@ -242,6 +259,22 @@ struct PINT_server_mirror_op
    write_job_t *jobs;
 };
 typedef struct PINT_server_mirror_op PINT_server_mirror_op;
+
+#define PVFS_debug_mirror_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_mirror_op *ts_op =                      \
+                                  &((_s_op)->u.mirror);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Mirror Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->job_count, int);    \
+        PVFS_debug_afield(ts_op->max_resp_sz, int);    \
+        /*PVFS_debug_afield(ts_op->jobs, write_job_t);  */  \
+        gossip_lsadebug("Server Mirror Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 /* Source refers to the handle being copied, and destination refers to        */
 /* its copy.                                                                  */
@@ -345,6 +378,48 @@ struct PINT_server_create_copies_op
 };
 typedef struct PINT_server_create_copies_op PINT_server_create_copies_op;
 
+#define PVFS_debug_create_copies_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_create_copies_op *ts_op =                      \
+                                  &((_s_op)->u.create_copies);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Create Copies Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->io_servers_required, uint32_t);    \
+        PVFS_debug_afield(ts_op->mirror_mode, uint32_t);    \
+        PVFS_debug_afield(ts_op->expected_mirror_mode, uint32_t);    \
+        PVFS_debug_afield(ts_op->my_remote_servers, pointer);    \
+        PVFS_debug_afield(ts_op->saved_error_code, PVFS_error);    \
+        PVFS_debug_afield(ts_op->copies, uint32_t);    \
+        PVFS_debug_afield(ts_op->writes_completed, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->retry_count, int);    \
+        PVFS_debug_afield(ts_op->io_servers, pointer);    \
+        PVFS_debug_afield(ts_op->remote_io_servers, pointer);    \
+        PVFS_debug_afield(ts_op->local_io_servers, pointer);    \
+        PVFS_debug_afield(ts_op->num_io_servers, int);    \
+        PVFS_debug_afield(ts_op->remote_io_servers_count, int);    \
+        PVFS_debug_afield(ts_op->local_io_servers_count, int);    \
+        PVFS_debug_afield(ts_op->handle_array_base, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->handle_array_base_local, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->handle_array_copies, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->handle_array_copies_local, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->handle_array_copies_remote, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->handle_array_base_local_count, int);    \
+        PVFS_debug_afield(ts_op->handle_array_copies_local_count, int);    \
+        PVFS_debug_afield(ts_op->handle_array_copies_remote_count, int);    \
+        PVFS_debug_afield(ts_op->dfile_count, uint32_t);    \
+        /*PVFS_debug_afield(ts_op->metadata_handle, PVFS_handle); */  \
+        PVFS_debug_afield(ts_op->fs_id, PVFS_fs_id);    \
+        PVFS_debug_afield(ts_op->io_servers_count, int);    \
+        PVFS_debug_afield(ts_op->dist_size, uint32_t);    \
+        /*PVFS_debug_afield(ts_op->dist, PINT_dist);  */  \
+        /*PVFS_debug_afield(ts_op->ds_attr_a, PVFS_ds_attributes);*/    \
+        PVFS_debug_afield(*(ts_op->bstream_array_base_local), PVFS_size);    \
+        gossip_lsadebug("Server Create Copies Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 /*This macro is used to initialize a PINT_server_op structure when pjmp'ing */
 /*to pvfs2_create_immutable_copies_sm.                                      */
@@ -391,6 +466,33 @@ struct PINT_server_lookup_op
     job_id_t j_id;
 };
 
+#define PVFS_debug_lookup_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_lookup_op *ts_op =                      \
+                                  &((_s_op)->u.lookup);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Lookup Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->seg_ct, int);    \
+        PVFS_debug_afield(ts_op->seg_nr, int);    \
+        PVFS_debug_afield(ts_op->attr_ct, uint32_t);    \
+        PVFS_debug_afield(ts_op->handle_ct, uint32_t);    \
+        PVFS_debug_afield(ts_op->segp, char);    \
+        PVFS_debug_afield(ts_op->segstate, pointer);    \
+        /*PVFS_debug_afield(ts_op->ds_attr_array, PVFS_ds_attributes);  */  \
+        PVFS_debug_afield(ts_op->attr, PVFS_object_attr);    \
+        /*PVFS_debug_afield(ts_op->temp_dirent_store, PVFS_ID);  */  \
+        PVFS_debug_afield(ts_op->temp_dirent_sid_count, int32_t);    \
+        PVFS_debug_afield(ts_op->dirdata_server_index, int);    \
+        PVFS_debug_afield(ts_op->dirdata_sid_index, int);    \
+        PVFS_debug_afield(ts_op->array_index, int);    \
+        PVFS_debug_afield(ts_op->j_id, job_id_t);    \
+        gossip_lsadebug("Server Lookup Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_readdir_op
 {
     uint64_t directory_version;
@@ -399,6 +501,23 @@ struct PINT_server_readdir_op
     PVFS_ID *keyval_db_entries;
     PVFS_size dirdata_size;
 };
+
+#define PVFS_debug_readdir_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_readdir_op *ts_op =                      \
+                                  &((_s_op)->u.readdir);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Readdir Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->directory_version, uint64_t);    \
+        /*PVFS_debug_afield(ts_op->dirent_handle, PVFS_handle);  */  \
+        /*PVFS_debug_afield(ts_op->keyval_db_entries, PVFS_ID); */   \
+        PVFS_debug_afield(ts_op->dirdata_size, PVFS_size);    \
+        gossip_lsadebug("Server Readdir Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 typedef struct
 {
@@ -454,10 +573,58 @@ struct PINT_server_crdirent_op
     PVFS_handle        *remote_dirdata_handles;
 };
 
+#define PVFS_debug_crdirent_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_crdirent_op *ts_op =                      \
+                                  &((_s_op)->u.crdirent);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Crdirent Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->capability, PVFS_capability);  */  \
+        /*PVFS_debug_afield(ts_op->keyval_handle_info, PVFS_ds_keyval_handle_info); */   \
+        PVFS_debug_afield(ts_op->dirdata_attr, PVFS_object_attr);    \
+        PVFS_debug_afield(ts_op->parent_dir_attr, PVFS_object_attr);    \
+        /*PVFS_debug_afield(ts_op->dirdata_ds_attr, PVFS_ds_attributes); */   \
+        /*PVFS_debug_afield(ts_op->keyval_temp_store, PVFS_ID);  */  \
+        PVFS_debug_afield(ts_op->split_node, int);    \
+        PVFS_debug_afield(ts_op->saved_attr, PVFS_object_attr);    \
+        /*PVFS_debug_afield(ts_op->svr_attr, PVFS_BMI_addr_t);  */  \
+        PVFS_debug_afield(*(ts_op->split_status), PVFS_error);    \
+        /*PVFS_debug_afield(ts_op->dist, PINT_dist);  */  \
+        PVFS_debug_afield(ts_op->read_all_directory_entries, int);    \
+        PVFS_debug_afield(ts_op->nentries, int);    \
+        PVFS_debug_afield(ts_op->entry_handles, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->entry_sid, PVFS_SID);    \
+        PVFS_debug_afield(ts_op->entry_names, pointer);    \
+        PVFS_debug_afield(ts_op->num_msgs_required, int);    \
+        /*PVFS_debug_afield(ts_op->msg_boundaries, split_msg_boundary);  */  \
+        /*PVFS_debug_afield(ts_op->entries_key_a, PVFS_ds_keyval);  */  \
+        /*PVFS_debug_afield(ts_op->entries_val_a, PVFS_ds_keyval);  */  \
+        PVFS_debug_afield(ts_op->remote_dirdata_handles, PVFS_handle);    \
+        gossip_lsadebug("Server Crdirent Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_setattr_op
 {
     PVFS_handle *remote_dirdata_handles;
 };
+
+#define PVFS_debug_setattr_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_setattr_op *ts_op =                      \
+                                  &((_s_op)->u.setattr);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Setattr Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->remote_dirdata_handles, PVFS_handle);    \
+        gossip_lsadebug("Server Setattr Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 struct PINT_server_rmdirent_op
 {
@@ -470,6 +637,26 @@ struct PINT_server_rmdirent_op
     PVFS_capability capability;/* for server-to-server */
 };
 
+#define PVFS_debug_rmdirent_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_rmdirent_op *ts_op =                      \
+                                  &((_s_op)->u.rmdirent);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Rmdirent Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->entry_handle, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->sid_array, PVFS_SID);    \
+        PVFS_debug_afield(ts_op->dirent_count, PVFS_size);    \
+        /*PVFS_debug_afield(ts_op->dir_ds_attr, PVFS_ds_attributes); */   \
+        /*PVFS_debug_afield(ts_op->dirdata_ds_attr, PVFS_ds_attributes); */   \
+        /*PVFS_debug_afield(ts_op->credential, PVFS_credential);  */  \
+        /*PVFS_debug_afield(ts_op->capability, PVFS_capability);  */  \
+        gossip_lsadebug("Server Rmdirent Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_chdirent_op
 {
     PVFS_handle dirdata_handle;
@@ -481,6 +668,26 @@ struct PINT_server_chdirent_op
     PVFS_object_attr dirdata_attr;
     PVFS_ds_attributes dirdata_ds_attr;
 };
+
+#define PVFS_debug_chdirent_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_chdirent_op *ts_op =                      \
+                                  &((_s_op)->u.chdirent);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Chdirent Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->dirdata_handle, PVFS_handle);   */ \
+        PVFS_debug_afield(ts_op->old_dirent_handle, PVFS_handle);    \
+        PVFS_debug_afield(ts_op->old_sid_array, PVFS_SID);    \
+        PVFS_debug_afield(ts_op->old_sid_count, int32_t);    \
+        PVFS_debug_afield(ts_op->dir_attr_update_required, int);    \
+        PVFS_debug_afield(ts_op->dirdata_attr, PVFS_object_attr);    \
+        /*PVFS_debug_afield(ts_op->dirdata_ds_attr, PVFS_ds_attributes); */   \
+        gossip_lsadebug("Server Chdirent Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 struct PINT_server_remove_op
 {
@@ -513,15 +720,75 @@ struct PINT_server_remove_op
     PVFS_handle* handle_array_remote;
 };
 
+#define PVFS_debug_remove_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_remove_op *ts_op =                      \
+                                  &((_s_op)->u.remove);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Remove Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->handle, PVFS_handle); */   \
+        PVFS_debug_afield(ts_op->fs_id, PVFS_fs_id);    \
+        /*PVFS_debug_afield(ts_op->dirdata_handle, PVFS_handle); */    \
+        PVFS_debug_afield(ts_op->dirent_count, PVFS_size);    \
+        /*PVFS_debug_afield(ts_op->key, PVFS_ds_keyval); */   \
+        /*PVFS_debug_afield(ts_op->pos, PVFS_ds_position);  */  \
+        PVFS_debug_afield(ts_op->key_count, int);    \
+        PVFS_debug_afield(ts_op->index, int);    \
+        PVFS_debug_afield(ts_op->remove_keyvals_state, int);    \
+        PVFS_debug_afield(ts_op->local_dirdata_index, int);    \
+        PVFS_debug_afield(*(ts_op->remote_dirdata_index), int);    \
+        PVFS_debug_afield(ts_op->num_remote_dirdata_indices, int);    \
+        PVFS_debug_afield(ts_op->saved_error_code, int);    \
+        PVFS_debug_afield(ts_op->need_rebuild_dirdata_local, int);    \
+        PVFS_debug_afield(ts_op->rebuild_local_dirdata_index, int);    \
+        PVFS_debug_afield(ts_op->num_rebuild_dirdata_remote, int);    \
+        PVFS_debug_afield(*(ts_op->rebuild_dirdata_index_array_remote), int);    \
+        /*PVFS_debug_afield(ts_op->handle_local, PVFS_handle);  */  \
+        PVFS_debug_afield(ts_op->handle_array_remote, PVFS_handle);    \
+        gossip_lsadebug("Server Remove Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_mgmt_remove_dirent_op
 {
     PVFS_handle dirdata_handle;
 };
 
+#define PVFS_debug_mgmt_remove_dirent_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_mgmt_remove_dirent_op *ts_op =                      \
+                                  &((_s_op)->u.mgmt_remove_dirent);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server MGMT Remove Dirent Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->dirdata_handle, PVFS_handle);  */  \
+        gossip_lsadebug("Server MGMT Remove Dirent Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_mgmt_split_dirent_op
 {
     PVFS_ID *keyval_temp_store;
 };
+
+#define PVFS_debug_mgmt_split_dirent_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_mgmt_split_dirent_op *ts_op =                      \
+                                  &((_s_op)->u.mgmt_split_dirent);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server MGMT Split Dirent Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->keyval_temp_store, PVFS_ID);  */  \
+        gossip_lsadebug("Server MGMT Split Dirent Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 /* WBL V3 removing precreate */
 #if 0
@@ -544,11 +811,41 @@ struct PINT_server_batch_create_op
     int batch_index;
 };
 
+#define PVFS_debug_batch_create_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_batch_create_op *ts_op =                      \
+                                  &((_s_op)->u.batch_create);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Batch Create Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->saved_error_code, int);    \
+        PVFS_debug_afield(ts_op->batch_index, int);    \
+        gossip_lsadebug("Server Batch Create Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_batch_remove_op
 {
     int handle_index;
     int error_code;
 };
+
+#define PVFS_debug_batch_remove_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_batch_remove_op *ts_op =                      \
+                                  &((_s_op)->u.batch_remove);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Batch Remove Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->handle_index, int);    \
+        PVFS_debug_afield(ts_op->error_code, int);    \
+        gossip_lsadebug("Server Batch Remove Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 struct PINT_server_mgmt_get_dirdata_op
 {
@@ -558,16 +855,60 @@ struct PINT_server_mgmt_get_dirdata_op
     int sid_count;
 };
 
+#define PVFS_debug_mgmt_get_dirdata_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_mgmt_get_dirdata_op *ts_op =                      \
+                                  &((_s_op)->u.mgmt_get_dirdata_handle);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server MGMT Get Dirdata Handle Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->keyval_temp_array, PVFS_ID);  */  \
+        PVFS_debug_afield(ts_op->sid_array, PVFS_SID);    \
+        PVFS_debug_afield(ts_op->sid_count, int);    \
+        gossip_lsadebug("Server MGMT Get Dirdata Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_getconfig_op
 {
     int strsize; /* used to hold string lengths during getconfig
                   * processing */
 };
 
+#define PVFS_debug_getconfig_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_getconfig_op *ts_op =                      \
+                                  &((_s_op)->u.getconfig);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Getconfig Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->strsize, int);    \
+        gossip_lsadebug("Server Getconfig Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_io_op
 {
     flow_descriptor* flow_d;
 };
+
+#define PVFS_debug_io_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_io_op *ts_op =                      \
+                                  &((_s_op)->u.io);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server IO Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->flow_d, flow_descriptor); */   \
+        gossip_lsadebug("Server IO Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 struct PINT_server_small_io_op
 {
@@ -576,17 +917,63 @@ struct PINT_server_small_io_op
     PVFS_size result_bytes;
 };
 
+#define PVFS_debug_small_io_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_small_io_op *ts_op =                      \
+                                  &((_s_op)->u.small_io);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Small IO Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->offsets, PVFS_offset); */   \
+        PVFS_debug_afield(*(ts_op->sizes), PVFS_size);    \
+        PVFS_debug_afield(ts_op->result_bytes, PVFS_size);    \
+        gossip_lsadebug("Server Small IO Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_flush_op
 {
     PVFS_handle handle;        /* handle of data we want to flush to disk */
     int flags;            /* any special flags for flush */
 };
 
+#define PVFS_debug_flush_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_flush_op *ts_op =                      \
+                                  &((_s_op)->u.flush);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Flush Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->handle, PVFS_handle);*/    \
+        PVFS_debug_afield(ts_op->flags, int);    \
+        gossip_lsadebug("Server Flush Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
+
 struct PINT_server_truncate_op
 {
     PVFS_handle handle;        /* handle of datafile we resize */
     PVFS_offset size;        /* new size of datafile */
 };
+
+#define PVFS_debug_truncate_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_truncate_op *ts_op =                      \
+                                  &((_s_op)->u.truncate);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Truncate Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        /*PVFS_debug_afield(ts_op->handle, PVFS_handle); */   \
+        /*PVFS_debug_afield(ts_op->size, PVFS_offset);  */  \
+        gossip_lsadebug("Server Truncate Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 struct PINT_server_mkdir_op
 {
@@ -618,6 +1005,28 @@ struct PINT_server_mkdir_op
     int *rmt_dirdata_array; /* array of indicies of the dirdata that are remote */
     PVFS_OID *dirdata_parent_buffer; /* OID and SIDs of the dir (parent to dirdatas) */
 };
+
+#define PVFS_debug_mkdir_op_s(_mask, _s_op)                \
+do {                                                        \
+    struct PINT_server_mkdir_op *ts_op =                      \
+                                  &((_s_op)->u.mkdir);       \
+    gossip_if (_mask)                                        \
+    {                                                       \
+        gossip_lsadebug("Server Mkdir Op:\n");               \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        PVFS_debug_afield(ts_op->fs_id, PVFS_fs_id);    \
+        /*PVFS_debug_afield(ts_op->handle, PVFS_handle);   */ \
+        /*PVFS_debug_afield(ts_op->server_to_server_capability, PVFS_capability);   */ \
+        PVFS_debug_afield(ts_op->saved_attr, PVFS_object_attr);    \
+        PVFS_debug_afield(ts_op->saved_error_code, PVFS_error);    \
+        PVFS_debug_afield(ts_op->dirdata_index, int);    \
+        PVFS_debug_afield(ts_op->rmt_dirdata_index, int);    \
+        PVFS_debug_afield(ts_op->rmt_dirdata_array, pointer);    \
+        PVFS_debug_afield(ts_op->dirdata_parent_buffer, PVFS_OID);    \
+        gossip_lsadebug("Server Mkdir Op End:\n");                   \
+    }                                                       \
+    gossip_end;                                             \
+} while (0)
 
 struct PINT_server_getattr_op
 {
