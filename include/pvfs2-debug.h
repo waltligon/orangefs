@@ -321,6 +321,59 @@ static inline int DBG_TRUE(PVFS_debug_mask mask)
  * src/server/pvfs2-server.h and others.
  */
 
+/* This expects a pointer to a directory_attr
+ */
+#define PVFS_to_string_PVFS_dist_dir_bitmap(_dattr, _string, _print)      \
+do {                                                                      \
+    int i;                                                                \
+    gossip_ladebug("Dist_Dir_Bitmap: \n");                                \
+    gossip_ladebug(#_dattr " = (%p)\n", (_dattr));                        \
+    if ((_dattr) == NULL || (_dattr)->dist_dir_bitmap == NULL)            \
+    {                                                                     \
+        sprintf(_string, "(nil)");                                        \
+    }                                                                     \
+    else                                                                  \
+    {                                                                     \
+        for(i = (_dattr)->dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)    \
+        {                                                                 \
+        gossip_ladebug("1\n"); \
+            unsigned char *c = (unsigned char *)((_dattr)->dist_dir_bitmap + i); \
+        gossip_ladebug("2\n"); \
+            gossip_ladebug("i=%d : %02x %02x %02x %02x\n",               \
+                            i, c[3], c[2], c[1], c[0]);                   \
+        gossip_ladebug("3\n"); \
+        }                                                                 \
+        gossip_ladebug("4\n"); \
+        _print = 'N';                                                     \
+        gossip_ladebug("5\n"); \
+    }                                                                     \
+} while (0)
+
+#define PVFS_to_string_PVFS_time(_time, _string, _print) \
+do { \
+    sprintf(_string, "%ld", (_time)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_ds_type(_ds_type, _string, _print) \
+do { \
+    sprintf(_string, "%d", (_ds_type)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_uid(_uid, _string, _print) \
+do { \
+    sprintf(_string, "%d", (_uid)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_gid(_gid, _string, _print) \
+do { \
+    sprintf(_string, "%d", (_gid)); \
+} while (0)
+
+#define PVFS_to_string_PVFS_permissions(_permissions, _string, _print) \
+do { \
+    sprintf(_string, "%o", (_permissions)); \
+} while (0)
+
 #define PVFS_to_string_PVFS_error(_error, _string, _print) \
 do { \
     sprintf(_string, "%d", (_error)); \
@@ -328,29 +381,45 @@ do { \
 
 #define PVFS_to_string_PVFS_credential(_cred, _string, _print) \
 do { \
-    PVFS_debug_PVFS_credential_nomask(_cred); \
-    _print = 'N';                             \
+    if (_cred == NULL)                   \
+    {                                    \
+        sprintf(_string, "(nil)");       \
+    }                                    \
+    else                                 \
+    {                                    \
+        PVFS_debug_PVFS_credential_nomask(_cred); \
+        _print = 'N';                    \
+    }                                    \
 } while (0)
 
 #define PVFS_to_string_PVFS_capability(_cap, _string, _print) \
-do { \
-    PVFS_debug_PVFS_capability_nomask(_cap); \
-    _print = 'N';                            \
+do {                                     \
+    if (_cap == NULL)                    \
+    {                                    \
+        sprintf(_string, "(nil)");       \
+    }                                    \
+    else                                 \
+    {                                    \
+        PVFS_debug_PVFS_capability_nomask(_cap); \
+        _print = 'N';                    \
+    }                                    \
 } while (0)
 
 #define PVFS_to_string_pointer(_ptr, _string, _print) \
 do { \
-    sprintf(_string, "(%p)", (_ptr)); \
+    if (_ptr == NULL)                    \
+    {                                    \
+        sprintf(_string, "(nil)");       \
+    }                                    \
+    else                                 \
+    {                                    \
+        sprintf(_string, "(%p)", (_ptr)); \
+    }                                    \
 } while (0)
 
 #define PVFS_to_string_PVFS_fs_id(_fsid, _string, _print) \
 do { \
     sprintf(_string, "%d", (_fsid)); \
-} while (0)
-
-#define PVFS_to_string_PVFS_handle(_handle, _string, _print) \
-do { \
-    PVFS_OID_bin2str(_handle, _string); \
 } while (0)
 
 #define PVFS_to_string_int64_t(_longint, _string, _print) \
@@ -360,6 +429,9 @@ do { \
 
 #define PVFS_to_string_job_id_t(_longint, _string, _print) \
         PVFS_to_string_int64_t(_longint, _string, _print)
+
+#define PVFS_to_string_PVFS_size(_size, _string, _print) \
+        PVFS_to_string_int64_t(_size, _string, _print)
 
 #define PVFS_to_string_uint64_t(_longuint, _string, _print) \
 do { \
@@ -379,29 +451,73 @@ do { \
     sprintf(_string, "%u", (_integer)); \
 } while (0)
 
-#define PVFS_to_string_PVFS_OID(_oid, _string, _print) \
+#define PVFS_to_string_char(_char, _string, _print) \
 do { \
-    PVFS_OID_bin2str(_oid, _string); \
+    sprintf(_string, "%c", (*_char)); \
 } while (0)
+
+#define PVFS_to_string_PVFS_OID(_oid, _string, _print) \
+do {                                     \
+    if (_oid == NULL)                    \
+    {                                    \
+        sprintf(_string, "(nil)");       \
+    }                                    \
+    else                                 \
+    {                                    \
+        PVFS_OID_bin2str(_oid, _string); \
+    }                                    \
+} while (0)
+
+#define PVFS_to_string_PVFS_handle(_handle, _string, _print) \
+        PVFS_to_string_PVFS_OID(_handle, _string, _print)
 
 #define PVFS_to_string_PVFS_SID(_sid, _string, _print) \
 do { \
-    PVFS_SID_bin2str(_sid, _string); \
+    if (_sid == NULL)                    \
+    {                                    \
+        sprintf(_string, "(nil)");       \
+    }                                    \
+    else                                 \
+    {                                    \
+        PVFS_SID_bin2str(_sid, _string); \
+    }                                    \
 } while (0)
 
 #define PVFS_to_string_string(_stringin, _stringout, _print) \
 do { \
-    strcpy(_stringout, _stringin); \
+    if (_stringin == NULL)               \
+    {                                    \
+        sprintf(_stringout, "(nil)");    \
+    }                                    \
+    else                                 \
+    {                                    \
+        strcpy(_stringout, _stringin);   \
+    }                                    \
 } while (0)
 
 #define PVFS_to_string_PVFS_object_ref(_ref, _string, _print) \
-do { \
-    PVFS_OID_bin2str(&((_ref).handle), _string); \
+do {                                     \
+    if ((_ref) == NULL)                  \
+    {                                    \
+        sprintf(_string, "(nil)");       \
+    }                                    \
+    else                                 \
+    {                                    \
+        PVFS_OID_bin2str(&((_ref)->handle), _string); \
+    }                                    \
 } while (0)
 
 #define PVFS_to_string_PVFS_object_attr(_ref, _string, _print) \
-do { \
-    _string[0] = 0; \
+do {                                     \
+    if ((_ref) == NULL)                  \
+    {                                    \
+        sprintf(_string, "(nil)");       \
+    }                                    \
+    else                                 \
+    {                                    \
+        /*PVFS_debug_PVFS_object_attr(__DEBUG_ALL, _ref);*/ \
+        _print = 'N';                    \
+    }                                    \
 } while (0)
 
 #define PVFS_to_string_PVFS_object_attrmask(_mask, _string, _print) \
@@ -414,15 +530,15 @@ do { \
     sprintf(_string, "%p", _stat_p); \
 } while (0)
 
-#define PVFS_debug_afield(_field, _type) \
-do { \
-    char _string[100]; \
-    char _print = 'Y'; \
-    PVFS_to_string_##_type(_field, _string, _print); \
-    if (_print == 'Y') \
-    {                  \
+#define PVFS_debug_afield(_field, _type)               \
+do {                                                   \
+    char _string[100];                                 \
+    char _print = 'Y';                                 \
+    PVFS_to_string_##_type((_field), _string, _print); \
+    if (_print == 'Y')                                 \
+    {                                                  \
         gossip_lsadebug("\t" #_field ": %s\n", _string); \
-    }                  \
+    }                                                  \
 } while (0) 
 
 #define PVFS_debug_areqfield(_field, _type) \

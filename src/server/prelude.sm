@@ -165,6 +165,13 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
         COPY_PVFS_CREDENTIAL(&s_op->orig_cred, cred);
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->req->op = %d\n", s_op->req->op);
+//    if (smcb->op == PVFS_SERV_MKDIR)
+    if (s_op->req->op == PVFS_SERV_MKDIR)
+    {
+        PVFS_debug_servreq_mkdir(GOSSIP_MKDIR_DEBUG, s_op->req);
+    }
+
     /* gets the target fs_id and handle from the request and copies
      * them in the s_op
      */

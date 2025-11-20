@@ -146,7 +146,7 @@ do {                                                              \
     {                                                             \
         gossip_lsadebug("Getattr State:\n");                      \
         gossip_lsadebug("state = (%p)\n", (state));               \
-        PVFS_debug_afield((state)->object_ref, PVFS_object_ref); \
+        PVFS_debug_afield(&(state)->object_ref, PVFS_object_ref); \
         PVFS_debug_afield((state)->req_attrmask, PVFS_object_attrmask); \
         PVFS_debug_afield((state)->ref_type, uint32_t);           \
         gossip_lsadebug("Getattr State End:\n");                  \

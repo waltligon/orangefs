@@ -295,15 +295,14 @@ nested machine pvfs2_tree_getattr_work_sm
 
 /******************** ACTION FUNCTIONS *********************/
 
-static PINT_sm_action tree_communicate_partition_handles(
-                                                  struct PINT_smcb *smcb
-                                                 ,job_status_s *js_p
-                                                 ,int num_data_files
-                                                 ,int num_sids
-                                                 ,PVFS_fs_id fs_id
-                                                 ,enum PVFS_server_op operation
-                                                 ,PVFS_handle *handle_array
-                                                 ,PVFS_SID *sid_array)
+static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
+                                                         job_status_s *js_p, 
+                                                         int num_data_files, 
+                                                         int num_sids, 
+                                                         PVFS_fs_id fs_id, 
+                                                         enum PVFS_server_op operation, 
+                                                         PVFS_handle *handle_array, 
+                                                         PVFS_SID *sid_array)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *ts_op = NULL; /* to access tree frame */
@@ -605,8 +604,8 @@ static PINT_sm_action tree_communicate_partition_handles(
 
                 ts_op->local_index = i; /* index into tree arrays */
 
-                //DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG,
-                //                      &s_op->req->u.tree_get_dirent_count.credential);
+                PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG,
+                                           &s_op->req->u.tree_get_dirent_count.credential);
                 //PINT_debug_capability(&s_op->req->capability, "from request");
 
 
@@ -641,9 +640,10 @@ static PINT_sm_action tree_communicate_partition_handles(
                 /* Will be needed in a bit */
                 /* ts_op does not point to new frame */
                 //ts_op->req->u.getattr.credential =
-                 //      s_op->req->u.getattr.credential;
-            PINT_server_req_get_credential(s_op->req, &cred);
-            //DEBUG_PVFS_CREDENTIAL(GOSSIP_SERVER_DEBUG, cred);       
+                //      s_op->req->u.getattr.credential;
+                //PINT_server_req_get_credential(s_op->req, &cred);
+                PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG,
+                                           &s_op->req->u.tree_getattr.credential);
 
                 PINT_SERVREQ_GETATTR_FILL(
                     *ts_req,
@@ -874,6 +874,8 @@ static PINT_sm_action tree_communicate_partition_handles(
             case PVFS_SERV_TREE_GET_DIRENT_COUNT:
             {
                 gossip_lsdebug(GOSSIP_SERVER_DEBUG, "TREE_GET_DIRENT_CNT\n");
+                PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG,
+                                           &s_op->req->u.tree_get_dirent_count.credential);       
                 PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
                         msg_p->req,
                         capability,
@@ -893,7 +895,8 @@ static PINT_sm_action tree_communicate_partition_handles(
 
                 PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &msg_p->req);
                 PVFS_debug_PVFS_capability(GOSSIP_SERVER_DEBUG, &capability);
-                PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG, &(s_op->req->u.tree_get_dirent_count.credential));       
+                //PINT_server_req_get_credential(s_op->req, &cred);
+                //PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG, cred);       
 
                 msg_p->comp_fn = tree_get_dirent_count_comp_fn;
                 msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;

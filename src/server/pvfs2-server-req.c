@@ -247,7 +247,7 @@ int PINT_server_req_get_credential(struct PVFS_server_req *req,
     if (0 > (ret = check_op(req->op)))
         return 0;
 
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "req->op %d\n", req->op);
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "req (%p) req->op %d\n", req, req->op);
 
     if (!PINT_server_req_table[req->op].params->get_credential)
     {

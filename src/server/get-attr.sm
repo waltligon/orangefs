@@ -353,7 +353,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
      * fail to add new fields than have a hard time understanding the
      * fields.
      */
-    respattr = &s_op->resp.u.getattr.attr;
+    respattr = &(s_op->resp.u.getattr.attr);
     memset(respattr, 0, sizeof(PVFS_object_attr));
 
     /* We are using this routine (which normally would be hidden) because
@@ -363,37 +363,9 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
      * fixed size fields.
      */
     PINT_copy_object_attr_fixed(respattr, &s_op->attr);
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "+  _DSPACE_ retrieved attrs:\n"
-                 "\t\tType  = %s(%d)\n"
-                 "\t\tfs_id = %d\n"
-                 "\t\tOID   = %s\n"
-                 "\t\tmask  = 0x%lx\n"
-                 "\t\towner = %d\n"
-                 "\t\tgroup = %d\n"
-                 "\t\tperms = %o\n"
-                 "\t\tatime = %llu\n"
-                 "\t\tmtime = %llu\n"
-                 "\t\tctime = %llu\n"
-                 "\t\tntime = %llu\n"
-                 "\t\tmeta_sid_count = %d\n",
-                 PVFS_ds_type_to_string(respattr->objtype),
-                 respattr->objtype,
-                 //s_op->ds_attr.fs_id,
-                 s_op->target_fs_id,
-                 //PVFS_OID_str(&s_op->ds_attr.handle),
-                 PVFS_OID_str(&s_op->target_handle),
-                 respattr->mask,
-                 respattr->owner,
-                 respattr->group,
-                 respattr->perms,
-                 llu(respattr->atime),
-                 llu(respattr->mtime),
-                 llu(respattr->ctime),
-                 llu(respattr->ntime),
-                 respattr->meta_sid_count);
-
+    /*PVFS_debug_PVFS_dist_dir_attr(GOSSIP_GETATTR_DEBUG, &(respattr->u.dir.dist_dir_attr));*/
+    /*PVFS_debug_PVFS_object_attr(GOSSIP_GETATTR_DEBUG, respattr);*/
+    PVFS_debug_PVFS_directory_attr(GOSSIP_GETATTR_DEBUG, &(respattr->u.dir));
 
     /*
      * weed out the attr mask of the response based on what the client
@@ -599,29 +571,6 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
             }
 #endif
-            gossip_debug(
-                GOSSIP_GETATTR_DEBUG,
-                "\n\t\ttree_height = %d\n"
-                "\t\tdirdata_min   = %d\n"
-                "\t\tdirdata_max   = %d\n"
-                "\t\tdirdata_count = %d\n"
-                "\t\tsid_count     = %d\n"
-                "\t\tbitmap_size   = %d\n"
-                "\t\tsplit_size    = %d\n"
-                "\t\tserver_no     = %d\n"
-                "\t\tbranch_level  = %d\n"
-                "\t\tdirent_count  = %d\n",
-                (int)respattr->u.dir.dist_dir_attr.tree_height,
-                (int)respattr->u.dir.dist_dir_attr.dirdata_min,
-                (int)respattr->u.dir.dist_dir_attr.dirdata_max,
-                (int)respattr->u.dir.dist_dir_attr.dirdata_count,
-                (int)respattr->u.dir.dist_dir_attr.sid_count,
-                (int)respattr->u.dir.dist_dir_attr.bitmap_size,
-                (int)respattr->u.dir.dist_dir_attr.split_size,
-                (int)respattr->u.dir.dist_dir_attr.server_no,
-                (int)respattr->u.dir.dist_dir_attr.branch_level,
-                (int)respattr->u.dir.dirent_count);
-
             /* respattr->mask |= PVFS_ATTR_DIR_ALL; */
             js_p->error_code = STATE_DIR;
             break;
@@ -729,6 +678,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             break;
     }/* end switch on object type */
     /* DEBUG_attr_mask(respattr->mask); makes a lot ot output  */
+
+
     return SM_ACTION_COMPLETE;
 }
 
@@ -1528,6 +1479,10 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
     keep_keyval_buffers(s_op, 2);
     /*----------------------------------------------------------------------------*/
 
+    PVFS_credential *cred;
+    PINT_server_req_get_credential(s_op->req, &cred);
+    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
+
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Calling trove keyval read list: fs_id %d\n",
                                          s_op->target_fs_id);
     js_p->error_code = 0;
@@ -1563,6 +1518,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     int ret, i, j;
     job_id_t tmp_id;
     PVFS_object_attr *attr_p;
+    PVFS_credential *cred;
     unsigned char *c GCC_UNUSED;
 
     attr_p = &s_op->resp.u.getattr.attr;
@@ -1570,6 +1526,8 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                  "frame: (%p), attr_p: (%p)\n", s_op, attr_p);
 
+    PINT_server_req_get_credential(s_op->req, &cred);
+    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     /*
      * Check for return of last database (keyval) read
      * and debugging of results
@@ -1826,6 +1784,9 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    PINT_server_req_get_credential(s_op->req, &cred);
+    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
+
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "frame (%p) keval_read_list\n", s_op);
 
     /* read key val pairs */
@@ -1863,6 +1824,9 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "frame (%p)\n", s_op);
 
+    PVFS_credential *cred;
+    PINT_server_req_get_credential(s_op->req, &cred);
+    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
         /* if we failed to get any of the keys, and the error code is due to
@@ -2069,12 +2033,14 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                  "frame s_op: (%p), attr_p: (%p), "
                  "dirdata_handles (%p), "
                  "dist_dir_bitmap (%p), "
-                 "parent: %s\n",
+                 "parent %s\n",
                  s_op, attr_p,
                  attr_p->u.dir.dirdata_handles,
                  attr_p->u.dir.dist_dir_bitmap,
                  PVFS_OID_str(attr_p->parent));
 
+    PINT_server_req_get_credential(s_op->req, &cred);
+    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     return SM_ACTION_COMPLETE;
 }
 
@@ -2101,17 +2067,26 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
      * parent frame, and reasonable data in the req.  We copy the resp
      * too just in case.
      */
+    PVFS_credential *cred;
+//    PINT_server_req_get_credential(s_op->req, &cred);
+//    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
+
     PINT_sm_push_dup_frame(smcb, sizeof(PINT_server_op));
+
     new_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT + 1); /* get new frame */
 
     new_op->op = PVFS_SERV_TREE_GET_DIRENT_COUNT; /* tree op we are about to jump to */
+
+    PINT_server_req_get_credential(new_op->req, &cred);
+    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
+
     new_op->msgarray_op.msgarray = &(new_op->msgarray_op.msgpair);
     new_op->req = &(new_op->msgarray_op.msgpair.req);  /* don't malloc if we don't have to */
     /* new_op->req = (struct PVFS_server_req *)malloc(sizeof(struct PVFS_server_req)); */
 
     memcpy(new_op->req, s_op->req, sizeof(struct PVFS_server_req));
+    //new_op->req = s_op->req;
     memcpy(&new_op->resp, &s_op->resp, sizeof(struct PVFS_server_resp));
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "fs_id %d\n", new_op->target_fs_id);
     new_op->msgarray_op.msgarray = NULL;
     new_op->key_a = NULL;
     new_op->val_a = NULL;
@@ -2155,11 +2130,14 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
                    //(void *)getattr_p->dirent_array);
 
     /* set up the tree op */
-    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(s_op->req->u.getattr.credential));
+//    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(s_op->req->u.getattr.credential));
+      PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(getattr_p->credential));
+//    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(new_op->req->u.getattr.credential));
     PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
                                     msg_p->req, /* dest is new_op */
                                     capability,
                                     getattr_p->credential, /* is this right? */
+                                    //new_op->req->u.getattr.credential,
                                     s_op->target_fs_id,
                                     //getattr_p->fs_id,
                                     0,
@@ -2470,8 +2448,9 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
 
     /* map credential based on credential certificate */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "mapping credentials\n");
-    PINT_server_req_get_credential(s_op->req, &cred);
-    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
+    //PINT_server_req_get_credential(s_op->req, &cred);
+    //PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
+    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
 
     ret = PINT_map_credential(&s_op->u.getattr.credential, 
                               &uid, 

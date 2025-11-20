@@ -298,9 +298,9 @@ do {                                                        \
         gossip_lsadebug("Create Request:\n");               \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(&(treq->credential), PVFS_credential);\
-        PVFS_debug_afield(treq->attr, PVFS_object_attr);    \
-        PVFS_debug_afield(treq->parent, PVFS_object_ref);   \
-        PVFS_debug_afield(treq->object, PVFS_object_ref);   \
+        PVFS_debug_afield(&(treq->attr), PVFS_object_attr); \
+        PVFS_debug_afield(&(treq->parent), PVFS_object_ref);\
+        PVFS_debug_afield(&(treq->object), PVFS_object_ref);\
         gossip_lsadebug("Create End:\n");                   \
     }                                                       \
     gossip_end;                                             \
@@ -560,8 +560,8 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Create Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->capability, PVFS_capability);\
-        PVFS_debug_afield(tresp->metafile_attrs, PVFS_object_attr);    \
+        PVFS_debug_afield(&tresp->capability, PVFS_capability);\
+        PVFS_debug_afield(&tresp->metafile_attrs, PVFS_object_attr);    \
         gossip_lsadebug("Create End:\n");                   \
     }                                                       \
     gossip_end;                                             \
@@ -939,7 +939,7 @@ do {                                                        \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->credential, PVFS_credential);\
         PVFS_debug_afield(treq->objtype, PVFS_ds_type);     \
-        PVFS_debug_afield(treq->attr, PVFS_object_attr);    \
+        PVFS_debug_afield(&treq->attr, PVFS_object_attr);    \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
         PVFS_debug_afield(treq->handle_count, uint32_t);    \
         PVFS_debug_afield(treq->handle_array, PVFS_handle);\
@@ -1394,7 +1394,7 @@ do {                                                        \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
         PVFS_debug_afield(treq->retry_msgpair_at_leaf, int32_t);\
         PVFS_debug_afield(&((treq)->credential), PVFS_credential);\
-        PVFS_debug_afield(treq->attrmask, PVFS_object_attrmask);\
+        PVFS_debug_afield(&treq->attrmask, PVFS_object_attrmask);\
         PVFS_debug_afield(treq->handle_count, uint32_t);    \
         PVFS_debug_afield(treq->handle_array, PVFS_handle); \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
@@ -1469,7 +1469,7 @@ do {                                                        \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
         PVFS_debug_afield(tresp->caller_handle_index, uint32_t);\
         PVFS_debug_afield(tresp->handle_count, uint32_t);    \
-        PVFS_debug_afield(tresp->attr, PVFS_object_attr);    \
+        PVFS_debug_afield(&tresp->attr, PVFS_object_attr);    \
         PVFS_debug_afield(tresp->error, PVFS_error);    \
         gossip_lsadebug("Tree Getattr End:\n");                   \
     }                                                       \
@@ -1694,7 +1694,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Getattr Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->attr, PVFS_object_attr);\
+        PVFS_debug_afield(&tresp->attr, PVFS_object_attr);\
         gossip_lsadebug("Getattr End:\n");                   \
     }                                                       \
     gossip_end;                                             \
@@ -1787,7 +1787,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Unstuff Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->attr, PVFS_object_attr);\
+        PVFS_debug_afield(&tresp->attr, PVFS_object_attr);\
         gossip_lsadebug("Unstuff End:\n");                   \
     }                                                       \
     gossip_end;                                             \
@@ -1826,7 +1826,7 @@ do {                                                        \
         gossip_lsadebug("Setattr Request:\n");              \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(&treq->handle, PVFS_handle);       \
-        PVFS_debug_afield(treq->attr, PVFS_object_attr);    \
+        PVFS_debug_afield(&treq->attr, PVFS_object_attr);    \
         PVFS_debug_afield(&((treq)->credential), PVFS_credential);\
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
@@ -2019,17 +2019,17 @@ struct PVFS_servreq_mkdir
     int32_t dist_dir_split_size;  /* # of dirents to reach for split to occur */
 };
 
-#define PVFS_debug_servreq_mkdir(mask, req)                 \
+#define PVFS_debug_servreq_mkdir(mask, _req)                \
 do {                                                        \
     struct PVFS_servreq_mkdir *treq =                       \
-                                  &((req)->u.mkdir);        \
+                                  &((_req)->u.mkdir);        \
     gossip_if (mask)                                        \
     {                                                       \
-        gossip_lsadebug("Mkdir Request:\n");                \
-        gossip_lsadebug("req = (%p)\n", (req));             \
+        gossip_lsadebug("PVFS_debug_servreq_mkdir Request: " \
+                        #_req " = (%p)\n", (_req));         \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(&((treq)->credential), PVFS_credential); \
-        PVFS_debug_afield(treq->attr, PVFS_object_attr);    \
+        PVFS_debug_afield(&treq->attr, PVFS_object_attr);    \
         PVFS_debug_afield(&treq->newdir_handle, PVFS_handle);\
         PVFS_debug_afield(treq->newdir_sid_count, int32_t); \
         PVFS_debug_afield(treq->newdir_sid_array, PVFS_SID);\
@@ -2041,7 +2041,7 @@ do {                                                        \
         PVFS_debug_afield(treq->dirdata_sid_array, PVFS_SID);\
         PVFS_debug_afield(treq->dist_dir_servers_initial, int32_t);\
         PVFS_debug_afield(treq->dist_dir_split_size, int32_t);\
-        gossip_lsadebug("Mkdir End:\n");                    \
+        gossip_lsadebug("PVFS_debug_servreq_mkdir End:\n"); \
     }                                                       \
     gossip_end;                                             \
 } while (0)
@@ -2225,7 +2225,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Mkdir Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->capability, PVFS_capability);\
+        PVFS_debug_afield(&tresp->capability, PVFS_capability);\
         gossip_lsadebug("Mkdir End:\n");                   \
     }                                                       \
     gossip_end;                                             \
@@ -2270,9 +2270,9 @@ do {                                                        \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_PVFS_credential((mask), &((treq)->credential));\
         PVFS_debug_afield(treq->name, string);              \
-        PVFS_debug_afield(treq->new_ref, PVFS_object_ref);  \
-        PVFS_debug_afield(treq->parent_ref, PVFS_object_ref);\
-        PVFS_debug_afield(treq->parent_attr, PVFS_object_attr);\
+        PVFS_debug_afield(&treq->new_ref, PVFS_object_ref);  \
+        PVFS_debug_afield(&treq->parent_ref, PVFS_object_ref);\
+        PVFS_debug_afield(&treq->parent_attr, PVFS_object_attr);\
         PVFS_debug_afield(treq->dd_server_index, int32_t);  \
         PVFS_debug_afield(treq->dd_sid_index, int32_t);     \
         gossip_lsadebug("Crdirent End:\n");                 \
@@ -3428,7 +3428,7 @@ do {                                                        \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
         PVFS_debug_afield(tresp->nhandles, uint32_t);\
         PVFS_debug_afield(tresp->error, PVFS_error);    \
-        PVFS_debug_afield(tresp->attr, PVFS_object_attr);    \
+        PVFS_debug_afield(&tresp->attr, PVFS_object_attr);    \
         gossip_lsadebug("Listattr End:\n");                   \
     }                                                       \
     gossip_end;                                             \
