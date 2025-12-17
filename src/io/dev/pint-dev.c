@@ -323,6 +323,15 @@ int PINT_dev_get_mapped_regions(int ndesc, struct PVFS_dev_map_desc *desc,
          * of the system page size
          */
         posix_memalign(&ptr, page_size, total_size);
+        gossip_err("DBG: total_size:%lu:, bufsiz:%lu: count:%u:\n", total_size, params[i].dev_buffer_size, params[i].dev_buffer_count);
+        /* Shoot for 2MB large pages as prep for dealing with
+         * folios in the kernel bufmap rather than pages.
+         */
+/*
+        posix_memalign(&ptr, 2097152, 41943040);
+        madvise(ptr, 41943040, MADV_HUGEPAGE);
+*/
+
         if (!ptr)
         {
             desc[i].ptr = NULL;
