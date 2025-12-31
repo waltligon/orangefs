@@ -211,7 +211,7 @@ PVFS_error PVFS_isys_symlink(char *entry_name,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_SYMLINK,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -442,7 +442,7 @@ static PINT_sm_action symlink_dspace_create_setup_msgpair(
         /* V3 how to process error in this loop?  Just bail? */
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -541,7 +541,7 @@ static PINT_sm_action symlink_crdirent_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -627,7 +627,7 @@ static PINT_sm_action symlink_setattr_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -682,7 +682,7 @@ static PINT_sm_action symlink_delete_handle_setup_msgpair(
     gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
                  "metafile handle %s\n", PVFS_OID_str(&msg_p->handle));
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

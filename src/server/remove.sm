@@ -684,7 +684,7 @@ static PINT_sm_action remove_get_dirent_count_cleanup_tree_getattr(
     int task_id = 0, error_code = 0;
 
     /* Clean up the frame that was created for tree_getattr. */
-    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
     tree_getattr_free(getattr_op);
     PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(getattr_op);
     return SM_ACTION_COMPLETE;
@@ -701,7 +701,7 @@ static PINT_sm_action remove_get_dirent_count_examine_tree_getattr(
 
     /* Make sure the count of directory entries that we retrieved was 0. */
     /* This pops the frame for the getattr */
-    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     attr_p = &s_op->attr;
     if (error_code != 0)
@@ -779,7 +779,7 @@ static PINT_sm_action remove_dirdata_handles_cleanup_tree_remove(
     int task_id = 0, error_code = 0;
 
     /* Clean up the frame that was created for tree_remove. */
-    remove_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    remove_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
     tree_remove_free(remove_op);
     PINT_CLEANUP_SUBORDINATE_SERVER_FRAME(remove_op);
     return SM_ACTION_COMPLETE;
@@ -795,7 +795,7 @@ static PINT_sm_action remove_dirdata_handles_check_remove_success(
     int i = 0;
 
     /* This pops the frame for the tree remove - success */
-    remove_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+    remove_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     if (error_code != 0)
     {
@@ -1091,7 +1091,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
     }
 #endif
 
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 }

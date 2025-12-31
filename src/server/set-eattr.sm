@@ -461,7 +461,7 @@ static PINT_sm_action setup_create_immutable_copies(struct PINT_smcb *smcb
      PVFS_SERVOP_IMM_COPIES_FILL(new_op, s_op);
      new_op->u.create_copies.expected_mirror_mode = MIRROR_ON_IMMUTABLE;
 
-     ret = PINT_sm_push_frame(smcb, CREATE_IMM_COPIES, new_op);
+     ret = PINT_sm_push_frame(smcb, CREATE_IMM_COPIES, new_op, S_OP);
      if (ret != 0)
      {
          gossip_debug(GOSSIP_MIRROR_DEBUG,

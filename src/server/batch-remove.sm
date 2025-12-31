@@ -118,7 +118,7 @@ static PINT_sm_action setup_remove(
     remove_op->u.remove.fs_id = s_op->target_fs_id;
     remove_op->u.remove.handle = s_op->target_handle;
 
-    ret = PINT_sm_push_frame(smcb, 0, remove_op);
+    ret = PINT_sm_push_frame(smcb, 0, remove_op, S_OP);
     if(ret < 0)
     {
         js_p->error_code = ret;
@@ -135,7 +135,7 @@ static PINT_sm_action remove_complete(
     int task_id;
     int remaining;
 
-    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
+    s_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining, NULL);
 
     free(remove_op);
 

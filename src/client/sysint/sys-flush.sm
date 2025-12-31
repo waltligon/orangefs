@@ -88,7 +88,7 @@ PVFS_error PVFS_isys_flush(PVFS_object_ref ref,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_FLUSH,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -261,7 +261,7 @@ static int flush_datafile_setup_msgpairarray(struct PINT_smcb *smcb,
 
     PINT_cleanup_capability(&capability);
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

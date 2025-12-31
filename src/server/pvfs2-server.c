@@ -113,6 +113,8 @@ static QLIST_HEAD(noreq_sop_list);
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
 
+int s_op_sz = sizeof(struct PINT_server_op);
+
 typedef struct
 {
     int server_remove_storage_space;
@@ -2506,7 +2508,7 @@ int server_post_unexpected_recv(void)
     gossip_ldebug(GOSSIP_SERVER_DEBUG, "allocating smcb\n");
     ret = PINT_smcb_alloc(&smcb,
                           BMI_UNEXPECTED_OP,
-                          sizeof(struct PINT_server_op),
+                          S_OP,
                           server_op_state_get_machine,
                           server_state_machine_terminate,
                           server_job_context);
@@ -2708,7 +2710,7 @@ int server_state_machine_alloc_noreq(enum PVFS_server_op op,
         PINT_server_op *tmp_op;
         ret = PINT_smcb_alloc(smcb,
                               op, 
-                              sizeof(struct PINT_server_op),
+                              S_OP,
                               server_op_state_get_machine,
                               server_state_machine_terminate,
                               server_job_context);

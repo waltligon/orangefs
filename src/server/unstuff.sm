@@ -435,7 +435,7 @@ static PINT_sm_action get_capability_setup(
         getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
         getattr_op->u.getattr.credential = s_op->req->u.unstuff.credential;
 
-        ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+        ret = PINT_sm_push_frame(smcb, 0, getattr_op, S_OP);
         if (ret < 0)
         {
             js_p->error_code = ret;
@@ -546,7 +546,7 @@ static PINT_sm_action getattr_setup(
     getattr_op->u.getattr.attrmask = s_op->req->u.unstuff.attrmask;
     getattr_op->u.getattr.credential = s_op->req->u.unstuff.credential;
 
-    ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+    ret = PINT_sm_push_frame(smcb, 0, getattr_op, S_OP);
     if(ret < 0)
     {
         js_p->error_code = ret;

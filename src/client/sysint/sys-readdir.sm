@@ -160,7 +160,7 @@ PVFS_error PVFS_isys_readdir(PVFS_object_ref ref,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_READDIR,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -485,7 +485,7 @@ static PINT_sm_action readdir_finish_partial_read(
 
     PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -669,7 +669,7 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         }
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
 
 readdir_msg_return:
     if (token_array)

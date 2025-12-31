@@ -835,7 +835,7 @@ static PINT_sm_action lookup_read_directory_entry_remote(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Push Frame (mop) (%p) and call MPA\n",
                    &s_op->msgarray_op);
 
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 
@@ -930,7 +930,7 @@ static PINT_sm_action lookup_read_object_metadata(
         /* so this says if there is a frame after the base pop it
          * I don't know if that's right - if we should pop multiples
          */
-        PINT_sm_pop_frame(smcb, NULL, &error_code, NULL);
+        PINT_sm_pop_frame(smcb, NULL, &error_code, NULL, NULL);
     }
 #endif
 
@@ -999,7 +999,7 @@ static PINT_sm_action lookup_read_object_metadata(
             g_op->target_sid_array = s_op->resp.u.lookup_path.sid_array;
             s_op->u.lookup.handle_ct = 1;
             /* push getattr frame */
-            PINT_sm_push_frame(smcb, 999, g_op);
+            PINT_sm_push_frame(smcb, 999, g_op, S_OP);
             /* this object is on this server */
             gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
                            "Local Segment s_op->lookup.handle_ct = %u\n",
@@ -1099,7 +1099,7 @@ static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
     PVFS_debug_servreq_getattr(GOSSIP_LOOKUP_DEBUG, &getattr_op->msgpair.req);
     PVFS_debug_msgpair_state(GOSSIP_LOOKUP_DEBUG, msg_p);
 
-    PINT_sm_push_frame(smcb, 0, getattr_op); /* this is a mop */
+    PINT_sm_push_frame(smcb, 0, getattr_op, M_OP); /* this is a mop */
     PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
 
     return SM_ACTION_COMPLETE;
@@ -1150,7 +1150,7 @@ static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
                    PVFS_OID_str(&(getattr_op->req->u.getattr.handle)),
                    getattr_op->req->u.getattr.fs_id);
 
-    ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+    ret = PINT_sm_push_frame(smcb, 0, getattr_op, M_OP);
     js_p->error_code = ret;
 
     if ( ret < 0 )
@@ -1211,7 +1211,7 @@ static PINT_sm_action cleanup_remote_request(struct PINT_smcb *smcb,
     PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
 
     /* pop the mop on top */
-    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining, NULL);
     /* now grab the parent s_op */
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* save the mop ?
@@ -1255,7 +1255,7 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
     PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
 
     /* remove getattr frame - already removed */
-    /* getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining); */
+    /* getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining, NULL); */
     /* getattr_op = &s_op->msgarray_op; - didn't save mop */
 
     getattr_op = &s_op->msgarray_op;
@@ -1461,7 +1461,7 @@ static PINT_sm_action lookup_setup_getattr_request(
     getattr_op->req->u.getattr.credential = getattr_op->u.getattr.credential;
     PVFS_REQ_COPY_CAPABILITY(s_op->req->capability, *getattr_op->req); 
 
-    ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+    ret = PINT_sm_push_frame(smcb, 0, getattr_op, M_OP);
     if ( ret < 0 )
     {
         gossip_lerr("Error pushing getattr frame onto lookup stack:ret(%d)\n", ret);
@@ -1493,7 +1493,7 @@ static PINT_sm_action lookup_verify_getattr_results(struct PINT_smcb *smcb,
     int ret;
     PVFS_object_attr *resp_attr;
 
-    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
+    getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining, NULL);
 
     if ( js_p->error_code )
     {

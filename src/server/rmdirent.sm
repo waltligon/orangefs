@@ -646,7 +646,7 @@ static PINT_sm_action rmdirent_update_remote_parent_dir(struct PINT_smcb *smcb,
     }
 
     /* ready to submit the requests */
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

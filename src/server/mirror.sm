@@ -409,7 +409,7 @@ static PINT_sm_action setup_write_request(struct PINT_smcb *smcb,
 
     PINT_cleanup_capability(&capability);
 
-    PINT_sm_push_frame(smcb,0,msgarray_op);
+    PINT_sm_push_frame(smcb,0,msgarray_op, M_OP);
   
     return SM_ACTION_COMPLETE;
 

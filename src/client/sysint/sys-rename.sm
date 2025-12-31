@@ -340,7 +340,7 @@ PVFS_error PVFS_isys_rename(char *old_entry,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_RENAME,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -827,7 +827,7 @@ static PINT_sm_action rename_parent_getattr_setup_msgpair_array(
 
     PINT_cleanup_capability(&capability);
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -903,7 +903,7 @@ static PINT_sm_action rename_lookups_setup_msgpair_array(
         }
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -997,7 +997,7 @@ static PINT_sm_action rename_crdirent_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1069,7 +1069,7 @@ static PINT_sm_action rename_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1232,7 +1232,7 @@ static PINT_sm_action rename_chdirent_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

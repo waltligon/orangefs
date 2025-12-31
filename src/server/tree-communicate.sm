@@ -1156,7 +1156,7 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
     /* for each state machine spawned, pop a frame */
     for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
     {
-        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
         if (old_frame)
         {
            /* sub-tree msgpair array*/
@@ -1417,7 +1417,7 @@ static int tree_remove_work_cleanup(struct PINT_smcb *smcb,
     /* for each state machine spawned, pop a frame */
     for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
     {
-        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
         if (old_frame)
         {
             /* sub-tree msgpair array*/
@@ -1702,7 +1702,7 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
     /* for each state machine spawned, pop a frame */
     for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
     {
-        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
         if (old_frame)
         {  
            /* sub-tree msgpair array*/
@@ -2262,7 +2262,7 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
     /* for each state machine spawned, pop a frame */
     for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
     {
-        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL);
+        old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
         if (old_frame)
         {
            /* sub-tree msgpair array*/

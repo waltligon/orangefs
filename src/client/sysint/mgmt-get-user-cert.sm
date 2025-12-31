@@ -139,7 +139,7 @@ PVFS_error PVFS_imgmt_get_user_cert(
                  "PVFS_imgmt_get_user_cert entered\n");
 
     PINT_smcb_alloc(&smcb, PVFS_MGMT_GET_USER_CERT, 
-             sizeof(struct PINT_client_sm),
+             SM_P,
              client_op_state_get_machine,
              client_state_machine_terminate,
              pint_client_sm_context);
@@ -273,7 +273,7 @@ static PINT_sm_action get_user_cert_public_key_setup_msgpair(
 
     PINT_cleanup_capability(&capability);
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
 
     return SM_ACTION_COMPLETE;
 }
@@ -551,7 +551,7 @@ static PINT_sm_action get_user_cert_req_setup_msgpair(
     msg_p->comp_fn = userid_pwd_comp_fn;
     msg_p->svr_addr = sm_p->u.mgmt_get_user_cert.pref_svr_addr;
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
 
     return SM_ACTION_COMPLETE;
 }

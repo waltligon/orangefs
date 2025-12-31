@@ -230,7 +230,8 @@ static PINT_sm_action listattr_interpret_getattrs(struct PINT_smcb *smcb,
         getattr_op = PINT_sm_pop_frame(smcb,
                                        &task_id,
                                        &tmp_err, 
-                                       &remaining);
+                                       &remaining, 
+                                       NULL);
         gossip_debug(GOSSIP_SERVER_DEBUG, "getattr_op is %s.\n",
                     (getattr_op ? "okay" : "NULL"));
         gossip_debug(GOSSIP_SERVER_DEBUG,

@@ -262,6 +262,24 @@ enum {
     DEFAULT_ERROR = -1,
 };
 
+/*Added info for ftype and fsize updates*/
+typedef enum Ftype {
+    UNKNOWN,
+    S_OP,
+    M_OP,
+    SM_P
+}Ftype;
+
+typedef struct{
+    int id;
+    const char* type_name;
+    int size;
+}Frame_type;
+
+extern Frame_type fsizes[];
+extern int fsizes_len;
+int lookup_fsize(int id);
+
 #define ENCODE_TYPE 0
 #define SM_STATE_RETURN -1
 #define SM_NESTED_STATE 1
@@ -315,7 +333,7 @@ int PINT_smcb_cancelled(struct PINT_smcb *smcb);
 
 int PINT_smcb_alloc(struct PINT_smcb **,
                     int,
-                    int,
+                    Ftype type,
                     struct PINT_state_machine_s *(*getmach)(int, int),
                     int (*term_fn)(struct PINT_smcb *,
                     job_status_s *),
@@ -331,23 +349,26 @@ int PINT_sm_push_frame_info(struct PINT_smcb *smcb,
                             int task_id,
                             struct PINT_frame_info_s *frame_p);
 
-int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);
+int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p, Ftype type);
 
 int PINT_sm_push_frame_ref(struct PINT_smcb *smcb,
                            int task_id,
                            void *frame_p,
-                           int refcnt);
+                           int refcnt, 
+                           Ftype type);
 
 int PINT_sm_push_dup_frame(struct PINT_smcb *smcb, int frame_size);
 
 struct PINT_frame_info_s *PINT_sm_pop_frame_info(struct PINT_smcb *smcb,
                                                  int *task_id,
                                                  int *error_code,
-                                                 int *remaining);
+                                                 int *remaining, 
+                                                 Ftype* type);
 void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
                         int *task_id,
                         int *error_code,
-                        int *remaining);
+                        int *remaining, 
+                        Ftype* type);
 
 PINT_sm_action PINT_sm_pop_old_pjmp_frames(struct PINT_smcb *smcb, int child_count);
 
