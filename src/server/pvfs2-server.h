@@ -1279,6 +1279,7 @@ typedef struct PINT_server_op
 
 } PINT_server_op;
 
+#define S_OP_SZ = sizeof(struct PINT_server_op);
 
 /* This creates  new frame in __s_op and pushes it for a subsequent PJMP
  *

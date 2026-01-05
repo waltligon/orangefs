@@ -70,8 +70,6 @@ static void PINT_sm_debug_stack(void);
 #define FRAME_STACK_DEBUG
 #endif
 
-extern int s_op_sz; /* from src/server/pvfs2-server.c */
-
 #if defined(__PVFS2_SERVER__)
 const char *PINT_map_server_op_to_string(enum PVFS_server_op op);
 extern job_context_id server_job_context;
@@ -808,7 +806,7 @@ int PINT_smcb_alloc(struct PINT_smcb **smcb,
     /* if frame_size given, allocate a frame */
     if (frame_type != UNKNOWN)
     {
-        int frame_size = lookup_fsize(frame_type);
+        int frame_size = PINT_sm_lookup_fsize(frame_type);
         void *new_frame = malloc(frame_size);
         if (!new_frame)
         {
@@ -1101,26 +1099,40 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
     return fip->frame;
 }
    
-
-
 Frame_type fsizes[] = {
     {0, "Unknown", 0},
-    {1, "s_op", s_op_sz},
+    {1, "s_op", 0},    /* will set during init */
     {2, "m_op", sizeof(PINT_sm_msgarray_op)},
     {3, "sm_p", sizeof(PINT_client_sm)},
 };
 
-int fsizes_len = 4;
-int lookup_fsize(int id){
-    //if (id > 3){set to unknown? }
+int fsizes_len = sizeof(fsizes)/sizeof(Frame_type);
+
+int PINT_sm_lookup_fsize(int id)
+{
     int i;
-    for(i = 0; i < fsizes_len; i++){
-        if(fsizes[i].id == id){
+    for(i = 0; i < fsizes_len; i++)
+    {
+        if(fsizes[i].id == id)
+        {
             return fsizes[i].size;
         }
     }
-    //unclear if we should set non-type ids to unknown or flag as an error
-    return -1; 
+    return 0; /* unknown */
+}
+
+/* used by init routines to finish setting up fsizes table */
+int PINT_sm_set_fsize(int id, int size)
+{
+    int i;
+    for(i = 0; i < fsizes_len; i++)
+    {
+        if(fsizes[i].id == id)
+        {
+            fsizes[i].size = size;
+        }
+    }
+    return 0; /* unknown */
 }
 
 /* Function: PINT_sm_push_frame_info
@@ -1182,7 +1194,7 @@ int PINT_sm_push_frame_ref(struct PINT_smcb *smcb,
     }
     fip->frame = frame_p;
     fip->ftype = type;
-    fip->fsize = lookup_fsize(type);
+    fip->fsize = PINT_sm_lookup_fsize(type);
     fip->frefcnt = refcnt + 1;
     PINT_sm_push_frame_info(smcb, task_id, fip);
 
@@ -1210,7 +1222,7 @@ int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p, Ftype
     }
     fip->frame = frame_p;
     fip->ftype = type;
-    fip->fsize = lookup_fsize(type);
+    fip->fsize = PINT_sm_lookup_fsize(type);
     fip->frefcnt = 1;
     PINT_sm_push_frame_info(smcb, task_id, fip);
 

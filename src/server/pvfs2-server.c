@@ -113,7 +113,8 @@ static QLIST_HEAD(noreq_sop_list);
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
 
-int s_op_sz = sizeof(struct PINT_server_op);
+// trying runtime init
+//const int s_op_sz = sizeof(struct PINT_server_op);
 
 typedef struct
 {
@@ -891,6 +892,7 @@ static int server_setup_process_environment(int background)
 /* server_initialize_subsystems()
  *
  * This:
+ * - initializes frame size table
  * - initializes distribution subsystem
  * - initializes encoding/decoding subsystem
  * - initializes BMI
@@ -923,6 +925,11 @@ static int server_initialize_subsystems(
     char *bmi_opts = NULL;
     int server_index;
 
+    /* Initialize SM - no needto finalize later */
+    gossip_debug(GOSSIP_SERVER_DEBUG, "... intializing SM size table\n");
+    PINT_sm_set_fsize(1, sizeof(struct PINT_server_op));
+
+    /* Initialize event subsystem */
     if(!(*server_status_flag & SERVER_EVENT_INIT) && 
        server_config.enable_events)
     {

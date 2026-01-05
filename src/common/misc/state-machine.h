@@ -257,28 +257,41 @@ extern char * PINT_sm_action_string[];
      ret == SM_ERROR)
 
 /* what is this type? */
-enum {
+enum
+{
     JMP_NOT_READY = 99,
     DEFAULT_ERROR = -1,
 };
 
-/*Added info for ftype and fsize updates*/
-typedef enum Ftype {
-    UNKNOWN,
-    S_OP,
-    M_OP,
-    SM_P
-}Ftype;
+/* Added info for ftype and fsize updates*/
+/* Should all of this be public? */
+typedef enum Ftype
+{
+    UNKNOWN =  0,
+    S_OP =     1,
+    M_OP =     2,
+    SM_P =     3
+} Ftype;
 
-typedef struct{
+/* This is for the fsizes table */
+typedef struct Frame_type_s
+{
     int id;
     const char* type_name;
     int size;
-}Frame_type;
+} Frame_type;
 
 extern Frame_type fsizes[];
 extern int fsizes_len;
-int lookup_fsize(int id);
+/* This function finds the size of a given type of 
+ * frame
+ */
+int PINT_sm_lookup_fsize(int id);
+/* This function allows the server to set the sop size during
+ * initialization.  Probably not used again after that.
+ */
+int PINT_sm_set_fsize(int id, int size);
+
 
 #define ENCODE_TYPE 0
 #define SM_STATE_RETURN -1
