@@ -155,41 +155,47 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
         }                                          \
         else                                       \
         {                                          \
-            /*dest->u.x = NULL;*/                      \
+            /*dest->u.x = NULL;*/                  \
         }                                          \
     } while (0)
 
 /* this macro is only for OID/SID arrays, we prefer these to be
  * allocated contiguouosly.  If the src has them packed, we simply copy
- * the src, otherwise we allocate space for both a copy in two chunks
+ * the src, otherwise we allocate space for both and copy in two chunks
  */
 #define PACKSID(o,s,oc,sc,f)                                                   \
     do {                                                                       \
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Starting PACKSID\n");\
         if (NULL != src->u.o && NULL != src->u.s &&                            \
             ((src->mask & (f)) == (f)))                                        \
         {                                                                      \
             if (src->u.s == (PVFS_SID *)(src->u.o + src->u.oc))                \
             {                                                                  \
+                gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Pre-Packed\n");\
                 /* OIDs and SIDs are packed */                                 \
                 CPYFIELD(o, OSASZ(dest->u.oc, dest->u.sc), f);                 \
             }                                                                  \
             else                                                               \
             {                                                                  \
+                gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Packing\n");\
                 /* make packed from unpacked */                                \
                 dest->u.o = malloc(OSASZ(dest->u.oc, dest->u.sc));             \
                 memcpy(dest->u.o, src->u.o, OASZ(dest->u.oc));                 \
                 memcpy(dest->u.o + dest->u.oc, src->u.s, SASZ(dest->u.sc));    \
             }                                                                  \
+            gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Seting SID ptr\n");\
             dest->u.s = (PVFS_SID *)(dest->u.o + dest->u.oc);                  \
         }                                                                      \
         else                                                                   \
         {                                                                      \
+            gossip_lerr("cannot PACKSID due to NULL ptr or mask\n");           \
             /*dest->u.o = dest->u.s = NULL;*/                                      \
         }                                                                      \
     } while (0)
 
 int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "starting oattrv copy (%p)->(%p)\n", src, dest);
     /* should we copy the capability? */
     if (src->parent && (src->mask &  PVFS_ATTR_COMMON_PARENT))
     {
@@ -207,16 +213,21 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     switch(dest->objtype)
     {
     case PVFS_TYPE_METAFILE:
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "type metafile\n");
         if (dest->u.meta.dist)
         {
+            gossip_ldebug(GOSSIP_CLIENT_DEBUG, "freeing old dist\n");
             PINT_dist_free(dest->u.meta.dist);
         }
-        dest->u.meta.dist = PINT_dist_copy(src->u.meta.dist);
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Copying dist\n");
+        PINT_dist_copy(&dest->u.meta.dist, src->u.meta.dist);
         dest->mask |= PVFS_ATTR_META_DIST;
         if (dest->u.meta.dist == NULL)
         {
+            gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Dist is NULL\n");
             return -PVFS_ENOMEM;
         }
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Packing dfile\n");
         /* dest->u.meta.dist_size = src->u.meta.dist_size; */
         PACKSID(meta.dfile_array,
                 meta.sid_array,
@@ -227,8 +238,10 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->mask |= PVFS_ATTR_META_DFILES;
         break;
     case PVFS_TYPE_DATAFILE:
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "type datafile\n");
         break;
     case PVFS_TYPE_DIRECTORY:
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "type dir\n");
         CPYFIELD(dir.hint.dist_name,
                  dest->u.dir.hint.dist_name_len,
                  PVFS_ATTR_DIR_HINT_DIST_NAME_LEN);
@@ -249,6 +262,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->mask |= PVFS_ATTR_DIR_DIRDATA;     /* CHECK ON THIS */
         break;
     case PVFS_TYPE_DIRDATA:
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "type dirdata\n");
         CPYFIELD(dirdata.dist_dir_bitmap,
                  (dest->u.dirdata.dist_dir_attr.bitmap_size *
                         sizeof(PVFS_dist_dir_bitmap_basetype)),
@@ -262,6 +276,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
         break;
         dest->mask |= PVFS_ATTR_DIR_DIRDATA;     /* CHECK ON THIS */
     case PVFS_TYPE_SYMLINK:
+        gossip_ldebug(GOSSIP_SERVER_DEBUG, "type symlink\n");
         CPYFIELD(sym.target_path, 
                  dest->u.sym.target_path_len,
                  PVFS_ATTR_SYMLNK_TARGET);
@@ -284,11 +299,16 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
 /* This macro checks to be sure the pointer field argument is not
  * actually pointing to anything, and frees it if it is
  */
-#define CLRFIELD(x) \
-    do { if (x) { free(x); (x) = NULL; } \
+#define CLRFIELD(_x)                                                      \
+    do {                                                                  \
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Freeing " #_x " = (%p)\n", (_x)); \
+    if (_x) { free(_x); (_x) = NULL; }                                    \
     } while (0)
 
 #define CLRPACK(o,s,oc) do {                                          \
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Clearing " #o " = (%p)\n", (dest->u.o));  \
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Clearing " #s " = (%p)\n", (dest->u.s));  \
+    gossip_ldebug(GOSSIP_SERVER_DEBUG, "Clearing " #oc " = %d\n", (dest->u.oc));  \
     if (dest->u.o == NULL || dest->u.s == NULL)                       \
     {                                                                 \
         if (dest->u.o != NULL) { free(dest->u.o); }                   \
@@ -299,12 +319,14 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
         if (dest->u.s == (PVFS_SID *)(dest->u.o + dest->u.oc))        \
         {                                                             \
             /* OIDs and SIDs are packed */                            \
+            gossip_ldebug(GOSSIP_SERVER_DEBUG, "Packed\n");  \
             free(dest->u.o);                                          \
             dest->u.s = NULL;                                         \
         }                                                             \
         else                                                          \
         {                                                             \
             /* not packed */                                          \
+            gossip_ldebug(GOSSIP_SERVER_DEBUG, "NOT Packed\n");  \
             free(dest->u.o);                                          \
             free(dest->u.s);                                          \
             dest->u.o = NULL;                                         \
@@ -317,12 +339,12 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
  * source mask, and if it does it copies the attribute and sets the
  * maskbit for the destination
  */
-#define copy_attr(attr, maskbit)                                    \
+#define copy_attr(_attr, _maskbit)                                  \
 do {                                                                \
-    if ((src->mask & maskbit) == maskbit)                           \
+    if ((src->mask & (_maskbit)) == (_maskbit))                     \
     {                                                               \
-        dest->attr = src->attr;                                     \
-        dest->mask |= maskbit;                                       \
+        dest->_attr = src->_attr;                                   \
+        dest->mask |= (_maskbit);                                   \
     }                                                               \
 } while (0)
 
@@ -334,6 +356,7 @@ do {                                                                \
 int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     int ret = -PVFS_EINVAL;
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "starting oattrf copy (%p)->(%p)\n", src, dest);
 
     /* error if the pointers aren't valid */
     if (!dest || !src)
@@ -341,8 +364,13 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         return ret;
     }
 
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "starting copy with a clear of dest\n");
+
     /* first clear the dest attr */
     PINT_free_object_attr(dest);
+    /* free_object_attr does not get the main struct, only ptrs */
+    memset(dest, 0, sizeof(*dest));
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, dest); 
 
     /* should not need to copy the mask - each mask bit is being
      * set by copy_attr() and all of the relevant fields should be 
@@ -371,6 +399,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     switch(dest->objtype)
     {
     case PVFS_TYPE_METAFILE :
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "type metafile\n");
         /* these is a var field copied after the fixed fields */
         CLRFIELD(dest->u.meta.dist);
 
@@ -388,10 +417,12 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         /**/
         break;
     case PVFS_TYPE_DATAFILE :
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "type datafile\n");
         copy_attr(u.data.size, PVFS_ATTR_DATA_SIZE);
         /**/
         break;
     case PVFS_TYPE_DIRECTORY :
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "type dir\n");
         copy_attr(u.dir.dirent_count, PVFS_ATTR_DIR_DIRENT_COUNT);
         /* begin hints */
         copy_attr(u.dir.hint.dist_name_len, PVFS_ATTR_DIR_HINT_DIST_NAME_LEN);
@@ -430,6 +461,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         /**/
         break;
     case PVFS_TYPE_DIRDATA :
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "type dirdata\n");
         copy_attr(u.dirdata.dirent_count, PVFS_ATTR_DIRDATA_DIRENT_COUNT);
         /* begin dirdata */
         copy_attr(u.dirdata.dist_dir_attr.tree_height, PVFS_ATTR_DIRDATA_TREE_HEIGHT);
@@ -448,6 +480,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
         /**/
         break;
     case PVFS_TYPE_SYMLINK :
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "type symlink\n");
         copy_attr(u.sym.target_path_len, PVFS_ATTR_SYMLNK_TARGET);
         /* these are var fields copied after the fixed fields */
         CLRFIELD(dest->u.sym.target_path);
@@ -475,19 +508,25 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
 int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     int ret = -PVFS_EINVAL;
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "starting oattr copy (%p)->(%p)\n", src, dest);
     ret = PINT_copy_object_attr_fixed(dest, src);
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "fixed complete\n");
     ret = PINT_copy_object_attr_var(dest, src);
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "var complete\n");
     /* should this be done all of the time ? */
     if (PINT_capability_is_null(&src->capability))
     {
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "NULLing cap\n");
         PINT_null_capability(&dest->capability);
     }
     else
     {
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "copy capability\n");
         PINT_cleanup_capability(&dest->capability);
         PINT_copy_capability(&src->capability, &dest->capability);
         dest->mask |= PVFS_ATTR_CAPABILITY;
     }
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "copy done\n");
     return ret;
 }
 
@@ -496,23 +535,23 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
  * do not use if buffers are shared
  */
 
-#define FREEFIELD(x) do { \
-    if (attr->u.x != NULL) { free(attr->u.x); attr->u.x = NULL; } \
+#define FREEFIELD(_x) do { \
+    if (attr->u._x != NULL) { free(attr->u._x); attr->u._x = NULL; } \
 } while (0)
 
 /* This macro is only for OID/SID arrays it checks to see if they are
  * packed (contiguous) and either frees them as one, or as two
  */
-#define FREEPACK(o,s,oc) do { \
-    if (attr->u.s != (PVFS_SID *)(attr->u.o + attr->u.oc)) \
+#define FREEPACK(_o,_s,_oc) do { \
+    if (attr->u._s != (PVFS_SID *)(attr->u._o + attr->u._oc)) \
     { \
         /* OIDs and SIDs are not packed */ \
-        free(attr->u.s); \
+        free(attr->u._s); \
     } \
     /* packed or not packed */ \
-    free(attr->u.o); \
-    attr->u.o = NULL; \
-    attr->u.s = NULL; \
+    free(attr->u._o); \
+    attr->u._o = NULL; \
+    attr->u._s = NULL; \
 } while (0)
 
 void PINT_free_object_attr(PVFS_object_attr *attr)

@@ -86,6 +86,28 @@ struct PINT_dist_s {
 	PINT_dist_methods *methods;
 };
 
+/* This macro expects a pointer to a struct PINT_dist_s
+ */
+#define PVFS_debug_PINT_dist(_mask, _dist)                       \
+do {                                                             \
+    struct PINT_dist_s *pattr = (_dist);                         \
+    gossip_if (_mask)                                            \
+    {                                                            \
+        gossip_ladebug("PINT Dist: " #_dist " = (%p)\n", (_dist)); \
+        if (_dist != NULL)                                       \
+        {                                                        \
+            PVFS_debug_afield(pattr->dist_name, pointer);         \
+            PVFS_debug_afield(pattr->name_size, uint32_t);       \
+            PVFS_debug_afield(pattr->param_size, uint32_t);      \
+            PVFS_debug_afield(pattr->params, pointer);           \
+            PVFS_debug_afield(pattr->methods, pointer);          \
+        }                                                        \
+        gossip_ladebug("PINT Dist End:\n");                     \
+    }                                                            \
+    gossip_end;                                                  \
+} while (0)
+
+
 /* Macros to encode/decode distributions for sending requests */
 
 /* compute encoded size of PINT_dist */
@@ -97,6 +119,7 @@ struct PINT_dist_s {
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 
 #if 0
+/* This is re-written as a function - can probably remove */
 #define encode_PINT_dist(pptr,x)  \
 do { PINT_dist *px = *(x); \
     encode_string(pptr, &px->dist_name); \
@@ -113,19 +136,35 @@ do { PINT_dist *px = *(x); \
 
 static inline void encode_PINT_dist(char **pptr, PINT_dist **dist)
 {
-    if (*dist == NULL || (*dist)->dist_name[0] == '\0') /* no name, no dist */
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Starting PINT_dist encode\n");
+    if (dist == NULL || pptr == NULL)
     {
+        gossip_lerr(" one or more of the encode parameters is NULL\n");
+        /* this or return ??? */
+	exit(1); 
+    }
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "*dist (%p)\n", *dist);
+    if (*dist == NULL ||
+       (*dist)->dist_name == NULL ||
+       (*dist)->dist_name[0] == '\0') /* no name, no dist */
+    {
+        gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Null Dist\n");
         **pptr = '\0';
         *pptr += 8;  /* align to 8 */
+        gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Dist encode returning\n");
         return;
     }
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Encoding name string\n");
     encode_string(pptr, (const char **)&(*dist)->dist_name); 
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Checking for methods\n");
     if (!(*dist)->methods)
     { 
-	gossip_err("%s: encode_PINT_dist: methods is null\n", __func__); 
+	gossip_lerr("encode_PINT_dist: methods is null\n"); 
 	exit(1); 
     } 
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Running method encode_lebf\n");
     ((*dist)->methods->encode_lebf) (pptr, (*dist)->params); 
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Aligning\n");
     align8(pptr); 
 }
 
@@ -212,8 +251,10 @@ PINT_dist *PINT_dist_create(const char *name);
 /* Deallocate resources in a PINT_dist */
 int PINT_dist_free(PINT_dist *dist);
 
-/* Return a cloned copy of dist */
-PINT_dist *PINT_dist_copy(const PINT_dist *dist);
+/* Return a cloned copy of sdist */
+/* if dist is NULL, mallocs new space */
+/* returns a pointer to the new copy */
+PINT_dist *PINT_dist_copy(PINT_dist **dist, const PINT_dist *sdist);
 
 /* Makes a memcpy of the distribution parameters in buf.
  * buf must be allocated to the correct size */
@@ -227,9 +268,6 @@ void PINT_dist_encode(void *buffer, PINT_dist *dist);
 
 /* unpack dist struct after receiving from storage */
 void PINT_dist_decode(PINT_dist **dist, void *buffer);
-
-/* Print dist state to debug system */
-void PINT_dist_dump(PINT_dist *dist);
 
 /* Registers the distribution d_p
  *

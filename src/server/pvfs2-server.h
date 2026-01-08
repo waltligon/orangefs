@@ -205,17 +205,15 @@ struct PINT_server_create_op
 
 #define PVFS_debug_create_op_s(_mask, _s_op)                \
 do {                                                        \
-    struct PINT_server_create_op *ts_op =                      \
-                                  &((_s_op)->u.create);       \
+    struct PINT_server_create_op *ts_op = &((_s_op)->u.create);       \
     gossip_if (_mask)                                        \
     {                                                       \
-        gossip_lsadebug("Server Create Op:\n");               \
-        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        gossip_ladebug("Server Create Op:" #_s_op " = (%p)\n", (_s_op)); \
         PVFS_debug_afield(ts_op->handle_array_local, PVFS_handle);    \
         PVFS_debug_afield(ts_op->handle_array_local_count, int);    \
         PVFS_debug_afield(ts_op->saved_error_code, PVFS_error);    \
         PVFS_debug_afield(ts_op->handle_index, int);    \
-        gossip_lsadebug("Server Create Op End:\n");                   \
+        gossip_ladebug("Server Create Op End:\n");                   \
     }                                                       \
     gossip_end;                                             \
 } while (0)
@@ -266,12 +264,11 @@ do {                                                        \
                                   &((_s_op)->u.mirror);       \
     gossip_if (_mask)                                        \
     {                                                       \
-        gossip_lsadebug("Server Mirror Op:\n");               \
-        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        gossip_ladebug("Server Mirror Op:" #_s_op " = (%p)\n", (_s_op)); \
         PVFS_debug_afield(ts_op->job_count, int);    \
         PVFS_debug_afield(ts_op->max_resp_sz, int);    \
         /*PVFS_debug_afield(ts_op->jobs, write_job_t);  */  \
-        gossip_lsadebug("Server Mirror Op End:\n");                   \
+        gossip_ladebug("Server Mirror Op End:\n");                   \
     }                                                       \
     gossip_end;                                             \
 } while (0)
@@ -384,8 +381,7 @@ do {                                                        \
                                   &((_s_op)->u.create_copies);       \
     gossip_if (_mask)                                        \
     {                                                       \
-        gossip_lsadebug("Server Create Copies Op:\n");               \
-        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        gossip_ladebug("Server Create Copies Op: " #_s_op " = (%p)\n", (_s_op));             \
         PVFS_debug_afield(ts_op->io_servers_required, uint32_t);    \
         PVFS_debug_afield(ts_op->mirror_mode, uint32_t);    \
         PVFS_debug_afield(ts_op->expected_mirror_mode, uint32_t);    \
@@ -416,7 +412,7 @@ do {                                                        \
         /*PVFS_debug_afield(ts_op->dist, PINT_dist);  */  \
         /*PVFS_debug_afield(ts_op->ds_attr_a, PVFS_ds_attributes);*/    \
         PVFS_debug_afield(*(ts_op->bstream_array_base_local), PVFS_size);    \
-        gossip_lsadebug("Server Create Copies Op End:\n");                   \
+        gossip_ladebug("Server Create Copies Op End:\n");                   \
     }                                                       \
     gossip_end;                                             \
 } while (0)
@@ -462,6 +458,10 @@ struct PINT_server_lookup_op
     int dirdata_sid_index;
 
     int array_index;
+
+    /* iindicates if getattr was a local or remote op */
+    int locrmt; 
+
     /* temp job id holder for sub jobs */
     job_id_t j_id;
 };
@@ -472,8 +472,7 @@ do {                                                        \
                                   &((_s_op)->u.lookup);       \
     gossip_if (_mask)                                        \
     {                                                       \
-        gossip_lsadebug("Server Lookup Op:\n");               \
-        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        gossip_ladebug("Server Lookup Op: " #_s_op " = (%p)\n", (_s_op)); \
         PVFS_debug_afield(ts_op->seg_ct, int);    \
         PVFS_debug_afield(ts_op->seg_nr, int);    \
         PVFS_debug_afield(ts_op->attr_ct, uint32_t);    \
@@ -488,7 +487,7 @@ do {                                                        \
         PVFS_debug_afield(ts_op->dirdata_sid_index, int);    \
         PVFS_debug_afield(ts_op->array_index, int);    \
         PVFS_debug_afield(ts_op->j_id, job_id_t);    \
-        gossip_lsadebug("Server Lookup Op End:\n");                   \
+        gossip_ladebug("Server Lookup Op End:\n");                   \
     }                                                       \
     gossip_end;                                             \
 } while (0)
@@ -508,13 +507,12 @@ do {                                                        \
                                   &((_s_op)->u.readdir);       \
     gossip_if (_mask)                                        \
     {                                                       \
-        gossip_lsadebug("Server Readdir Op:\n");               \
-        gossip_lsadebug("s_op = (%p)\n", (_s_op));             \
+        gossip_ladebug("Server Readdir Op: " #_s_op " = (%p)\n", (_s_op)); \
         PVFS_debug_afield(ts_op->directory_version, uint64_t);    \
         /*PVFS_debug_afield(ts_op->dirent_handle, PVFS_handle);  */  \
         /*PVFS_debug_afield(ts_op->keyval_db_entries, PVFS_ID); */   \
         PVFS_debug_afield(ts_op->dirdata_size, PVFS_size);    \
-        gossip_lsadebug("Server Readdir Op End:\n");                   \
+        gossip_ladebug("Server Readdir Op End:\n");                   \
     }                                                       \
     gossip_end;                                             \
 } while (0)

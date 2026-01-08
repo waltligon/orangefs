@@ -521,8 +521,7 @@ static int lebf_encode_req(struct PVFS_server_req *req,
     {
         goto out;
     }
-    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,
-                 "req (%p) target_msg (%p)\n",
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "req (%p) target_msg (%p)\n",
                  req, target_msg);
 
     /* every request has these fields */
@@ -537,50 +536,20 @@ static int lebf_encode_req(struct PVFS_server_req *req,
                        "tag " #tag "var (%p)\n", &(req->u.var)); \
         break
          
-
     switch (req->op)
     {
 
         /* call standard function defined in headers */
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
-#if 1
+#if 0
         CASE(PVFS_SERV_CREATE, create);
 #else
     case PVFS_SERV_CREATE: {
-    int i;                                                                 
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "encoding create req\n");
     encode_PVFS_credential((p), &(&req->u.create)->credential);
     encode_PVFS_object_attr((p), &(&req->u.create)->attr);
-    encode_PVFS_fs_id((p), &(&req->u.create)->fs_id);
-    encode_int32_t((p), &(&req->u.create)->sid_count);
-    encode_uint32_t((p), &(&req->u.create)->datafile_count);
-    encode_int32_t((p), &(&req->u.create)->datafile_sid_count);
-    encode_PVFS_handle((p), &(&req->u.create)->handle);
-    for (i = 0; i < (&req->u.create)->sid_count; i++)
-    {                                                                      
-        encode_PVFS_SID((p), &(&req->u.create)->sid_array[i]);
-    }                                                                      
-    if ((&req->u.create)->parent &&
-        !PVFS_OID_is_null((&req->u.create)->parent))
-    {                                                                      
-        encode_PVFS_handle((p), (&req->u.create)->parent);
-        for (i = 0; i < (&req->u.create)->sid_count; i++)
-        {                                            
-            encode_PVFS_SID((p), &(&req->u.create)->parent_sid_array[i]);
-        }                                                                  
-    }                                                                      
-    else                                                                   
-    {                                                                      
-        encode_PVFS_handle((p), &PVFS_HANDLE_NULL); 
-    }                                                                      
-    for (i = 0; i < (&req->u.create)->datafile_count; i++)
-    {                                                                      
-        encode_PVFS_handle((p), &(&req->u.create)->datafile_handles[i]);
-    }                                                                      
-    for (i = 0; i < ((&req->u.create)->datafile_sid_count *
-                     (&req->u.create)->datafile_count); i++)
-    {                                                                      
-        encode_PVFS_SID((p), &(&req->u.create)->datafile_sid_array[i]);
-    }          
+    encode_PVFS_object_ref((p), &(&req->u.create)->parent);
+    encode_PVFS_object_ref((p), &(&req->u.create)->object);
     } break;
 #endif
         CASE(PVFS_SERV_MIRROR, mirror);
@@ -621,10 +590,6 @@ static int lebf_encode_req(struct PVFS_server_req *req,
         CASE(PVFS_SERV_LISTATTR,  listattr);
         CASE(PVFS_SERV_MGMT_GET_UID, mgmt_get_uid);
         CASE(PVFS_SERV_MGMT_GET_DIRENT, mgmt_get_dirent);
-/* V3 - no longer needed */
-#if 0
-        CASE(PVFS_SERV_MGMT_CREATE_ROOT_DIR, mgmt_create_root_dir);
-#endif
         CASE(PVFS_SERV_MGMT_SPLIT_DIRENT, mgmt_split_dirent);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT, mgmt_get_user_cert);
         CASE(PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ, mgmt_get_user_cert_keyreq);
@@ -684,11 +649,14 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
     {
         goto out;
     }
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_resp\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "lebf_encode_resp\n");
+
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "resp->op %d \n", resp->op);
 
     /* every response has these fields */
     p = &target_msg->ptr_current;
     encode_PVFS_server_resp(p, resp);
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "1\n");
 
 #define CASE(tag,var) \
     case tag: encode_PVFS_servresp_##var(p,&resp->u.var); break
@@ -771,6 +739,7 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
             ret = -PVFS_ENOSYS;
             break;
         }
+        gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "2\n");
     } 
 
 #undef CASE
@@ -789,6 +758,7 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
     }
 
 out:
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "3\n");
     return ret;
 }
 

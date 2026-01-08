@@ -642,7 +642,7 @@ static PINT_sm_action unexp_remote_pre(struct PINT_smcb *smcb,
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running remote state pre-action\n");
 
     /* set up to call MPA */
     ret = PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
@@ -654,7 +654,11 @@ static PINT_sm_action unexp_remote_pre(struct PINT_smcb *smcb,
 static PINT_sm_action unexp_remote_post(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running state action\n");
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running remote state post-action\n");
+
+    /* clean up MPA call */
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    
     js_p->error_code = 0;
     return SM_ACTION_TERMINATE;
 }

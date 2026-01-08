@@ -642,21 +642,16 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
     return js.error_code;
 }
 
-PVFS_error PINT_client_state_machine_release(PINT_smcb * smcb)
+PVFS_error PINT_client_state_machine_release(PINT_smcb *smcb)
 {
     PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-
     if( sm_p )
     {
         PVFS_hint_free( &sm_p->hints );
+        PINT_id_gen_safe_unregister(sm_p->sys_op_id);
     }
 
     PINT_smcb_set_complete(smcb);
-
-    PINT_id_gen_safe_unregister(sm_p->sys_op_id);
-
-    /* free the internal hint list */
-    PVFS_hint_free(&sm_p->hints);
 
     PINT_smcb_free(smcb);
     return 0;

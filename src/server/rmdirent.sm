@@ -31,26 +31,9 @@ machine pvfs2_rmdirent_sm
     state prelude
     {
         jump pvfs2_prelude_sm;
-/*        success => get_dirdata_attr; */
         success => get_bitmap;
         default => final_response;
     }
-
-/* REMOVE 
-    state get_dirdata_attr
-    {
-        run rmdirent_get_dirdata_attr;
-        success => get_dist_dir_attr;
-        default => final_response;
-    }
-
-    state get_dist_dir_attr
-    {
-        run rmdirent_get_dist_dir_attr;
-        success => get_bitmap;
-        default => setup_resp;
-    }
-*/
 
     state get_bitmap
     {
@@ -689,6 +672,10 @@ static PINT_sm_action rmdirent_setup_resp(
         struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* clean up mop pushed before the msgpair jump */
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+
     /* Set the handle if it was removed */
     if(js_p->error_code == 0)
     {

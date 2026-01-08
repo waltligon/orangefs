@@ -1027,7 +1027,9 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
 
     /* NOTE: any memory allocated here will be free'd in the cleanup function */
 
-    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "mkdir state: setattr_setup_msgpair\n");
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "sm_p (%p) mkdir state: setattr_setup_msgpair\n", sm_p);
+
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
 
     memset(&dirdata_attr, 0, sizeof(PVFS_object_attr));
 
@@ -1184,6 +1186,8 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
                    "sm_p (%p) crdirent_setup_msgpair\n", sm_p);
+
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
 
     js_p->error_code = 0;
 
@@ -1389,6 +1393,8 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_MKDIR_DEBUG, " sm_p (%p) cleanup\n", sm_p);
+
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
 

@@ -494,7 +494,7 @@ struct PVFS_metafile_attr_s
 
     /* list of sids */
     PVFS_SID *sid_array;
-    int32_t sid_count;   /* which sids is this conting? */
+    int32_t sid_count;   /* which sids is this counting? */
 
     uint32_t mirror_mode;
 
@@ -507,25 +507,25 @@ struct PVFS_metafile_attr_s
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 
 /* WBL V3 we now move the SIDs whenever we move the OIDs */
+/* this requires a ptr to an object_attr */
 
-#define PVFS_debug_PVFS_metafile_attr(_mask, _attr)                \
+#define PVFS_debug_PVFS_metafile_attr(_mask, _attr)         \
 do {                                                        \
-    struct PVFS_metafile_attr_s *tattr =                      \
+    struct PVFS_metafile_attr_s *tattr =                    \
                                   &((_attr)->u.meta);       \
-    gossip_if (_mask)                                        \
+    gossip_if (_mask)                                       \
     {                                                       \
-        gossip_lsadebug("Metafile Attrs:\n");               \
-        gossip_lsadebug("attr = (%p)\n", (_attr));             \
-        /*PVFS_debug_afield(tattr->dist, PINT_dist);   */ \
-        PVFS_debug_afield(tattr->dist_size, uint32_t);    \
-        PVFS_debug_afield(tattr->dfile_count, uint32_t);    \
-        PVFS_debug_afield(tattr->dfile_array, PVFS_handle);    \
-        PVFS_debug_afield(tattr->sid_array, PVFS_SID);    \
-        PVFS_debug_afield(tattr->sid_count, int32_t);    \
+        gossip_ladebug("PVFS Metafile Attr:" #_attr " = (%p)\n", (_attr));  \
         PVFS_debug_afield(tattr->mirror_mode, uint32_t);    \
-        PVFS_debug_afield(tattr->size, PVFS_size);    \
-        PVFS_debug_afield(tattr->flags, uint64_t);    \
-        gossip_lsadebug("Metafile Attrs End:\n");                   \
+        PVFS_debug_afield(tattr->size, PVFS_size);          \
+        PVFS_debug_afield(tattr->flags, uint64_t);          \
+        PVFS_debug_afield(tattr->dfile_count, uint32_t);    \
+        PVFS_debug_afield(tattr->dfile_array, PVFS_handle); \
+        PVFS_debug_afield(tattr->sid_count, int32_t);       \
+        PVFS_debug_afield(tattr->sid_array, PVFS_SID);      \
+        PVFS_debug_afield(tattr->dist_size, uint32_t);      \
+        PVFS_debug_PINT_dist(_mask, tattr->dist);           \
+        gossip_ladebug("PVFS Metafile Attr End:\n");        \
     }                                                       \
     gossip_end;                                             \
 } while (0)
@@ -671,16 +671,17 @@ struct PVFS_datafile_attr_s
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
 endecode_fields_1(PVFS_datafile_attr, PVFS_size, size);
 
+/* THis requires a ptr to an object_attr */
+
 #define PVFS_debug_PVFS_datafile_attr(_mask, _attr)                \
 do {                                                        \
     struct PVFS_datafile_attr_s *tattr =                      \
                                   &((_attr)->u.data);       \
     gossip_if (_mask)                                        \
     {                                                       \
-        gossip_lsadebug("Datafile Attrs:\n");               \
-        gossip_lsadebug("attr = (%p)\n", (_attr));             \
+        gossip_ladebug("PVFS Datafile Attr:\n" #_attr " = (%p)\n", (_attr));   \
         PVFS_debug_afield(tattr->size, PVFS_size);    \
-        gossip_lsadebug("Datafile Attrs End:\n");                   \
+        gossip_ladebug("PVFS Datafile Attr End:\n");                   \
     }                                                       \
     gossip_end;                                             \
 } while (0)
@@ -749,8 +750,7 @@ do {                                                                \
     struct PVFS_directory_hint_s *thint = _hint;                    \
     gossip_if (_mask)                                               \
     {                                                               \
-        gossip_lsadebug("Directory Hint Attrs:\n");                 \
-        gossip_lsadebug("hint attr = (%p)\n", (_hint));             \
+        gossip_ladebug("PVFS Directory Hint: " #_hint " = (%p)\n", (_hint));  \
         PVFS_debug_afield(thint->dist_name_len, uint32_t);          \
         PVFS_debug_afield(thint->dist_name, string);                \
         PVFS_debug_afield(thint->dist_params_len, uint32_t);        \
@@ -762,7 +762,7 @@ do {                                                                \
         PVFS_debug_afield(thint->dir_dirdata_max, uint32_t);        \
         PVFS_debug_afield(thint->dir_split_size, uint32_t);         \
         /*PVFS_debug_afield(thint->dir_layout, PVFS_dirhint_layout); */   \
-        gossip_lsadebug("Directory Hint Attrs End:\n");             \
+        gossip_ladebug("PVFS Directory Hint End:\n");             \
     }                                                               \
     gossip_end;                                                     \
 } while (0)
@@ -799,22 +799,21 @@ struct PVFS_directory_attr_s
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
-/* This expects a pointer to a directory_attr
+/* This expects a pointer to a object_attr
  */
 #define PVFS_debug_PVFS_directory_attr(_mask, _attr)             \
 do {                                                             \
-    struct PVFS_directory_attr_s *dattr = (_attr);               \
+    struct PVFS_directory_attr_s *dattr = &((_attr)->u.dir);     \
     gossip_if (_mask)                                            \
     {                                                            \
-        gossip_lsadebug("Directory Attrs:\n");                   \
-        gossip_lsadebug(#_attr " = (%p)\n", (_attr));            \
+        gossip_ladebug("PVFS Directory Attrs: " #_attr " = (%p)\n", (_attr)); \
         PVFS_debug_afield(dattr->dirent_count, PVFS_size);       \
-        PVFS_debug_PVFS_directory_hint(_mask, &(dattr->hint));   \
-        PVFS_debug_PVFS_dist_dir_attr(_mask, &(dattr->dist_dir_attr)); \
-        PVFS_debug_afield(dattr, PVFS_dist_dir_bitmap);          \
         PVFS_debug_afield(dattr->dirdata_handles, PVFS_handle);  \
         PVFS_debug_afield(dattr->dirdata_sids, PVFS_SID);        \
-        gossip_lsadebug("Directory Attrs End:\n");               \
+        PVFS_debug_afield(dattr, PVFS_dist_dir_bitmap);          \
+        PVFS_debug_PVFS_directory_hint(_mask, &(dattr->hint));   \
+        PVFS_debug_PVFS_dist_dir_attr(_mask, &(dattr->dist_dir_attr)); \
+        gossip_ladebug("PVFS Directory Attrs End:\n");          \
     }                                                            \
     gossip_end;                                                  \
 } while (0)
@@ -1002,23 +1001,21 @@ struct PVFS_dirdata_attr_s
 };
 typedef struct PVFS_dirdata_attr_s PVFS_dirdata_attr;
 
+/* This function expects a pointer to obj_attr */
 #define PVFS_debug_PVFS_dirdata_attr(_mask, _attr)                \
-do {                                                        \
-    struct PVFS_dirdata_attr_s *tattr =                      \
-                                  &((_attr)->u.dirdata);       \
-    gossip_if (_mask)                                        \
-    {                                                       \
-        gossip_lsadebug("Dirdata Attrs:\n");               \
-        gossip_lsadebug("attr = (%p)\n", (_attr));             \
-        PVFS_debug_afield(tattr->dirent_count, int32_t);    \
-        PVFS_debug_afield(tattr->__PAD, void);    \
-        /*PVFS_debug_afield(tattr->dist_dir_attr, PVFS_dist_dir_attr); */   \
-        PVFS_debug_afield(tattr->dist_dir_bitmap, PVFS_dist_dir_bitmap);    \
-        PVFS_debug_afield(tattr->dirdata_handles, PVFS_handle);    \
-        PVFS_debug_afield(tattr->dirdata_sids, PVFS_SID);    \
-        gossip_lsadebug("Dirdata Attrs End:\n");                   \
-    }                                                       \
-    gossip_end;                                             \
+do {                                                              \
+    struct PVFS_dirdata_attr_s *tattr = &((_attr)->u.dirdata);    \
+    gossip_if (_mask)                                             \
+    {                                                             \
+        gossip_ladebug("PVFS_dirdata_attr:\n" #_attr " = (%p)\n", (_attr)); \
+        PVFS_debug_afield(tattr->dirent_count, int32_t);          \
+        PVFS_debug_afield(tattr, PVFS_dist_dir_bitmap);           \
+        PVFS_debug_afield(tattr->dirdata_handles, PVFS_handle);   \
+        PVFS_debug_afield(tattr->dirdata_sids, PVFS_SID);         \
+        PVFS_debug_PVFS_dist_dir_attr(_mask, &(tattr->dist_dir_attr)); \
+        gossip_ladebug("PVFS_dirdata_attr End:\n");              \
+    }                                                             \
+    gossip_end;                                                   \
 } while (0)
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1120,17 +1117,18 @@ endecode_fields_3(
         skip4,,
         string, target_path);
 
+/* This requires a ptr to an object_attr */
+
 #define PVFS_debug_PVFS_symlink_attr(_mask, _attr)             \
 do {                                                           \
     struct PVFS_symlink_attr_s *tattr =                        \
                                   &((_attr)->u.sym);           \
     gossip_if (_mask)                                          \
     {                                                          \
-        gossip_lsadebug("Symlink Attrs:\n");                   \
-        gossip_lsadebug("attr = (%p)\n", (_attr));             \
+        gossip_ladebug("PVFS_symlink_attr:\n" #_attr " = (%p)\n", (_attr)); \
         PVFS_debug_afield(tattr->target_path_len, uint32_t);   \
         PVFS_debug_afield(tattr->target_path, char);           \
-        gossip_lsadebug("Symlink Attrs End:\n");               \
+        gossip_ladebug("PVFS_symlink_attr End:\n");               \
     }                                                          \
     gossip_end;                                                \
 } while (0)
@@ -1173,22 +1171,24 @@ do {                                                             \
     struct PVFS_object_attr *_tattr = _attr;                     \
     gossip_if (_mask)                                            \
     {                                                            \
-        gossip_lsadebug("Object Attrs:\n");                      \
-        gossip_lsadebug("attr = (%p)\n", (_attr));               \
-        PVFS_debug_afield(_tattr->objtype, PVFS_ds_type);        \
-        PVFS_debug_afield(_tattr->mask, PVFS_object_attrmask);   \
-        PVFS_debug_afield(_tattr->owner, PVFS_uid);              \
-        PVFS_debug_afield(_tattr->group, PVFS_gid);              \
-        PVFS_debug_afield(_tattr->perms, PVFS_permissions);      \
-        PVFS_debug_afield(_tattr->atime, PVFS_time);             \
-        PVFS_debug_afield(_tattr->mtime, PVFS_time);             \
-        PVFS_debug_afield(_tattr->ctime, PVFS_time);             \
-        PVFS_debug_afield(_tattr->ntime, PVFS_time);             \
-        PVFS_debug_afield(_tattr->meta_sid_count, uint32_t);     \
-        PVFS_debug_afield(&_tattr->capability, PVFS_capability);  \
-        PVFS_debug_afield(_tattr->parent, PVFS_handle);          \
-        PVFS_debug_afield(_tattr->parent_sids, PVFS_SID);        \
-        gossip_lsadebug("Object Attrs End:\n");                  \
+        gossip_ladebug("PVFS Object Attr:" #_attr " = (%p)\n", (_attr)); \
+        if (_attr != NULL)                                        \
+        {                                                        \
+            PVFS_debug_afield(_tattr->objtype, PVFS_ds_type);    \
+            PVFS_debug_afield(_tattr->mask, PVFS_object_attrmask); \
+            PVFS_debug_afield(_tattr->owner, PVFS_uid);          \
+            PVFS_debug_afield(_tattr->group, PVFS_gid);          \
+            PVFS_debug_afield(_tattr->perms, PVFS_permissions);  \
+            PVFS_debug_afield(_tattr->atime, PVFS_time);         \
+            PVFS_debug_afield(_tattr->mtime, PVFS_time);         \
+            PVFS_debug_afield(_tattr->ctime, PVFS_time);         \
+            PVFS_debug_afield(_tattr->ntime, PVFS_time);         \
+            PVFS_debug_afield(_tattr->meta_sid_count, uint32_t); \
+            PVFS_debug_afield(_tattr->parent, PVFS_handle);      \
+            PVFS_debug_afield(_tattr->parent_sids, PVFS_SID);    \
+            PVFS_debug_afield(&_tattr->capability, PVFS_capability); \
+        }                                                        \
+        gossip_ladebug("PVFS Object Attrs End:\n");             \
     }                                                            \
     gossip_end;                                                  \
 } while (0)

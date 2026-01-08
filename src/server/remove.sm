@@ -986,27 +986,27 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
     PVFS_object_attr attr;
     int i;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                  "  remove_rebuild_remote_dirdata_keyval_setup_msgpair: \n");
 
     if(!s_op->u.remove.need_rebuild_dirdata_local && 
             (s_op->u.remove.num_rebuild_dirdata_remote == 0))
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "  no dirdata handles got rebuilt! "
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "  no dirdata handles got rebuilt! "
                      "no need to write keyval.  "
                      "move to dirdata cleanup !\n");
         js_p->error_code = REBUILD_DONE;
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
                  "\t remove_rebuild: ORIGINAL dirdata "
                  "handles array of directory %s.\n",
                  PVFS_OID_str(&s_op->req->u.remove.handle));
 
     for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.dirdata_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, 
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
                      "\t\tdirdata server [%d]: %s.\n",
                      i, PVFS_OID_str(&s_op->attr.u.dir.dirdata_handles[i]));
     }
@@ -1024,14 +1024,14 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
                 s_op->u.remove.handle_array_remote[i];
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
                  "\t remove_rebuild: REBUILT dirdata handles "
                  "array of directory %s.\n",
                  PVFS_OID_str(&s_op->req->u.remove.handle));
 
     for(i = 0; i < s_op->attr.u.dir.dist_dir_attr.dirdata_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, 
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, 
                      "\t\tdirdata server [%d]: %s.\n",
                      i, PVFS_OID_str(&s_op->attr.u.dir.dirdata_handles[i]));
     }
@@ -1045,7 +1045,7 @@ static PINT_sm_action remove_rebuild_remote_dirdata_keyval_setup_msgpair(
     attr.mask = PVFS_ATTR_COMMON_ALL;
     attr.mask |= PVFS_ATTR_DISTDIR_ATTR;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                  "remove_rebuild: SENDING attrs: [owner = %d, group = %d\n\t"
                  "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
                  "ctime = %llu ]\n",
@@ -1111,6 +1111,8 @@ static PINT_sm_action remove_rebuild_write_dirdata_keyval(
     int ret = -PVFS_ENOMEM;
     job_id_t j_id;
 
+    /* clean up mop pushed before the msgpair jump */
+    //PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
 
     /* set up key and value structures for writing dirdata handles */
     s_op->key.buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;

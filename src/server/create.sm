@@ -394,6 +394,9 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     s_op->val_a[1].buffer_sz = s_op->req->u.create.attr.u.meta.dist_size;
     s_op->val_a[1].buffer =    malloc(s_op->val_a[1].buffer_sz);
 
+    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "dist_size = %d\n",
+                   s_op->req->u.create.attr.u.meta.dist_size);
+
     if(!s_op->val_a[1].buffer)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -401,8 +404,18 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     }
     ZEROMEM(s_op->val_a[1].buffer, s_op->val_a[1].buffer_sz);
 
-    PINT_dist_encode(s_op->val_a[1].buffer,
-                     s_op->req->u.create.attr.u.meta.dist);
+    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "Dist Buffer for create (%p)\n",
+                   s_op->val_a[1].buffer);
+
+/*** WAIT!  Why do we encode this?  This is just writing to disk, not 
+ * the network, so unless there is a reason ... 
+ * Does getattr decode this?
+ */
+    PVFS_debug_PINT_dist(GOSSIP_SERVER_DEBUG, s_op->req->u.create.attr.u.meta.dist);
+    //PINT_dist_encode(s_op->val_a[1].buffer, s_op->req->u.create.attr.u.meta.dist);
+    PINT_dist_copy((struct PINT_dist_s **)&s_op->val_a[1].buffer,
+                   s_op->req->u.create.attr.u.meta.dist);
+    //PVFS_debug_PINT_dist(GOSSIP_SERVER_DEBUG, s_op->val_a[1].buffer);
 
     /* writing object parent handle and sids */
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
@@ -421,6 +434,8 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
         return SM_ACTION_COMPLETE;
     }
     ZEROMEM(s_op->val_a[2].buffer, s_op->val_a[2].buffer_sz);
+
+    /* no encoding here! */
 
     memcpy(s_op->val_a[2].buffer,
           &s_op->req->u.create.parent.handle,
@@ -517,6 +532,8 @@ static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
     }
 #endif
 
+    PVFS_debug_PVFS_object_attr(GOSSIP_CREATE_DEBUG, dspace_a_p);
+#if 0
     gossip_debug(
          GOSSIP_SERVER_DEBUG,
          "[STUFFED CREATE]: WRITING attrs: [owner = %d, group = %d\n\t"
@@ -528,6 +545,7 @@ static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
          llu(dspace_a_p->ctime),
          (int)dspace_a_p->u.meta.dfile_count,
          (int)dspace_a_p->u.meta.dist_size);
+#endif
 
     /* translate attrs to storage attr format */
     ds_attr = &(s_op->ds_attr);

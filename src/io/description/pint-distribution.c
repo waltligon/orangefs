@@ -16,8 +16,6 @@
 #include "internal.h"
 #include "pint-distribution.h"
 
-
-
 /* global size of dist table */
 #define PINT_DIST_TABLE_SZ 8
 static int PINT_Dist_count = 0; 
@@ -92,6 +90,8 @@ PINT_dist *PINT_dist_create(const char *name)
     PINT_dist old_dist;
     PINT_dist *new_dist = 0;
 
+    gossip_ldebug(GOSSIP_DIST_DEBUG, "Creating new Dist from table\n");
+
     if (!name)
     {
         return 0;
@@ -102,10 +102,12 @@ PINT_dist *PINT_dist_create(const char *name)
     if (PINT_dist_lookup(&old_dist) == 0)
     {
         /* distribution was found */
+        gossip_ldebug(GOSSIP_DIST_DEBUG, "New Dist name found in table\n");
         new_dist = malloc(PINT_DIST_PACK_SIZE(&old_dist));
         if (new_dist)
         {
             /* copy all fields */
+            gossip_ldebug(GOSSIP_DIST_DEBUG, "Copying all fields\n");
             *new_dist = old_dist;
             /* find address for name and params */
             new_dist->dist_name
@@ -140,29 +142,38 @@ int PINT_dist_free(PINT_dist *dist)
 }
 
 /* copies an entire dist in binary to a new contiguous block of memory */
-PINT_dist* PINT_dist_copy(const PINT_dist *dist)
+PINT_dist *PINT_dist_copy(PINT_dist **dist, const PINT_dist *sdist)
 {
     int dist_size;
-    PINT_dist *new_dist;
 
-    if (!dist)
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Starting distribution copy (%p)->(%p)\n", sdist, *dist);
+
+    if (sdist == NULL)
     {
+        gossip_lerr("source distribution pointer is null\n");
         return NULL;
     }
-    dist_size = PINT_DIST_PACK_SIZE(dist);
-    new_dist = (PINT_dist *)malloc(dist_size);
-    if (new_dist)
+
+    dist_size = PINT_DIST_PACK_SIZE(sdist);
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Dist size %d\n", dist_size);
+    if (*dist == NULL)
     {
-        memcpy(new_dist, dist, dist_size);
-        /* fixup pointers to new space */
-        new_dist->dist_name
-                      = (char *) new_dist + roundup8(sizeof(*new_dist));
-        new_dist->params
-                = (void *)(new_dist->dist_name + roundup8(new_dist->name_size));
-        memcpy(new_dist->dist_name, dist->dist_name, dist->name_size);
-        memcpy(new_dist->params, dist->params, dist->param_size);
+        (*dist) = (PINT_dist *)malloc(dist_size);
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Mallocing dest (%p)\n", (*dist));
     }
-    return (new_dist);
+    if (*dist)
+    {
+        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Copying (%p)->(%p)\n", sdist, (*dist));
+        memcpy((*dist), sdist, dist_size);
+        /* fixup pointers to new space */
+        (*dist)->dist_name
+                      = (char *) (*dist) + roundup8(sizeof(**dist));
+        (*dist)->params
+                = (void *)((*dist)->dist_name + roundup8((*dist)->name_size));
+        memcpy((*dist)->dist_name, sdist->dist_name, sdist->name_size);
+        memcpy((*dist)->params, sdist->params, sdist->param_size);
+    }
+    return (*dist);
 }
 
 /* copies a binary block of parameters from a dist */
@@ -219,30 +230,19 @@ int PINT_dist_lookup(PINT_dist *dist)
     return -1;
 }
 
-/* pack dist struct for storage */
+/* again, why are we doing this? */
+/* pack dist struct for storage from dist to buffer */
 void PINT_dist_encode(void *buffer, PINT_dist *dist)
 {
     char *tmpbuf = (char *)buffer;
     encode_PINT_dist(&tmpbuf, &dist);
 }
 
-/* unpack dist struct after receiving from storage */
+/* unpack dist struct after receiving from storage from buffer to dist */
 void PINT_dist_decode(PINT_dist **dist, void *buffer)
 {
     char *tmpbuf = (char *)buffer;
     decode_PINT_dist(&tmpbuf, dist, NULL);
-}
-
-void PINT_dist_dump(PINT_dist *dist)
-{
-    gossip_debug(GOSSIP_DIST_DEBUG,"******************************\n");
-    gossip_debug(GOSSIP_DIST_DEBUG,"address\t\t%p\n", dist);
-    gossip_debug(GOSSIP_DIST_DEBUG,"dist_name\t%s\n", dist->dist_name);
-    gossip_debug(GOSSIP_DIST_DEBUG,"name_size\t%d\n", dist->name_size);
-    gossip_debug(GOSSIP_DIST_DEBUG,"param_size\t%d\n", dist->param_size);
-    gossip_debug(GOSSIP_DIST_DEBUG,"params\t\t%p\n", dist->params);
-    gossip_debug(GOSSIP_DIST_DEBUG,"methods\t\t%p\n", dist->methods);
-    gossip_debug(GOSSIP_DIST_DEBUG,"******************************\n");
 }
 
 /*

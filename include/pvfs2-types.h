@@ -810,13 +810,13 @@ do { \
  */
 #define PVFS_debug_object_ref(oref) \
 do { \
-        gossip_lsadebug("Object ref Debug (" #oref "):\n"); \
-        gossip_lsadebug("Handle    %s\n", PVFS_OID_str(&((oref)->handle))); \
-        gossip_lsadebug("FS_id     %d\n", (oref)->fs_id); \
-        gossip_lsadebug("SID count %d\n", (oref)->sid_count); \
+        gossip_ladebug("Object ref Debug (" #oref "):\n"); \
+        gossip_ladebug("Handle    %s\n", PVFS_OID_str(&((oref)->handle))); \
+        gossip_ladebug("FS_id     %d\n", (oref)->fs_id); \
+        gossip_ladebug("SID count %d\n", (oref)->sid_count); \
         if ((oref)->sid_count > 0) \
         { \
-           gossip_lsadebug("SID %s\n", PVFS_SID_str((oref)->sid_array)); \
+           gossip_ladebug("SID %s\n", PVFS_SID_str((oref)->sid_array)); \
         } \
 } while (0)     
 
@@ -945,24 +945,23 @@ endecode_fields_9(
  */
 #define PVFS_debug_PVFS_dist_dir_attr(_mask, _ddattr)            \
 do {                                                             \
-    struct PVFS_dist_dir_attr_s *tattr = (_ddattr);              \
+    struct PVFS_dist_dir_attr_s *tmpattr = (_ddattr);            \
     gossip_if (_mask)                                            \
     {                                                            \
-        gossip_lsadebug("Dist_Dir_Attrs:\n");                    \
-        gossip_lsadebug(#_ddattr " = (%p)\n", (_ddattr));        \
+        gossip_ladebug("Dist Dir Attrs: " #_ddattr " = (%p)\n", (_ddattr)); \
         if (_ddattr != NULL)                                     \
         {                                                        \
-            PVFS_debug_afield(tattr->tree_height, uint32_t);     \
-            PVFS_debug_afield(tattr->dirdata_min, uint32_t);     \
-            PVFS_debug_afield(tattr->dirdata_max, uint32_t);     \
-            PVFS_debug_afield(tattr->dirdata_count, uint32_t);   \
-            PVFS_debug_afield(tattr->sid_count, uint32_t);       \
-            PVFS_debug_afield(tattr->bitmap_size, uint32_t);     \
-            PVFS_debug_afield(tattr->split_size, uint32_t);      \
-            PVFS_debug_afield(tattr->server_no, int32_t);        \
-            PVFS_debug_afield(tattr->branch_level, int32_t);     \
+            PVFS_debug_afield(tmpattr->tree_height, uint32_t);   \
+            PVFS_debug_afield(tmpattr->dirdata_min, uint32_t);   \
+            PVFS_debug_afield(tmpattr->dirdata_max, uint32_t);   \
+            PVFS_debug_afield(tmpattr->dirdata_count, uint32_t); \
+            PVFS_debug_afield(tmpattr->sid_count, uint32_t);     \
+            PVFS_debug_afield(tmpattr->bitmap_size, uint32_t);   \
+            PVFS_debug_afield(tmpattr->split_size, uint32_t);    \
+            PVFS_debug_afield(tmpattr->server_no, int32_t);      \
+            PVFS_debug_afield(tmpattr->branch_level, int32_t);   \
         }                                                        \
-        gossip_lsadebug("Dist_Dir_Attrs End:\n");                \
+        gossip_ladebug("Dist Dir Attrs End:\n");                 \
     }                                                            \
     gossip_end;                                                  \
 } while (0)

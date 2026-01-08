@@ -245,7 +245,7 @@ PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
     PINT_smcb *smcb = NULL;
     PINT_client_sm *sm_p = NULL;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "PVFS_isys_getattr entered\n");
+    gossip_ldebug(GOSSIP_GETATTR_DEBUG, "PVFS_isys_getattr entered\n");
 
     if ((!PVFS_OID_cmp(&ref.handle, &PVFS_HANDLE_NULL)) ||
         (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
@@ -314,7 +314,7 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
     PVFS_error ret, error = 0;
     PVFS_sys_op_id op_id;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "PVFS_sys_getattr entered\n");
+    gossip_ldebug(GOSSIP_GETATTR_DEBUG, "PVFS_sys_getattr entered\n");
 
     ret = PVFS_isys_getattr(ref,
                             attrmask,
@@ -330,7 +330,7 @@ PVFS_error PVFS_sys_getattr(PVFS_object_ref ref,
     }
     else if (!ret && op_id != -1)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,"Waiting for state machine.\n");
+        gossip_ldebug(GOSSIP_GETATTR_DEBUG,"Waiting for state machine.\n");
         ret = PVFS_sys_wait(op_id, "getattr", &error);
         if (ret)
         {
@@ -374,7 +374,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      * caching.
      */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Copy to psm_p->getattr.attr from resp\n");
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, resp_p->u.getattr.attr.mask);
+    /* PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, resp_p->u.getattr.attr.mask); */
+
+    PVFS_debug_PVFS_attr(GOSSIP_GETATTR_DEBUG, &resp_p->u.getattr.attr);
 
     PINT_copy_object_attr(&psm_p->getattr.attr, &resp_p->u.getattr.attr);
 
@@ -562,7 +564,7 @@ static int getattr_dirdata_getattr_comp_fn(void *v_p,
     assert( (cur_index >= 0) &&
             (cur_index < attr_p->u.dir.dist_dir_attr.dirdata_count));
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
+    gossip_ldebug(GOSSIP_GETATTR_DEBUG,
             "dirdata getattr[%d] (#[%d]) returns attrs: "
             "[dirent_count=%llu, "
             "atime = %llu, mtime = %llu, ctime = %llu]\n",
@@ -606,7 +608,7 @@ static int getattr_dirdata_getattr_comp_fn(void *v_p,
     }
 
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attr_p->mask);
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "updated directory attrs: "
+    gossip_ldebug(GOSSIP_GETATTR_DEBUG, "updated directory attrs: "
             "[dirent_count=%llu, atime = %llu, mtime = %llu, ctime = %llu]\n",
             llu(attr_p->u.dir.dirent_count),
             llu(attr_p->atime),
@@ -674,6 +676,10 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         gossip_lsadebug("nil: %s\n", PVFS_OID_str(&PVFS_HANDLE_NULL));
     }
     gossip_end;
+
+    assert(PVFS_OID_NE(&object_ref.handle, &PVFS_HANDLE_NULL));
+    assert(object_ref.fs_id != PVFS_FS_ID_NULL);
+    assert(object_ref.sid_count > 0);
 
     assert(PVFS_OID_NE(&object_ref.handle, &PVFS_HANDLE_NULL));
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
@@ -971,7 +977,7 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
     PVFS_uid local_uid;
     int ret;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "(%p)\n", sm_p);
 
     /* only process if a capability was requested */
     if (!(sm_p->getattr.req_attrmask & PVFS_ATTR_CAPABILITY))
@@ -1008,18 +1014,15 @@ static PINT_sm_action getattr_client_capcache_lookup(struct PINT_smcb *smcb,
     {
         if (ret == -PVFS_ENOENT)
         {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: client capcache miss\n", 
-                         __func__);
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "client capcache miss\n");
         }
         else if (ret == -PVFS_ETIME)
         {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: client capcache timeout\n",
-                         __func__);
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "client capcache timeout\n");
         }
         else
         {
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "%s: client capcache error "
-                         "%d\n", __func__, ret);
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "client capcache error %d\n", ret);
         }
 
         /* report the miss */
@@ -1184,19 +1187,9 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     int i = 0;
     PVFS_handle *handles;
 #endif
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "(%p)\n", sm_p);
 
     PVFS_capability capability;
-
-    gossip_lsdebug(GOSSIP_MIRROR_DEBUG,
-                   "Executing getattr_datafile_getattr_setup_msgpairarray...\n");
-    gossip_lsdebug(GOSSIP_MIRROR_DEBUG,
-                   "%s: Are we mirroring? %s\n",__func__,
-                  (mirror_retry ? "YES" : "NO")); 
-    gossip_lsdebug(GOSSIP_MIRROR_DEBUG,
-                   "attr.mask:0x%lx \tmirror_retry:0x%x\n",
-                   sm_p->getattr.attr.mask,
-                   (unsigned int)mirror_retry);
 
     js_p->error_code = 0;
 
@@ -1213,9 +1206,8 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
     /*initialize the size_array, which will hold the size of each datahandle*/
     PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&getattr->size_array,
                                      attr->u.meta.dfile_count);
-    gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "%s: getattr->size_array = %p\n",
-                 __func__,
+    gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+                 "getattr->size_array = %p\n",
                  (void *) getattr->size_array);
 
 /* V3 this is handled in MPA */
@@ -1633,7 +1625,9 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);    
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "sm_p (%p) poping old msgpari frame\n", sm_p);
+
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
 
 #if 0
     PINT_sm_getattr_state *getattr = &(sm_p->getattr);
@@ -1686,7 +1680,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
     int tmp_index, cur_index;
     PVFS_capability capability;
         
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "(%p)\n", sm_p);
 
     js_p->error_code = 0;
         
@@ -1701,9 +1695,8 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
     PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&sm_p->getattr.size_array,
             attr->u.dir.dist_dir_attr.dirdata_count);
             
-    gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "%s: sm_p->getattr->size_array = %p\n",
-                 __func__,
+    gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+                 "sm_p->getattr->size_array = %p\n",
                  (void *) sm_p->getattr.size_array);
 
     sm_p->getattr.active_dirdata_index = (int *)malloc(
@@ -1747,8 +1740,8 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
     {
         cur_index = sm_p->getattr.active_dirdata_index[i];
     
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "getattr: posting dirdata getattr[%d] ([%d]:%s,%d)\n",
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                     "posting dirdata getattr[%d] ([%d]:%s,%d)\n",
                      i, cur_index,
                      PVFS_OID_str(&attr->u.dir.dirdata_handles[cur_index]),
                      sm_p->getattr.object_ref.fs_id);
@@ -1800,7 +1793,9 @@ static PINT_sm_action getattr_dirdata_getattr_cleanup(
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "sm_p(%p) poping old msgpair frame\n", sm_p);
+
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
 
     /* cleanup tree request */
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
@@ -1929,7 +1924,7 @@ static PINT_sm_action getattr_acache_insert(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_size* tmp_size = NULL;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "(%p)\n", sm_p);
 
     /* TODO: This is for debugging only. */
 #if 0
@@ -1956,27 +1951,22 @@ static PINT_sm_action getattr_acache_insert(struct PINT_smcb *smcb,
          sm_p->getattr.req_attrmask
         );
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "%s: Mask properties of the request:\n",
-                 __func__);
+    gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+                 "Mask properties of the request:\n");
     PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, sm_p->getattr.req_attrmask);
-    gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "%s: Mask properties of the object we are inserting:\n",
-                 __func__);
+    gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+                 "Mask properties of the object we are inserting:\n");
     PINT_attr_dump_object_type(GOSSIP_ACACHE_DEBUG, &sm_p->getattr.attr);
     PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, sm_p->getattr.attr.mask);
     if(missing_attrs)
     {
-        gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: Mask properties missing:\n",
-                     __func__);
+        gossip_lsdebug(GOSSIP_ACACHE_DEBUG, "Mask properties missing:\n");
         PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
     }
     else
     {
-        gossip_debug(GOSSIP_ACACHE_DEBUG,
-                     "%s: No mask properties missing:\n",
-                     __func__);
+        gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+                     "No mask properties missing:\n");
     }
 
     if( sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE || 
@@ -1992,14 +1982,11 @@ static PINT_sm_action getattr_acache_insert(struct PINT_smcb *smcb,
         if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE &&
             sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
         {
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: NOTE, objtype is metafile and "
+            gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+                         "NOTE, objtype is metafile and "
                          "PVFS_ATTR_DATA_SIZE is in mask. "
-                         "Should cache size.\n",
-                         __func__);
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: caching file size\n",
-                         __func__);
+                         "Should cache size.\n");
+            gossip_lsdebug(GOSSIP_ACACHE_DEBUG, "caching file size\n");
             /* compute size as requested */
             assert(sm_p->getattr.attr.u.meta.dist);
             assert(sm_p->getattr.attr.u.meta.dist->methods &&
@@ -2012,7 +1999,7 @@ static PINT_sm_action getattr_acache_insert(struct PINT_smcb *smcb,
                             sm_p->getattr.size_array);
 
             tmp_size = &sm_p->getattr.size;
-            gossip_debug(GOSSIP_GETATTR_DEBUG
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG
                          ,"getattr_acache_insert calculated"
                           " logical size of %lld\n"
                          , lld(*tmp_size));
@@ -2022,10 +2009,9 @@ static PINT_sm_action getattr_acache_insert(struct PINT_smcb *smcb,
             sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
         {
             /* size_array SHOULD be valid here if the proper bit was flipped */
-            gossip_debug(GOSSIP_ACACHE_DEBUG,
-                         "%s: getattr should cache size array! "
+            gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+                         "getattr should cache size array! "
                          "handle=%s size_array=%p num_servers=%d\n",
-                         __func__,
                          PVFS_OID_str(&sm_p->getattr.object_ref.handle),
                          (void *) sm_p->getattr.size_array,
                          sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count);
@@ -2052,7 +2038,7 @@ static PINT_sm_action getattr_client_capcache_insert(struct PINT_smcb *smcb,
     int ret GCC_UNUSED;
     PVFS_uid local_uid;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "(%p)\n", sm_p);
 
     /* only process if capability returned */
     if (!(sm_p->getattr.attr.mask & PVFS_ATTR_CAPABILITY))
@@ -2078,9 +2064,8 @@ static PINT_sm_action getattr_client_capcache_insert(struct PINT_smcb *smcb,
     ret = PINT_client_capcache_update(sm_p->getattr.object_ref, 
                                       local_uid, 
                                       &sm_p->getattr.attr.capability);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s: "
-                 "PINT_client_capcache_update returned %d\n",
-                     __func__, ret);
+    gossip_lsdebug(GOSSIP_SECURITY_DEBUG, 
+                 "PINT_client_capcache_update returned %d\n", ret);
 
     return SM_ACTION_COMPLETE;
 }
@@ -2125,7 +2110,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     PVFS_sysresp_getattr * sysresp = NULL;
     PVFS_object_attr *attr = NULL;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "(%p)\n", sm_p);
 
     if(js_p->error_code != 0)
     {
@@ -2186,10 +2171,10 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
     }
     if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                      "dfile_count: %d\n", 
                      attr->u.dir.hint.dfile_count);
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                      "dist_name_len = %d, "
                      "dist_params_len = %d\n",
                      attr->u.dir.hint.dist_name_len,
@@ -2209,7 +2194,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
                 PINT_SET_OP_COMPLETE;
                 return SM_ACTION_TERMINATE;
             }
-            gossip_debug(GOSSIP_GETATTR_DEBUG
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG
                          , "dist_name_hint: %s\n"
                          , sysresp->attr.dist_name);
         }
@@ -2225,7 +2210,7 @@ static PINT_sm_action getattr_set_sys_response(struct PINT_smcb *smcb,
                 PINT_SET_OP_COMPLETE;
                 return SM_ACTION_TERMINATE;
             }
-            gossip_debug(GOSSIP_GETATTR_DEBUG, "dist_name_params: %s\n"
+            gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "dist_name_params: %s\n"
                                             , sysresp->attr.dist_params);
         }
     }
@@ -2322,11 +2307,10 @@ static PINT_sm_action attr_mask_include_size(
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr_p = &sm_p->getattr.attr;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", sm_p, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "(%p)\n", sm_p);
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "%s: INCLUDING PVFS_ATTR_DATA_SIZE BIT IN ATTR MASK\n",
-                 __func__);
+    gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+                 "INCLUDING PVFS_ATTR_DATA_SIZE BIT IN ATTR MASK\n");
 
     attr_p->mask |= PVFS_ATTR_DATA_SIZE;
 

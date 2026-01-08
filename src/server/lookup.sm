@@ -114,7 +114,6 @@ machine pvfs2_lookup_sm
     }
 
     /* read an object attr for the current segment */
-
     state read_object_metadata
     {
         run lookup_read_object_metadata;
@@ -916,6 +915,8 @@ static PINT_sm_action lookup_read_object_metadata(
 
     PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
 
+    /* This is for the frame pushed before the msgpair jump */
+    /* maybe only needs to be 1 frame, but this is working */
     PINT_sm_pop_top_frames(smcb);
 
     PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
@@ -998,6 +999,7 @@ static PINT_sm_action lookup_read_object_metadata(
             g_op->target_fs_id = s_op->req->u.lookup_path.fs_id;
             g_op->target_sid_array = s_op->resp.u.lookup_path.sid_array;
             s_op->u.lookup.handle_ct = 1;
+            s_op->u.lookup.locrmt = LOCAL_SEGMENT;
             /* push getattr frame */
             PINT_sm_push_frame(smcb, 999, g_op);
             /* this object is on this server */
@@ -1021,6 +1023,7 @@ static PINT_sm_action lookup_read_object_metadata(
          * That func doesn't look for it either, so this seems to be
          * rather useless.
          */
+        s_op->u.lookup.locrmt = REMOTE_SEGMENT;
         js_p->error_code = REMOTE_SEGMENT;
         return SM_ACTION_COMPLETE;
     }
@@ -1181,10 +1184,14 @@ static int read_remote_metadata_comp_fn(void *v_p, struct PVFS_server_resp *resp
     gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "parent frame (%p)\n", p_op);
     gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "resp_p (%p)\n", resp_p);
 
-    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
-    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, parent_smcb);
+    //PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
+    //PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, parent_smcb);
 
-    PINT_copy_object_attr(&p_op->attr, &resp_p->u.getattr.attr);
+    PVFS_debug_PVFS_attr(GOSSIP_LOOKUP_DEBUG, &(resp_p->u.getattr.attr));
+
+    PINT_copy_object_attr(&(p_op->attr), &(resp_p->u.getattr.attr));
+
+    PVFS_debug_PVFS_attr(GOSSIP_LOOKUP_DEBUG, &(p_op->attr));
 
     gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
                    "resp_p->u.getattr.attr.objtype %d\n", resp_p->u.getattr.attr.objtype);
@@ -1210,7 +1217,7 @@ static PINT_sm_action cleanup_remote_request(struct PINT_smcb *smcb,
 
     PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
 
-    /* pop the mop on top */
+    /* pop the mop on top from before the msgpair jump */
     getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining);
     /* now grab the parent s_op */
     s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -1257,6 +1264,18 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
     /* remove getattr frame - already removed */
     /* getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining); */
     /* getattr_op = &s_op->msgarray_op; - didn't save mop */
+
+    /* OK, we get to this state in one of two ways: a remote getattr
+     * or a local getattr.  For the first a mop is on the stack, but
+     * should have been removed iin a previous state, and for a local
+     * there is an s_op on the stack we want to get off.  We have a
+     * frame variable to tell which it is.
+     */
+
+    if (s_op->u.lookup.locrmt == LOCAL_SEGMENT)
+    {
+        PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    }
 
     getattr_op = &s_op->msgarray_op;
 
@@ -1429,18 +1448,17 @@ static PINT_sm_action lookup_setup_getattr_request(
 
     js_p->error_code = 0;
 
-    getattr_op = calloc(1,sizeof(*getattr_op));
+    getattr_op = calloc(1, sizeof(*getattr_op));
     if ( !getattr_op )
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-   
     getattr_op->attr = s_op->resp.u.lookup_path.attr_array[
                                                s_op->u.lookup.array_index];
 
-    getattr_op->req = s_op->req;
+    getattr_op->req = s_op->req; /* This forces and error below */
 
     getattr_op->u.getattr.fs_id      = s_op->req->u.lookup_path.fs_id;
     getattr_op->u.getattr.handle     = s_op->resp.u.lookup_path.handle_array[
@@ -1459,7 +1477,9 @@ static PINT_sm_action lookup_setup_getattr_request(
     getattr_op->req->u.getattr.handle = getattr_op->u.getattr.handle;
     getattr_op->req->u.getattr.attrmask = getattr_op->u.getattr.attrmask;
     getattr_op->req->u.getattr.credential = getattr_op->u.getattr.credential;
-    PVFS_REQ_COPY_CAPABILITY(s_op->req->capability, *getattr_op->req); 
+    /* ERROR: These two are the same thing */
+    //PVFS_REQ_COPY_CAPABILITY(s_op->req->capability, getattr_op->req->capability);
+    PINT_copy_capability(&s_op->req->capability, &getattr_op->req->capability);
 
     ret = PINT_sm_push_frame(smcb, 0, getattr_op);
     if ( ret < 0 )
@@ -1470,6 +1490,7 @@ static PINT_sm_action lookup_setup_getattr_request(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "6\n");
     return SM_ACTION_COMPLETE;
 
     /* jumps to a getattr */
@@ -1772,9 +1793,11 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
                    "Begin: s_op (%p) s_op->lookup.handle_ct %u s_op->decoded.enc_type %d\n",
                    s_op, s_op->u.lookup.handle_ct, s_op->decoded.enc_type);
+
     s_op->resp.u.lookup_path.handle_count = s_op->u.lookup.handle_ct;
     s_op->resp.u.lookup_path.attr_count   = s_op->u.lookup.attr_ct;
     s_op->resp.op = s_op->req->op;
+    //s_op->decoded.enc_type = t_op->decoded.enc_type; /* makes encode work */
 
     if (s_op->resp.u.lookup_path.handle_count ||
         s_op->resp.u.lookup_path.attr_count)

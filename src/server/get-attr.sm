@@ -137,9 +137,7 @@ nested machine pvfs2_get_attr_work_sm
 
     state read_file_size
     {
-/*        jump pvfs2_msgpairarray_sm; */
         jump pvfs2_tree_get_file_size_work_sm;
-
         default => check_if_capability_required;
     }
 
@@ -174,9 +172,7 @@ nested machine pvfs2_get_attr_work_sm
 
     state read_dirent_count
     {
-/*        jump pvfs2_msgpairarray_sm; */
         jump pvfs2_tree_get_dirent_count_work_sm; 
-
         default => clear_dup_frame;
     }
 
@@ -365,7 +361,6 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
     PINT_copy_object_attr_fixed(respattr, &s_op->attr);
     /*PVFS_debug_PVFS_dist_dir_attr(GOSSIP_GETATTR_DEBUG, &(respattr->u.dir.dist_dir_attr));*/
     /*PVFS_debug_PVFS_object_attr(GOSSIP_GETATTR_DEBUG, respattr);*/
-    PVFS_debug_PVFS_directory_attr(GOSSIP_GETATTR_DEBUG, &(respattr->u.dir));
 
     /*
      * weed out the attr mask of the response based on what the client
@@ -483,7 +478,9 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                            "handle %s refers to a directory\n",
                            PVFS_OID_str(&s_op->target_handle));
-                           //PVFS_OID_str(&s_op->u.getattr.handle));
+
+            PVFS_debug_PVFS_directory_attr(GOSSIP_GETATTR_DEBUG, respattr);
+
             /* We need some of this error checking back, but the bit
              * flipping going on does not seem right.  Need a careful
              * review of this.
@@ -577,6 +574,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
 
         case PVFS_TYPE_DIRDATA:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
+            PVFS_debug_PVFS_dirdata_attr(GOSSIP_GETATTR_DEBUG, respattr);
 
             gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                            "handle %s refers to a dirdata\n",
@@ -1110,7 +1108,7 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p)\n", s_op);
 
     if ((js_p->error_code == 0) &&
         (s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
@@ -1134,6 +1132,8 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         }
     }
 
+    PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
+
     if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST)
     {
         /* successfully read dist key; make sure we got something valid */
@@ -1153,7 +1153,13 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         }
 
         assert(s_op->val_a[1].buffer);
-        PINT_dist_decode(&s_op->resp.u.getattr.attr.u.meta.dist, s_op->val_a[1].buffer);
+        /* Not sure why dist was encoded on disk - seems to be a problem
+         * Trying without
+         */
+        //PINT_dist_decode(&s_op->resp.u.getattr.attr.u.meta.dist, s_op->val_a[1].buffer);
+        PINT_dist_copy(&s_op->resp.u.getattr.attr.u.meta.dist, s_op->val_a[1].buffer);
+
+        PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->resp.u.getattr.attr.u.meta.dist);
 
         if(s_op->resp.u.getattr.attr.u.meta.dist == NULL)
         {
@@ -1164,19 +1170,27 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
             return SM_ACTION_COMPLETE;
         }
     }
+    else
+    {
+        /* clear out the Dist rather than leave junk */
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Clearing Dist won't be returned\n");
+        memset(s_op->val_a[1].buffer, 0, sizeof(struct PINT_dist_s));
+        memset(s_op->resp.u.getattr.attr.u.meta.dist, 0, s_op->val_a[1].buffer_sz);
+        PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
+    }
     //respattr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
     if (s_op->u.getattr.attrmask & PVFS_ATTR_FASTEST)
     {
-        gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     " client requests fastest size\n");
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                     "client requests fastest size\n");
         s_op->resp.u.getattr.attr.mask &= ~PVFS_ATTR_META_SIZE;
         s_op->resp.u.getattr.attr.u.meta.size = s_op->attr.u.meta.size;
     }
     else
     {
         /* default is LATEST */
-        gossip_debug(GOSSIP_GETATTR_DEBUG, 
-                     " client requests latest size\n");
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, 
+                     "client requests latest size\n");
         s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_SIZE;
         js_p->error_code = STATE_META_SIZE;
     }
@@ -1518,16 +1532,13 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     int ret, i, j;
     job_id_t tmp_id;
     PVFS_object_attr *attr_p;
-    PVFS_credential *cred;
+    PVFS_credential *cred GCC_UNUSED;
     unsigned char *c GCC_UNUSED;
 
     attr_p = &s_op->resp.u.getattr.attr;
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                  "frame: (%p), attr_p: (%p)\n", s_op, attr_p);
-
-    PINT_server_req_get_credential(s_op->req, &cred);
-    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     /*
      * Check for return of last database (keyval) read
      * and debugging of results
@@ -1550,7 +1561,9 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    PVFS_debug_PVFS_directory_attr(GOSSIP_GETATTR_DEBUG, attr_p);
 
+#if 0
     /* gossip parent */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                  "kvals of directory %s\n"
@@ -1585,6 +1598,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
                        i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]),
                        PVFS_SID_str(&attr_p->u.dir.dirdata_sids[i]));
     }
+#endif
 
     /*
      * Start to get DIR HINTS
@@ -1784,9 +1798,6 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    PINT_server_req_get_credential(s_op->req, &cred);
-    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
-
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "frame (%p) keval_read_list\n", s_op);
 
     /* read key val pairs */
@@ -1827,6 +1838,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
     PVFS_credential *cred;
     PINT_server_req_get_credential(s_op->req, &cred);
     PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
+    PINT_copy_credential(cred, &s_op->u.getattr.credential);
     if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
         /* if we failed to get any of the keys, and the error code is due to
@@ -2213,7 +2225,6 @@ static PINT_sm_action getattr_clear_dup_frame(struct PINT_smcb *smcb,
      * This frame was a dup pushed in getattr_dirent_count
      */
      gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "popping frame\n");
-     /*PINT_sm_pop_frame(smcb, &task, &error_code, &remain);*/
      PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
      return SM_ACTION_COMPLETE;
 }    
@@ -2353,7 +2364,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     void *acl_buf;
     size_t acl_size;
     int ret = 0;
-    PVFS_credential *cred;
+    PVFS_credential *cred GCC_UNUSED;
     PVFS_uid uid;
     uint32_t num_groups;
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
@@ -2586,6 +2597,9 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    PVFS_debug_servresp_getattr(GOSSIP_GETATTR_DEBUG, &(s_op->resp));
+
+#if 0
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "Handle %s retrieved attrs: \n\t\t"
                  "type = %d \n\t\towner = %d \n\t\t"
@@ -2599,6 +2613,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                  llu(respattr->ctime), llu(respattr->ntime),
                  (int)respattr->u.meta.dist_size,
                  (int)respattr->u.dir.dirent_count);
+#endif
 
     if (respattr->parent)
     {
@@ -2735,14 +2750,6 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                    "status %d (error = %d)\n",
                    PINT_util_get_object_type(respattr->objtype),
                    s_op->resp.status, js_p->error_code);
-
-#if 1
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "returning attrmask\n");
-    /*
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG,
-                        s_op->resp.u.getattr.attr.mask);
-     */
-#endif
 
     /* free some mirror stuff, free_keyval_buffers */
     free_nested_getattr_data(s_op);

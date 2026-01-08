@@ -123,8 +123,10 @@ int main(int argc, char **argv)
         }
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+        //fprintf(stderr, "issuing lookup request\n");
         rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
                              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
+        //fprintf(stderr, "done\n");
         if (rc)
         {
             PVFS_perror("PVFS_sys_lookup", rc);
@@ -207,6 +209,7 @@ int main(int argc, char **argv)
             }
         }
 
+        //fprintf(stderr, "issuing create request\n");
         rc = PVFS_sys_create(filename,
                              parent_ref,
                              attr,
@@ -223,9 +226,12 @@ int main(int argc, char **argv)
             ret = -1;
             break;
         }
+        //fprintf(stderr, "done\n");
     }
 
+    //fprintf(stderr, "finalizing PVFS\n");
     PVFS_sys_finalize();
+    //fprintf(stderr, "done\n");
 
     if(user_opts->server_list)
     {

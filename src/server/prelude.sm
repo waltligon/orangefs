@@ -559,8 +559,6 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         s_op->target_object_attr = &s_op->attr;
     }
 
-    //DEBUG_attr_mask(s_op->attr.mask);
-
     /* Remaining logic deals with new or existing object. */
 
     if (s_op->prelude_mask & PRELUDE_PERM_CHECK_DONE)
@@ -575,7 +573,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
     /* keeping this one to see the state of cap field after getattr
      */
-    PVFS_debug_PVFS_capability(GOSSIP_SECURITY_DEBUG, &s_op->req->capability);
+    //PVFS_debug_PVFS_capability(GOSSIP_SECURITY_DEBUG, &s_op->req->capability);
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
@@ -600,10 +598,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
      * It is used ot poke it into the credcache
      * Probably we should read this somewhere else
      */
-    PINT_server_req_get_credential(s_op->req, &cred);
+    //PINT_server_req_get_credential(s_op->req, &cred);
     /* keeping this one to see the state of cred field after getattr
      */
-    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
+    //PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     if (cred != NULL)
     {
 #ifdef ENABLE_CREDCACHE

@@ -70,7 +70,7 @@ nested machine pvfs2_mkdir_work_sm
     state dirdata_create
     {
         run mkdir_dirdata_create;
-        STATE_DIRDATA_DONE => setup_dirdata_create;
+        STATE_DIRDATA_DONE => setup_dirdata_create; /* exit loop */
         default => dirdata_attribs;
     }
 
@@ -83,7 +83,7 @@ nested machine pvfs2_mkdir_work_sm
     state dirdata_keyval
     {
         run mkdir_dirdata_keyvals;
-        default => dirdata_create;
+        default => dirdata_create; /* LOOP for multiple dirdatas */
     }
 
     /* create remote dirdatas */
@@ -92,12 +92,12 @@ nested machine pvfs2_mkdir_work_sm
     state setup_dirdata_create
     {
         run setup_dirdata_create;
-        STATE_DIRDATA_DONE => setup_getattr_request;
+        STATE_DIRDATA_DONE => setup_getattr_request; /* FORCED */
         success => initiate_dirdata_create;
         default => err_msg;
     }
 
-    state initiate_dirdata_create
+    state initiate_dirdata_create /* not used */
     {
         jump pvfs2_msgpairarray_sm;
         success => setup_getattr_request;
@@ -1081,10 +1081,12 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /*
     int ret = 0, h = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_capability capability;
     PVFS_object_attr *pattr = NULL;;
+    */
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 
@@ -1098,7 +1100,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
                    "setting return (error) code: 1 STATE_DIRDATA_DONE\n");
     js_p->error_code = STATE_DIRDATA_DONE;
     return SM_ACTION_COMPLETE;
-#endif
+#else
 
     /* set up for an array of requests */
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Setting up array of req\n");
@@ -1189,6 +1191,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Returning %d\n", ret);
     js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
+#endif
 }
 
 /*
@@ -1207,6 +1210,14 @@ static PINT_sm_action mkdir_setup_getattr_request(
     struct PINT_server_op *getattr_op;
     int ret = 0;
     PVFS_capability capability;
+
+    /* We aren't using the remote request so this is not needed
+     * See setup_dirdata_create
+     */
+    /* Just finished a remote request, starting another one
+     * pop the frame from the previous msgpair jump
+     */
+    /* PINT_sm_pop_frame(smcb, NULL, NULL, NULL); */
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "s_op (%p)\n", s_op);
 

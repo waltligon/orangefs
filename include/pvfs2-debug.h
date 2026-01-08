@@ -321,32 +321,27 @@ static inline int DBG_TRUE(PVFS_debug_mask mask)
  * src/server/pvfs2-server.h and others.
  */
 
-/* This expects a pointer to a directory_attr
+/* This expects a pointer to a directory_attr or a dirdata_attr
  */
 #define PVFS_to_string_PVFS_dist_dir_bitmap(_dattr, _string, _print)      \
 do {                                                                      \
     int i;                                                                \
-    gossip_ladebug("Dist_Dir_Bitmap: \n");                                \
-    gossip_ladebug(#_dattr " = (%p)\n", (_dattr));                        \
+    gossip_ladebug("Dist_Dir_Bitmap: " #_dattr " = (%p)\n", (_dattr));   \
     if ((_dattr) == NULL || (_dattr)->dist_dir_bitmap == NULL)            \
     {                                                                     \
-        sprintf(_string, "(nil)");                                        \
+        sprintf(_string, "->dist-dir-bitmap: (nil)");                     \
     }                                                                     \
     else                                                                  \
     {                                                                     \
         for(i = (_dattr)->dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)    \
         {                                                                 \
-        gossip_ladebug("1\n"); \
             unsigned char *c = (unsigned char *)((_dattr)->dist_dir_bitmap + i); \
-        gossip_ladebug("2\n"); \
-            gossip_ladebug("i=%d : %02x %02x %02x %02x\n",               \
+            gossip_ladebug("i=%d : %02x %02x %02x %02x\n",                \
                             i, c[3], c[2], c[1], c[0]);                   \
-        gossip_ladebug("3\n"); \
         }                                                                 \
-        gossip_ladebug("4\n"); \
         _print = 'N';                                                     \
-        gossip_ladebug("5\n"); \
     }                                                                     \
+    gossip_ladebug("Dist_Dir_Bitmap: END\n");                            \
 } while (0)
 
 #define PVFS_to_string_PVFS_time(_time, _string, _print) \
@@ -507,6 +502,7 @@ do {                                     \
     }                                    \
 } while (0)
 
+#if 0
 #define PVFS_to_string_PVFS_object_attr(_ref, _string, _print) \
 do {                                     \
     if ((_ref) == NULL)                  \
@@ -519,6 +515,7 @@ do {                                     \
         _print = 'N';                    \
     }                                    \
 } while (0)
+#endif
 
 #define PVFS_to_string_PVFS_object_attrmask(_mask, _string, _print) \
 do { \
@@ -537,7 +534,7 @@ do {                                                   \
     PVFS_to_string_##_type((_field), _string, _print); \
     if (_print == 'Y')                                 \
     {                                                  \
-        gossip_lsadebug("\t" #_field ": %s\n", _string); \
+        gossip_ladebug("\t" #_field ": %s\n", _string); \
     }                                                  \
 } while (0) 
 
@@ -551,7 +548,7 @@ do { \
     PVFS_to_string_##_type(_field, _string, _print); \
     if (_print == 'Y') \
     {                  \
-        gossip_lsdebug((_mask), "\t" #_field ": %s\n", _string); \
+        gossip_ldebug((_mask), "\t" #_field ": %s\n", _string); \
     }                  \
 } while (0)
 

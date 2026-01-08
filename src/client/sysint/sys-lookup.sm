@@ -750,10 +750,6 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
 
     gossip_ldebug(GOSSIP_LOOKUP_DEBUG, "Resolved %d segments\n",
                  resp_p->u.lookup_path.handle_count);
-
-    /* this is duplicated below */
-    memset(&last_resolved_refn, 0, sizeof(PVFS_object_ref));
-
     /*
      * Find metadata replication factor from configuration
      */
@@ -770,6 +766,11 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
      * those resolved handles.  in addition, we fill in the attribute
      * information for each segment if the attrs are available here
      */
+    /* we should not need this.  first iteration of the loop
+     * last_resolved_reference is not used before it is zero'd
+     */
+    /* memset(&last_resolved_refn, 0, sizeof(PVFS_object_ref)); */
+
     for (i = 0; i < resp_p->u.lookup_path.handle_count; i++)
     {
         cur_seg = GET_SEGMENT_AT(sm_p, current_seg_index + i);
@@ -827,7 +828,6 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
                                   &(resp_p->u.lookup_path.attr_array[i]));
         }
 
-        
         memcpy(oid1,
                PVFS_OID_str(&last_resolved_refn.handle),
                OID_STR_SZ); 
@@ -965,7 +965,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *seg_to_lookup = NULL;
 
-    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "setting up lookup request\n");
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "sm_p (%p) setting up lookup request\n", sm_p);
     js_p->error_code = 0;
 
     /* do a lookup on the current segment of the current context */

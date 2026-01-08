@@ -117,8 +117,14 @@ nested machine pvfs2_crdirent_work_sm
     state remote_dir_update_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => check_for_split;
+        success => msgpair_pop_frame;
         default => return;
+    }
+
+    state msgpair_pop_frame
+    {
+        run msgpair_pop_frame;
+        default => check_for_split;
     }
 
     /* setattr */
@@ -1005,6 +1011,12 @@ static PINT_sm_action crdirent_get_dirent_count(struct PINT_smcb *smcb,
 }
 #endif
 
+static PINT_sm_action msgpair_pop_frame(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    return SM_ACTION_COMPLETE;
+}
+
 /*
  * Function: crdirent_check_for_split
  */
@@ -1014,7 +1026,7 @@ static PINT_sm_action crdirent_check_for_split(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
     PVFS_object_attr *attr_p = NULL;
-    unsigned char *c __attribute__ ((unused)) = NULL;
+    unsigned char *c GCC_UNUSED = NULL;
 
     PINT_ACCESS_DEBUG(s_op,
                       GOSSIP_ACCESS_DEBUG,

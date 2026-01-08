@@ -44,7 +44,7 @@ int PVFS_sys_finalize()
 {
     static int finiflag = 0;
     static gen_mutex_t finimutex = GEN_MUTEX_INITIALIZER;
-    char * perf_counters_to_display = NULL;
+    char  *perf_counters_to_display = NULL;
 
     /* first time runs, other wait until completed then exit */
     if (finiflag)
@@ -102,29 +102,41 @@ int PVFS_sys_finalize()
     job_time_mgr_finalize();
     job_close_context(pint_client_sm_context);
     job_finalize();
+    //fprintf(stderr, "job finalize done\n");
 
     PINT_flow_finalize();
+    //fprintf(stderr, "flow finalize done\n");
 
     PINT_req_sched_finalize();
+    //fprintf(stderr, "req sched finalize done\n");
 
     /* release timer_queue resources, if there are any */
     PINT_timer_queue_finalize();
+    //fprintf(stderr, "timer queue finalize done\n");
 
     BMI_finalize();
+    //fprintf(stderr, "BMI finalize done\n");
 
     PINT_encode_finalize();
+    //fprintf(stderr, "encode finalize done\n");
 
     PINT_client_security_finalize();
+    //fprintf(stderr, "client security finalize done\n");
 
     PINT_dist_finalize();
+    //fprintf(stderr, "dist finalize done\n");
 
     PINT_event_finalize();
+    //fprintf(stderr, "event finalize done\n");
 
     PINT_release_pvfstab();
-
-    gossip_disable();
+    //fprintf(stderr, "release pvfstab finalize done\n");
 
     PINT_client_state_machine_release(g_smcb);
+    //fprintf(stderr, "Timer SM release finalize done\n");
+
+    gossip_disable();
+    //fprintf(stderr, "gossip disable finalize done\n");
 
 #ifdef WIN32
     pvfs_sys_init_flag = 0;
@@ -133,6 +145,7 @@ int PVFS_sys_finalize()
     finiflag = 1;
     
     gen_mutex_unlock(&finimutex);
+    //fprintf(stderr, "mutex unlock finalize done\n");
     return 0;
 }
 

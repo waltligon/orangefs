@@ -69,6 +69,7 @@ static void PINT_sm_debug_stack(void);
 #define FRAME_STACK_DEBUG
 #endif
 
+extern int s_op_sz; /* from src/server/pvfs2-server.c */
 
 
 #if defined(__PVFS2_SERVER__)
@@ -789,7 +790,6 @@ int PINT_smcb_alloc(struct PINT_smcb **smcb,
                     int (*term_fn)(struct PINT_smcb *, job_status_s *),
                     job_context_id context_id)
 {
-    gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, "");
     *smcb = (struct PINT_smcb *)malloc(sizeof(struct PINT_smcb));
     if (!(*smcb))
     {
@@ -870,6 +870,7 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
     qlist_for_each_entry_safe(frame_entry, tmp, &smcb->frames, link)
 #endif
     {
+        char freeframe[16] = "";
         if (frame_entry->frame_info->frame)
         {
            gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
@@ -890,7 +891,8 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
             frame_entry->frame_info->frame /*&& frame_entry->task_id != 0*/)
         {
             /* This combines with the lsdebug below */
-            gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Freeing / ");
+            sprintf(freeframe, "Freeing / "),
+            //gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Freeing frame\n");
             /* V3 - are we assured this frame has had any referenced
              * memory freed.  Shouldn't we call a specific free routine
              * on it to make sure and free anything remaining, rather
@@ -900,7 +902,7 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
             free(frame_entry->frame_info->frame);
             free(frame_entry->frame_info);
         } 
-        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Unlinking Frame\n");
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "%s Unlinking Frame\n", freeframe);
         qlist_del(&frame_entry->link);
         free(frame_entry);
     }
@@ -1028,9 +1030,9 @@ struct PINT_frame_info_s *PINT_sm_frame_info(struct PINT_smcb *smcb, int index)
          * to the target (index)
          */
         prev = smcb->frames.prev;
-        gossip_debug(GOSSIP_SM_FRMSTK_DEBUG, "BEFORE Target: %d prev: (%p)\n",
+        gossip_lsdebug(GOSSIP_SM_FRMSTK_DEBUG, "BEFORE Target: %d prev: (%p)\n",
                      target, prev);
-        gossip_debug(GOSSIP_SM_FRMSTK_DEBUG, "smcb.frames (%p) smcb.n: (%p) smbc.p: (%p)\n",
+        gossip_lsdebug(GOSSIP_SM_FRMSTK_DEBUG, "smcb.frames (%p) smcb.n: (%p) smbc.p: (%p)\n",
                      &smcb->frames, smcb->frames.next, smcb->frames.prev);
 
         for(f = 0; f != target && f < smcb->frame_count; f++)
@@ -1038,10 +1040,10 @@ struct PINT_frame_info_s *PINT_sm_frame_info(struct PINT_smcb *smcb, int index)
             gossip_if(GOSSIP_SM_FRMSTK_DEBUG)
             {
                 struct PINT_frame_s *fr_entry;
-                gossip_adebug("F: %d prev: (%p)\n", f, prev);
-                gossip_adebug("    prev.n: (%p) prev.p: (%p)\n", prev->next, prev->prev);
+                gossip_lsadebug("F: %d prev: (%p)\n", f, prev);
+                gossip_lsadebug("    prev.n: (%p) prev.p: (%p)\n", prev->next, prev->prev);
                 fr_entry = qlist_entry(prev, struct PINT_frame_s, link);
-                gossip_adebug("    info (%p) frame (%p)\n",
+                gossip_lsadebug("    info (%p) frame (%p)\n",
                              fr_entry->frame_info, fr_entry->frame_info->frame);
             }
             gossip_end;
@@ -1051,9 +1053,9 @@ struct PINT_frame_info_s *PINT_sm_frame_info(struct PINT_smcb *smcb, int index)
 
         gossip_if(GOSSIP_SM_FRMSTK_DEBUG)
         {
-            gossip_log("AFTER F: %d prev: (%p)\n", f, prev);
-            gossip_log("    prev.n: (%p) prev.p: (%p)\n", prev->next, prev->prev);
-            gossip_log("calling entry with prev (%p)\n", prev);
+            gossip_lsadebug("AFTER F: %d prev: (%p)\n", f, prev);
+            gossip_lsadebug("    prev.n: (%p) prev.p: (%p)\n", prev->next, prev->prev);
+            gossip_lsadebug("calling entry with prev (%p)\n", prev);
         }
         gossip_end;
 
@@ -1061,10 +1063,10 @@ struct PINT_frame_info_s *PINT_sm_frame_info(struct PINT_smcb *smcb, int index)
 
         gossip_if(GOSSIP_SM_FRMSTK_DEBUG)
         {
-            gossip_log("    info (%p) frame (%p)\n",
+            gossip_lsadebug("    info (%p) frame (%p)\n",
                        frame_entry->frame_info, frame_entry->frame_info->frame);
 
-            gossip_log("    entry returns frame_entry (%p) info (%p)\n",
+            gossip_lsadebug("    entry returns frame_entry (%p) info (%p)\n",
                        frame_entry, frame_entry->frame_info);
         }
         gossip_end;

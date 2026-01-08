@@ -113,6 +113,8 @@ static QLIST_HEAD(noreq_sop_list);
 /* this is used externally by some server state machines */
 job_context_id server_job_context = -1;
 
+int s_op_sz = sizeof(struct PINT_server_op);
+
 typedef struct
 {
     int server_remove_storage_space;

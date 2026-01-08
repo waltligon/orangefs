@@ -156,6 +156,7 @@ do {                                                    \
  */
 #define PVFS_object_attr_from_ds_attr(__oa, __dsa)                     \
 do {                                                                   \
+    memset((__oa), 0, sizeof(*(__oa)));                                \
     (__oa)->owner = (__dsa)->uid;                                      \
     (__oa)->group = (__dsa)->gid;                                      \
     (__oa)->perms = (__dsa)->mode;                                     \
