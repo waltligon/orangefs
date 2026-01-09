@@ -384,7 +384,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Client addr %ld tag %d (from local_op_frame %p)\n",
                    local_op_frame->addr, local_op_frame->tag, local_op_frame);
 
-    ret = PINT_sm_push_frame(smcb, PJMP_LOCAL, local_op_frame);
+    ret = PINT_sm_push_frame(smcb, PJMP_LOCAL, local_op_frame, S_OP);
 
     if(ret < 0)
     {
@@ -515,7 +515,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
             }
         }
         /* now push remote ops frame */
-        ret = PINT_sm_push_frame(smcb, PJMP_REMOTE, remote_op_frame);
+        ret = PINT_sm_push_frame(smcb, PJMP_REMOTE, remote_op_frame, S_OP);
         gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Pushing remote op frame\n");
         s_op->num_pjmp_frames += 1;
         if(ret < 0)
@@ -565,7 +565,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
     {
         gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Poping a remote frame\n");
 
-        remote_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining);
+        remote_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining, NULL);
         if (!remote_op)
         {
             gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Failed to pop a frame\n");
@@ -585,7 +585,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
     assert(s_op->num_pjmp_frames == 1);
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Poping a local frame\n");
-    local_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining);
+    local_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining, NULL);
     if (!local_op)
     {
         gossip_err("Failed to pop a frame\n");
@@ -645,7 +645,7 @@ static PINT_sm_action unexp_remote_pre(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running remote state pre-action\n");
 
     /* set up to call MPA */
-    ret = PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    ret = PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
 
     js_p->error_code = ret;
     return SM_ACTION_COMPLETE;
@@ -657,7 +657,7 @@ static PINT_sm_action unexp_remote_post(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "running remote state post-action\n");
 
     /* clean up MPA call */
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
     
     js_p->error_code = 0;
     return SM_ACTION_TERMINATE;

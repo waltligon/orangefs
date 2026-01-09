@@ -55,7 +55,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SERV_GET_CONFIG,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     server_op_state_get_machine,
                     server_state_machine_terminate,
                     server_job_context);

@@ -234,7 +234,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "create Allocating SMCB\n\n");
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_CREATE,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -1426,8 +1426,8 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                      PVFS_SID_str(&msg_p->sid_array[0]));
     }
 
-    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "sys-create: Push frame\n");
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op); /* must pop after MPA */
+    gossip_debug(GOSSIP_CREATE_DEBUG, "sys-create: Push frame\n");
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1449,7 +1449,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_CREATE_DEBUG,
                    "sm_p (%p) poping old msgppair frame\n", sm_p);
 
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
     js_p->error_code = 0;
 
@@ -1587,7 +1587,7 @@ static PINT_sm_action create_crdirent_setup_msgpair(struct PINT_smcb *smcb,
                      PVFS_SID_str(&msg_p->sid_array[0]));
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -2101,7 +2101,7 @@ static PINT_sm_action create_delete_handles_setup_msgpair_array(
         }
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

@@ -138,7 +138,7 @@ PVFS_error PVFS_isys_readdirplus(PVFS_object_ref ref,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_READDIRPLUS,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -918,7 +918,7 @@ static PINT_sm_action readdirplus_fetch_attrs_setup_msgpair(
     }
     /* immediate return. next state jumps to msgpairarray machine */
     js_p->error_code = 0;
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -995,7 +995,7 @@ static PINT_sm_action readdirplus_fetch_sizes_setup_msgpair(
     /* immediate return. next state jumps to msgpairarray machine */
     js_p->error_code = 0;
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

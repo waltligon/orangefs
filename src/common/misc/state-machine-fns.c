@@ -18,6 +18,7 @@
 #include "state-machine.h"
 #include "client-state-machine.h"
 
+
 #if 0
 /* moved to state-machine.h
  */
@@ -68,9 +69,6 @@ static int child_sm_terminate(struct PINT_smcb * smcb, job_status_s * js_p);
 static void PINT_sm_debug_stack(void);
 #define FRAME_STACK_DEBUG
 #endif
-
-extern int s_op_sz; /* from src/server/pvfs2-server.c */
-
 
 #if defined(__PVFS2_SERVER__)
 const char *PINT_map_server_op_to_string(enum PVFS_server_op op);
@@ -785,7 +783,7 @@ int PINT_smcb_cancelled(struct PINT_smcb *smcb)
  */
 int PINT_smcb_alloc(struct PINT_smcb **smcb,
                     int op,
-                    int frame_size,
+                    Ftype frame_type,
                     struct PINT_state_machine_s *(*getmach)(int, int),
                     int (*term_fn)(struct PINT_smcb *, job_status_s *),
                     job_context_id context_id)
@@ -805,8 +803,9 @@ int PINT_smcb_alloc(struct PINT_smcb **smcb,
     (*smcb)->frame_count = 0;
 
     /* if frame_size given, allocate a frame */
-    if (frame_size > 0)
+    if (frame_type != UNKNOWN)
     {
+        int frame_size = PINT_sm_lookup_fsize(frame_type);
         void *new_frame = malloc(frame_size);
         if (!new_frame)
         {
@@ -818,7 +817,7 @@ int PINT_smcb_alloc(struct PINT_smcb **smcb,
                       "Pushing a new frame (%p)\n", new_frame);
         /* zero out all members */
         memset(new_frame, 0, frame_size);
-        PINT_sm_push_frame(*smcb, 0, new_frame);
+        PINT_sm_push_frame(*smcb, 0, new_frame, frame_type);
         (*smcb)->base_frame = 0;
         (*smcb)->frame_count = 1;
     }
@@ -1100,6 +1099,42 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
     fip = PINT_sm_frame_info(smcb, index);
     return fip->frame;
 }
+   
+Frame_type fsizes[] = {
+    {0, "Unknown", 0},
+    {1, "s_op", 0},    /* will set during init */
+    {2, "m_op", sizeof(PINT_sm_msgarray_op)},
+    {3, "sm_p", sizeof(PINT_client_sm)},
+};
+
+int fsizes_len = sizeof(fsizes)/sizeof(Frame_type);
+
+int PINT_sm_lookup_fsize(int id)
+{
+    int i;
+    for(i = 0; i < fsizes_len; i++)
+    {
+        if(fsizes[i].id == id)
+        {
+            return fsizes[i].size;
+        }
+    }
+    return 0; /* unknown */
+}
+
+/* used by init routines to finish setting up fsizes table */
+int PINT_sm_set_fsize(int id, int size)
+{
+    int i;
+    for(i = 0; i < fsizes_len; i++)
+    {
+        if(fsizes[i].id == id)
+        {
+            fsizes[i].size = size;
+        }
+    }
+    return 0; /* unknown */
+}
 
 /* Function: PINT_sm_push_frame_info
  * Params: pointer to smcb, void pointer for new frame
@@ -1124,6 +1159,8 @@ int PINT_sm_push_frame_info(struct PINT_smcb *smcb,
     }
 
     /* refcnt must be set by caller */
+    newframe->frame_info->ftype = frame_info_p->ftype;
+    newframe->frame_info->fsize = frame_info_p->fsize;
     newframe->frame_info = frame_info_p;
     newframe->task_id = task_id;
     newframe->error = 0;
@@ -1141,7 +1178,8 @@ int PINT_sm_push_frame_info(struct PINT_smcb *smcb,
 int PINT_sm_push_frame_ref(struct PINT_smcb *smcb,
                            int task_id,
                            void *frame_p,
-                           int refcnt)
+                           int refcnt, 
+                           Ftype type)
 {
     struct PINT_frame_info_s *fip;
 
@@ -1156,8 +1194,8 @@ int PINT_sm_push_frame_ref(struct PINT_smcb *smcb,
         return -PVFS_ENOMEM;
     }
     fip->frame = frame_p;
-    fip->ftype = 0;
-    fip->fsize = 0;
+    fip->ftype = type;
+    fip->fsize = PINT_sm_lookup_fsize(type);
     fip->frefcnt = refcnt + 1;
     PINT_sm_push_frame_info(smcb, task_id, fip);
 
@@ -1169,7 +1207,7 @@ int PINT_sm_push_frame_ref(struct PINT_smcb *smcb,
  * Returns: 
  * Synopsis: pushes a new frame pointer onto the frame_stack
  */
-int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p)
+int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p, Ftype type)
 {
     struct PINT_frame_info_s *fip;
 
@@ -1184,8 +1222,8 @@ int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p)
         return -PVFS_ENOMEM;
     }
     fip->frame = frame_p;
-    fip->ftype = 0;
-    fip->fsize = 0;
+    fip->ftype = type;
+    fip->fsize = PINT_sm_lookup_fsize(type);
     fip->frefcnt = 1;
     PINT_sm_push_frame_info(smcb, task_id, fip);
 
@@ -1252,7 +1290,8 @@ int PINT_sm_push_dup_frame(struct PINT_smcb *smcb, int frame_size)
 struct PINT_frame_info_s *PINT_sm_pop_frame_info(struct PINT_smcb *smcb, 
                                                  int *task_id,
                                                  int *error_code,
-                                                 int *remaining)
+                                                 int *remaining, 
+                                                 Ftype* type)
 {
     struct PINT_frame_s *frame_entry;
     struct PINT_frame_info_s *frame_info;
@@ -1289,6 +1328,10 @@ struct PINT_frame_info_s *PINT_sm_pop_frame_info(struct PINT_smcb *smcb,
     {
         *task_id = frame_entry->task_id;
     }
+    if(type)
+    {
+        *type = frame_entry->frame_info->ftype;
+    }
 
     frame_info = frame_entry->frame_info;
 
@@ -1308,7 +1351,8 @@ struct PINT_frame_info_s *PINT_sm_pop_frame_info(struct PINT_smcb *smcb,
 void *PINT_sm_pop_frame(struct PINT_smcb *smcb, 
                         int *task_id,
                         int *error_code,
-                        int *remaining)
+                        int *remaining, 
+                        Ftype* type)
 {
     struct PINT_frame_info_s *fip;
     void *frame;
@@ -1318,7 +1362,7 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
     old_frame_count = smcb->frame_count;
 
     /* this gets it off the smcb frame stack */
-    fip = PINT_sm_pop_frame_info(smcb, task_id, error_code, remaining);
+    fip = PINT_sm_pop_frame_info(smcb, task_id, error_code, remaining, type);
     if (fip)
     {
         char *endstr;
@@ -1363,7 +1407,7 @@ int PINT_sm_pop_top_frames(struct PINT_smcb *smcb)
 
     while(smcb->frame_count - 1 > smcb->base_frame)
     {
-        fip = PINT_sm_pop_frame_info(smcb, NULL, NULL, NULL);
+        fip = PINT_sm_pop_frame_info(smcb, NULL, NULL, NULL, NULL);
         if (--(fip->frefcnt) <= 0)
         {
             if (PINT_check_malloc(fip->frame))
@@ -1515,7 +1559,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Allocating SMCB\n");
         PINT_smcb_alloc(&new_sm,
                         smcb->op, /* set to parent value */
-                        0, /* frame size - frames already exist*/
+                        UNKNOWN, /* frame size - frames already exist*/
                         smcb->op_get_state_machine, /* set to parent value */
                         child_sm_terminate,
                         smcb->context);

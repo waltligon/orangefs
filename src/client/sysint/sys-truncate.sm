@@ -126,7 +126,7 @@ PVFS_error PVFS_isys_truncate(PVFS_object_ref ref,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_TRUNCATE,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -338,7 +338,7 @@ static PINT_sm_action truncate_datafile_setup_msgpairarray(
 
     sm_p->getattr.size = sm_p->u.truncate.size;
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -432,7 +432,7 @@ static PINT_sm_action truncate_unstuff_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

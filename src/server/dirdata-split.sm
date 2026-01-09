@@ -494,7 +494,7 @@ static PINT_sm_action crdirent_send_server_attrs(struct PINT_smcb *smcb,
                  "setting dist_dir_attrs for handle %s\n",
                  PVFS_OID_str(&msg_p->handle));
 
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;
 
@@ -817,7 +817,7 @@ static PINT_sm_action crdirent_find_split_entries(struct PINT_smcb *smcb,
             }
 
         }
-        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
     }
     return SM_ACTION_COMPLETE;
 }
@@ -976,7 +976,7 @@ static PINT_sm_action crdirent_notify_dirdata_servers_setup(
             js_p->error_code = ret;
         }
 
-        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
         js_p->error_code = NOTIFY_DIRDATA;
     }
     else
@@ -1233,7 +1233,7 @@ static PINT_sm_action crdirent_split_remove_entries(struct PINT_smcb *smcb,
 
         }
         js_p->error_code = REMOVE_ENTRIES_REQUIRED;
-        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
     }
     return SM_ACTION_COMPLETE;
 }

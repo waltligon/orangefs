@@ -257,10 +257,41 @@ extern char * PINT_sm_action_string[];
      ret == SM_ERROR)
 
 /* what is this type? */
-enum {
+enum
+{
     JMP_NOT_READY = 99,
     DEFAULT_ERROR = -1,
 };
+
+/* Added info for ftype and fsize updates*/
+/* Should all of this be public? */
+typedef enum Ftype
+{
+    UNKNOWN =  0,
+    S_OP =     1,
+    M_OP =     2,
+    SM_P =     3
+} Ftype;
+
+/* This is for the fsizes table */
+typedef struct Frame_type_s
+{
+    int id;
+    const char* type_name;
+    int size;
+} Frame_type;
+
+extern Frame_type fsizes[];
+extern int fsizes_len;
+/* This function finds the size of a given type of 
+ * frame
+ */
+int PINT_sm_lookup_fsize(int id);
+/* This function allows the server to set the sop size during
+ * initialization.  Probably not used again after that.
+ */
+int PINT_sm_set_fsize(int id, int size);
+
 
 #define ENCODE_TYPE 0
 #define SM_STATE_RETURN -1
@@ -315,7 +346,7 @@ int PINT_smcb_cancelled(struct PINT_smcb *smcb);
 
 int PINT_smcb_alloc(struct PINT_smcb **,
                     int,
-                    int,
+                    Ftype type,
                     struct PINT_state_machine_s *(*getmach)(int, int),
                     int (*term_fn)(struct PINT_smcb *,
                     job_status_s *),
@@ -331,23 +362,26 @@ int PINT_sm_push_frame_info(struct PINT_smcb *smcb,
                             int task_id,
                             struct PINT_frame_info_s *frame_p);
 
-int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p);
+int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p, Ftype type);
 
 int PINT_sm_push_frame_ref(struct PINT_smcb *smcb,
                            int task_id,
                            void *frame_p,
-                           int refcnt);
+                           int refcnt, 
+                           Ftype type);
 
 int PINT_sm_push_dup_frame(struct PINT_smcb *smcb, int frame_size);
 
 struct PINT_frame_info_s *PINT_sm_pop_frame_info(struct PINT_smcb *smcb,
                                                  int *task_id,
                                                  int *error_code,
-                                                 int *remaining);
+                                                 int *remaining, 
+                                                 Ftype* type);
 void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
                         int *task_id,
                         int *error_code,
-                        int *remaining);
+                        int *remaining, 
+                        Ftype* type);
 
 PINT_sm_action PINT_sm_pop_old_pjmp_frames(struct PINT_smcb *smcb, int child_count);
 
