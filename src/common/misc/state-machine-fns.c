@@ -1159,9 +1159,10 @@ int PINT_sm_push_frame_info(struct PINT_smcb *smcb,
     }
 
     /* refcnt must be set by caller */
-    newframe->frame_info->ftype = frame_info_p->ftype;
-    newframe->frame_info->fsize = frame_info_p->fsize;
     newframe->frame_info = frame_info_p;
+    /* should already be set by caller */
+    //newframe->frame_info->ftype = frame_info_p->ftype;
+    //newframe->frame_info->fsize = frame_info_p->fsize;
     newframe->task_id = task_id;
     newframe->error = 0;
     qlist_add(&newframe->link, &smcb->frames);
