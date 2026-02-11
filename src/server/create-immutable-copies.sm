@@ -1331,7 +1331,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
                      SERVER_NAME_MAX-1) == 0 )
         {
             gossip_debug(GOSSIP_MIRROR_DEBUG,"Above SRC is local.\n");
-            PINT_sm_push_frame(smcb, LOCAL_SRC, mirror_op);
+            PINT_sm_push_frame(smcb, LOCAL_SRC, mirror_op, S_OP);
         }
         else
         {
@@ -1382,7 +1382,7 @@ static PINT_sm_action copy_data (struct PINT_smcb *smcb, job_status_s *js_p)
                                               msg_p->fs_id,
                                               PVFS_OID_str(&msg_p->handle) );
 
-            PINT_sm_push_frame(smcb, REMOTE_SRC, mirror_op);
+            PINT_sm_push_frame(smcb, REMOTE_SRC, mirror_op, S_OP);
         }
    } /* end for (src) */
 
@@ -1416,7 +1416,7 @@ static PINT_sm_action check_copy_results (struct PINT_smcb *smcb,
 
     do 
     {
-        mirror_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);
+        mirror_op = PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining, NULL);
         respmir = &(mirror_op->resp.u.mirror);
         reqmir = &(mirror_op->req->u.mirror);
 

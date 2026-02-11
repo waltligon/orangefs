@@ -372,7 +372,7 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_IO,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -882,7 +882,7 @@ static PINT_sm_action io_inspect_attr(struct PINT_smcb *smcb,
             return(SM_ACTION_COMPLETE);
         }
 
-        PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+        PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
         js_p->error_code = IO_ATIME_UPDATE;
         return(SM_ACTION_COMPLETE);
     }
@@ -1022,7 +1022,7 @@ static PINT_sm_action io_unstuff_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = ret;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1331,7 +1331,7 @@ static PINT_sm_action io_datafile_setup_msgpairs(struct PINT_smcb *smcb,
     }
         
     js_p->error_code = 0;
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
 
 sio_array_destroy:
     free(sio_array);

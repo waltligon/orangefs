@@ -265,7 +265,7 @@ PVFS_error PVFS_isys_getattr(PVFS_object_ref ref,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_GETATTR, 
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -1139,7 +1139,7 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
     }
 
     /* push empty frame for MPA */
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "exiting state action\n");
     return SM_ACTION_COMPLETE;
@@ -1319,7 +1319,7 @@ static PINT_sm_action getattr_datafile_getattr_setup_msgpairarray(
         /*msg_p->retry_flag = PVFS_MSGPAIR_RETRY;*/
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1613,7 +1613,7 @@ static PINT_sm_action getattr_datafile_getattr_retry(struct PINT_smcb *smcb,
     getattr->index_to_server = tmp_server_nr;
 
     /* Push the msgarray_op and jump to msgpairarray.sm */
-    PINT_sm_push_frame(smcb, 0, mop);
+    PINT_sm_push_frame(smcb, 0, mop, M_OP);
     js_p->error_code=GETATTR_IO_RETRY;
 
     return SM_ACTION_COMPLETE;
@@ -1627,7 +1627,7 @@ static PINT_sm_action getattr_datafile_getattr_cleanup(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "sm_p (%p) poping old msgpari frame\n", sm_p);
 
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
 #if 0
     PINT_sm_getattr_state *getattr = &(sm_p->getattr);
@@ -1782,7 +1782,7 @@ static PINT_sm_action getattr_dirdata_getattr_setup_msgpairarray(
 
     PINT_cleanup_capability(&capability);
     
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 
 }
@@ -1795,7 +1795,7 @@ static PINT_sm_action getattr_dirdata_getattr_cleanup(
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "sm_p(%p) poping old msgpair frame\n", sm_p);
 
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
     /* cleanup tree request */
     PINT_msgpairarray_destroy(&sm_p->msgarray_op);
@@ -1817,7 +1817,7 @@ static PINT_sm_action getattr_mpa_cleanup(struct PINT_smcb *smcb,
     /* pop the frame pushed before the JUMP to MPA
      * getattr_object_getattr_setup_msgpair()
      */
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
     struct PINT_client_sm *sm_p GCC_UNUSED = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *attr = &sm_p->getattr.attr;  /* returned atributes */

@@ -1271,7 +1271,7 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
 
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     /* frame is pushed in call_msgpairarray in src/server/pjmp-machines */
-    /* PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op); */
+    /* PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP); */
 
    return SM_ACTION_COMPLETE;
 }
@@ -2195,7 +2195,7 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
 
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     /* frame is pushed in call_msgpairarray in src/server/pjmp-machines */
-    /* PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op); */
+    /* PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP); */
 
     /* This now continues in the tree code */
     return SM_ACTION_COMPLETE;
@@ -2225,7 +2225,8 @@ static PINT_sm_action getattr_clear_dup_frame(struct PINT_smcb *smcb,
      * This frame was a dup pushed in getattr_dirent_count
      */
      gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "popping frame\n");
-     PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+     /*PINT_sm_pop_frame(smcb, &task, &error_code, &remain, NULL);*/
+     PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
      return SM_ACTION_COMPLETE;
 }    
 

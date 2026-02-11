@@ -216,7 +216,7 @@ static PINT_sm_action remove_datafile_remove_setup_msgpair(
     /* the first SID of the first object is the target */
     PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -262,7 +262,7 @@ static PINT_sm_action remove_object_remove_setup_msgpair(
 	js_p->error_code = ret;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

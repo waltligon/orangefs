@@ -378,7 +378,7 @@ static PINT_sm_action call_msgpairarray (struct PINT_smcb *smcb
                    s_op->msgarray_op.msgpair.req.op);
 
     /* PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op.msgpair.req.op); */
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
    
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                    "AFTER PUSH:smcb->base_frame:%d\tframe_count:%d\n",

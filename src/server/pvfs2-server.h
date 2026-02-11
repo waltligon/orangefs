@@ -1277,6 +1277,7 @@ typedef struct PINT_server_op
 
 } PINT_server_op;
 
+#define S_OP_SZ = sizeof(struct PINT_server_op);
 
 /* This creates  new frame in __s_op and pushes it for a subsequent PJMP
  *
@@ -1306,11 +1307,11 @@ do {                                                                            
       if (!PVFS_SID_is_null(&(__sid)) &&                                            \
           !PVFS_SID_cmp(&(__sid), &(__config->host_sid)))                           \
       {                                                                             \
-          PINT_sm_push_frame(__smcb, PJMP_LOCAL, __s_op);                           \
+          PINT_sm_push_frame(__smcb, PJMP_LOCAL, __s_op, S_OP);                           \
       }                                                                             \
       else                                                                          \
       {                                                                             \
-          PINT_sm_push_frame(__smcb, PJMP_REMOTE, __s_op);                          \
+          PINT_sm_push_frame(__smcb, PJMP_REMOTE, __s_op, S_OP);                          \
           memset(&__s_op->msgarray_op, 0, sizeof(PINT_sm_msgarray_op));             \
           PINT_serv_init_msgarray_params(__s_op, __fs_id);                          \
       }                                                                             \

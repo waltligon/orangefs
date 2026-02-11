@@ -629,7 +629,7 @@ static PINT_sm_action rmdirent_update_remote_parent_dir(struct PINT_smcb *smcb,
     }
 
     /* ready to submit the requests */
-    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -674,7 +674,7 @@ static PINT_sm_action rmdirent_setup_resp(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* clean up mop pushed before the msgpair jump */
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
     /* Set the handle if it was removed */
     if(js_p->error_code == 0)

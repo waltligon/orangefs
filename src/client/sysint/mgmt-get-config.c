@@ -52,7 +52,7 @@ int PVFS_mgmt_get_config(const PVFS_fs_id *fsid,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SERVER_GET_CONFIG,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);

@@ -231,7 +231,7 @@ static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
         submop->count = mop->count;
         submop->index = i;
         submop->msgarray = mop->msgarray;
-        PINT_sm_push_frame(smcb, i + 1, submop); /* task 0 is invalid */
+        PINT_sm_push_frame(smcb, i + 1, submop, M_OP); /* task 0 is invalid */
         gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                        "MOP %d(%p) ready to fork\n", i, submop);
     }
@@ -257,6 +257,7 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
         submop = (PINT_sm_msgarray_op *)PINT_sm_pop_frame(smcb,
                                                           &task_id,
                                                           &error_code,
+                                                          NULL, 
                                                           NULL);
         /* V3 replace with a gossip_debug */
         /* TODO: put in more detailed error checking */
@@ -302,7 +303,7 @@ static PINT_sm_action msgpairarray_done(struct PINT_smcb *smcb,
     /* This may be in error - need to check and see if this
      * is the right place to pop this.  It generates an error
      */
-    /*PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining);*/
+    /*PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining, NULL);*/
     return SM_ACTION_COMPLETE;
 }
 

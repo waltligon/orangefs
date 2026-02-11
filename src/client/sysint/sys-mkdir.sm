@@ -248,7 +248,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     gossip_debug(GOSSIP_MKDIR_DEBUG, "mkdir Allocating SMCB\n\n");
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_MKDIR,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -998,7 +998,7 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     }
 
     /* this is a mop set up for jumping to MPA */
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1029,7 +1029,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "sm_p (%p) mkdir state: setattr_setup_msgpair\n", sm_p);
 
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
     memset(&dirdata_attr, 0, sizeof(PVFS_object_attr));
 
@@ -1148,7 +1148,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
         }
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     free(dirdata_attr.u.dirdata.dist_dir_bitmap);
     return SM_ACTION_COMPLETE;
 }
@@ -1187,7 +1187,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
                    "sm_p (%p) crdirent_setup_msgpair\n", sm_p);
 
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
     js_p->error_code = 0;
 
@@ -1277,7 +1277,7 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
 
     PVFS_debug_servreq_crdirent(GOSSIP_MKDIR_DEBUG, &(msg_p->req));
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1384,7 +1384,7 @@ static PINT_sm_action mkdir_delete_handle_setup_msgpair(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Preparing to remove "
                    "directory handle %s\n", PVFS_OID_str(&msg_p->handle));
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1394,7 +1394,7 @@ static PINT_sm_action mkdir_cleanup(struct PINT_smcb *smcb,
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_debug(GOSSIP_MKDIR_DEBUG, " sm_p (%p) cleanup\n", sm_p);
 
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
 
@@ -1632,7 +1632,7 @@ static PINT_sm_action mkdir_seteattr_setup_msgpair(struct PINT_smcb *smcb,
         js_p->error_code = 0;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

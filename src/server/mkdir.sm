@@ -1179,7 +1179,7 @@ static PINT_sm_action setup_dirdata_create(struct PINT_smcb *smcb,
     }
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Pushing mop frame\n");
-    ret = PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+    ret = PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
     if ( ret < 0 )
     {
        gossip_err("%s:Error pushing setattr frame onto mkdir stack:ret(%d)\n",
@@ -1252,7 +1252,7 @@ static PINT_sm_action mkdir_setup_getattr_request(
 
     /* pushing the getattr on top of the mkdir
      */
-    ret = PINT_sm_push_frame(smcb, 0, getattr_op);
+    ret = PINT_sm_push_frame(smcb, 0, getattr_op, S_OP);
 
     if ( ret < 0 )
     {
@@ -1290,7 +1290,8 @@ static PINT_sm_action mkdir_setup_response(struct PINT_smcb *smcb,
     getattr_op = PINT_sm_pop_frame(smcb,
                              &task_id,
                              &js_p->error_code,
-                             &remaining);
+                             &remaining, 
+                             NULL);
 
     resp_attr = &(getattr_op->resp.u.getattr.attr);
 

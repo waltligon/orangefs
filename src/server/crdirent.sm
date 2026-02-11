@@ -978,7 +978,7 @@ static PINT_sm_action crdirent_remote_dir_update(struct PINT_smcb *smcb,
         }
 
         /* ready to submit the requests */
-        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op);
+        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
         return SM_ACTION_COMPLETE;
     }
 
@@ -1013,7 +1013,7 @@ static PINT_sm_action crdirent_get_dirent_count(struct PINT_smcb *smcb,
 
 static PINT_sm_action msgpair_pop_frame(struct PINT_smcb *smcb, job_status_s *js_p)
 {
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
     return SM_ACTION_COMPLETE;
 }
 

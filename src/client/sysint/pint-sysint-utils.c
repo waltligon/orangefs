@@ -408,7 +408,7 @@ int client_perf_start_rollover(struct PINT_perf_counter *pc,
 
     PINT_smcb_alloc(&(pc->smcb),
                     PVFS_CLIENT_PERF_COUNT_TIMER,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);

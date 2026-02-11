@@ -2,7 +2,7 @@
  * (C) 2001 Clemson University and The University of Chicago
  *
  * Changes by Acxiom Corporation to add support for nonblocking fs addition
- * Copyright © Acxiom Corporation, 2006.
+ * Copyright ï¿½ Acxiom Corporation, 2006.
  *
  * See COPYING in top-level directory.
  */
@@ -215,7 +215,7 @@ PVFS_error PVFS_isys_fs_add(struct PVFS_sys_mntent *mntent,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_FS_ADD,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -683,7 +683,7 @@ static PINT_sm_action server_fetch_config_setup_msgpair(struct PINT_smcb *smcb,
 
     js_p->error_code = 0;
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 

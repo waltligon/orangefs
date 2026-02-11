@@ -545,7 +545,7 @@ PVFS_error PVFS_isys_ref_lookup(PVFS_fs_id fs_id,
 
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_LOOKUP,
-                    sizeof(struct PINT_client_sm),
+                    SM_P,
                     client_op_state_get_machine,
                     client_state_machine_terminate,
                     pint_client_sm_context);
@@ -1034,7 +1034,7 @@ static PINT_sm_action lookup_segment_setup_msgpair(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op);
+    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1059,7 +1059,7 @@ static PINT_sm_action lookup_segment_verify_attr_present(
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
     /* remove frame used in jump to MPA */
-    void *old_frame = PINT_sm_pop_frame(smcb, NULL, NULL, NULL);
+    void *old_frame = PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
     PVFS_debug_object_ref(&(((PINT_client_sm *)old_frame)->getattr.object_ref));
 
     if (PINT_check_malloc(old_frame)) /* this may be a portion of sm_p */
