@@ -1410,15 +1410,18 @@ static int server_initialize_subsystems(
     }
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
-    gossip_debug(GOSSIP_SERVER_DEBUG, "... starting performance counter init\n");
+    gossip_debug(GOSSIP_SERVER_DEBUG, "... starting performance updater init\n");
     /* history size should be in server config too */
     PINT_server_pc = PINT_perf_initialize(PINT_PERF_COUNTER,
                                           server_keys, 
                                           server_perf_start_rollover);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "... performance updater PC started\n");
 
     PINT_server_tpc = PINT_perf_initialize(PINT_PERF_TIMER,
                                            server_tkeys, 
                                            server_perf_start_rollover);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "... performance updater TPC started\n");
+
     if(!PINT_server_pc || !PINT_server_tpc)
     {
         gossip_err("Error initializing performance counters.\n");
@@ -1426,9 +1429,11 @@ static int server_initialize_subsystems(
     }
     if (server_config.perf_update_interval > 0)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting performance update interval init\n");
         ret = PINT_perf_set_info(PINT_server_pc,
                                  PINT_PERF_UPDATE_INTERVAL, 
                                  server_config.perf_update_interval);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... performance interval PC set\n");
         if (ret < 0)
         {
             gossip_err("Error PINT_perf_set_info (update interval)\n");
@@ -1437,6 +1442,7 @@ static int server_initialize_subsystems(
         ret = PINT_perf_set_info(PINT_server_tpc,
                                  PINT_PERF_UPDATE_INTERVAL, 
                                  server_config.perf_update_interval);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... performance interval TPC set\n");
         if (ret < 0)
         {
             gossip_err("Error PINT_perf_set_info (update interval)\n");
@@ -1445,9 +1451,11 @@ static int server_initialize_subsystems(
     }
     if (server_config.perf_update_history > 0)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... starting performance update history init\n");
         ret = PINT_perf_set_info(PINT_server_pc,
                                  PINT_PERF_UPDATE_HISTORY, 
                                  server_config.perf_update_history);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... performance history PC set\n");
         if (ret < 0)
         {
             gossip_err("Error PINT_perf_set_info (update history)\n");
@@ -1456,6 +1464,7 @@ static int server_initialize_subsystems(
         ret = PINT_perf_set_info(PINT_server_tpc,
                                  PINT_PERF_UPDATE_HISTORY, 
                                  server_config.perf_update_history);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "... performance history TPC set\n");
         if (ret < 0)
         {
             gossip_err("Error PINT_perf_set_info (update history)\n");
@@ -1465,6 +1474,7 @@ static int server_initialize_subsystems(
     /* if history_size is greater than 1, start the rollover SM */
     if (PINT_server_pc->running)
     {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "performance rollover starting\n");
         ret = server_perf_start_rollover(PINT_server_pc, PINT_server_tpc);
 #if 0
         struct PINT_smcb *tmp_op = NULL;
@@ -1486,10 +1496,12 @@ static int server_initialize_subsystems(
         if (PINT_server_pc->running)
         {
             struct PINT_smcb *tmp_op = NULL;
+            gossip_debug(GOSSIP_SERVER_DEBUG, "performance process alloc noreq\n");
             ret = server_state_machine_alloc_noreq(PVFS_SERV_PERF_UPDATE,
                                                    &(tmp_op));
             if (ret == 0)
             {
+                gossip_debug(GOSSIP_SERVER_DEBUG, "performance process start noreq\n");
                 ret = server_state_machine_start_noreq(tmp_op);
             }
             if (ret < 0)
