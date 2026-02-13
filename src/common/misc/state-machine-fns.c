@@ -1071,9 +1071,10 @@ struct PINT_frame_info_s *PINT_sm_frame_info(struct PINT_smcb *smcb, int index)
         gossip_end;
 
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                     "[SM frame get] (%p): scmb->op: %d frame (%p) refcnt %d base-frm: %d index: %d frm_cnt %d\n",
+                     "[SM frame get] (%p): scmb->op: %d frame (%p)%s refcnt %d base-frm: %d index: %d frm_cnt %d\n",
                      smcb, smcb->op,
                      frame_entry->frame_info->frame,
+                     PINT_sm_lookup_ftype(frame_entry->frame_info->ftype),
                      frame_entry->frame_info->frefcnt,
                      smcb->base_frame, index, smcb->frame_count);
 
@@ -1136,6 +1137,19 @@ int PINT_sm_set_fsize(int id, int size)
     return 0; /* unknown */
 }
 
+const char *PINT_sm_lookup_ftype(int id)
+{   
+    int i;
+    for(i = 0; i < fsizes_len; i++)
+    {
+        if(fsizes[i].id == id)
+        {
+            return fsizes[i].type_name;
+        }
+    }
+    return 0; /* unknown */
+}
+
 /* Function: PINT_sm_push_frame_info
  * Params: pointer to smcb, void pointer for new frame
  * Returns: 
@@ -1185,8 +1199,9 @@ int PINT_sm_push_frame_ref(struct PINT_smcb *smcb,
     struct PINT_frame_info_s *fip;
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM push_frame_ref] smcb (%p) frame (%p) base-frm %d frm-cnt %d refcnt %d->%d\n",
-                 smcb, frame_p, smcb->base_frame, smcb->frame_count, refcnt, refcnt + 1);
+                 "[SM push_frame_ref] smcb (%p) frame (%p)%s base-frm %d frm-cnt %d refcnt %d->%d\n",
+                 smcb, frame_p, PINT_sm_lookup_ftype(type), smcb->base_frame,
+                 smcb->frame_count, refcnt, refcnt + 1);
 
     fip = malloc(sizeof(struct PINT_frame_info_s));
 
@@ -1213,8 +1228,10 @@ int PINT_sm_push_frame(struct PINT_smcb *smcb, int task_id, void *frame_p, Ftype
     struct PINT_frame_info_s *fip;
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM push_frame] smcb (%p) frame (%p) op-id %d st-stk-ptr %d base-frm %d frm-cnt %d->%d\n",
-                 smcb, frame_p, smcb->op, smcb->stackptr, smcb->base_frame, smcb->frame_count, smcb->frame_count + 1);
+                 "[SM push_frame] smcb (%p) frame (%p)%s op-id %d "
+                 "st-stk-ptr %d base-frm %d frm-cnt %d->%d\n",
+                 smcb, frame_p, PINT_sm_lookup_ftype(type), smcb->op, smcb->stackptr,
+                 smcb->base_frame, smcb->frame_count, smcb->frame_count + 1);
 
     fip = malloc(sizeof(struct PINT_frame_info_s));
 
@@ -1254,9 +1271,10 @@ int PINT_sm_push_dup_frame(struct PINT_smcb *smcb, int frame_size)
     memcpy(frame_p, frame_slot->frame_info->frame, frame_size);
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                 "[SM push_dup_frame] (%p): new frame (%p) op-id %d"
+                 "[SM push_dup_frame] (%p): new frame (%p)%s op-id %d"
                  " st-stk-ptr %d base-frm %d frm-cnt %d->%d\n",
-                 smcb, frame_p, smcb->op, smcb->stackptr, smcb->base_frame,
+                 smcb, frame_p, PINT_sm_lookup_ftype(frame_slot->frame_info->ftype),
+                 smcb->op, smcb->stackptr, smcb->base_frame,
                  smcb->frame_count, smcb->frame_count + 1);
 
     /* allocate new frame linkage */
@@ -1292,7 +1310,7 @@ struct PINT_frame_info_s *PINT_sm_pop_frame_info(struct PINT_smcb *smcb,
                                                  int *task_id,
                                                  int *error_code,
                                                  int *remaining, 
-                                                 Ftype* type)
+                                                 Ftype* ftype)
 {
     struct PINT_frame_s *frame_entry;
     struct PINT_frame_info_s *frame_info;
@@ -1329,9 +1347,9 @@ struct PINT_frame_info_s *PINT_sm_pop_frame_info(struct PINT_smcb *smcb,
     {
         *task_id = frame_entry->task_id;
     }
-    if(type)
+    if(ftype)
     {
-        *type = frame_entry->frame_info->ftype;
+        *ftype = frame_entry->frame_info->ftype;
     }
 
     frame_info = frame_entry->frame_info;
@@ -1353,7 +1371,7 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
                         int *task_id,
                         int *error_code,
                         int *remaining, 
-                        Ftype* type)
+                        Ftype* ftype)
 {
     struct PINT_frame_info_s *fip;
     void *frame;
@@ -1363,7 +1381,7 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
     old_frame_count = smcb->frame_count;
 
     /* this gets it off the smcb frame stack */
-    fip = PINT_sm_pop_frame_info(smcb, task_id, error_code, remaining, type);
+    fip = PINT_sm_pop_frame_info(smcb, task_id, error_code, remaining, ftype);
     if (fip)
     {
         char *endstr;
@@ -1378,8 +1396,8 @@ void *PINT_sm_pop_frame(struct PINT_smcb *smcb,
         }
         /* in this case the frame persists and is returned to caller */
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG,
-                     "[SM pop_frame] smcb (%p) frame (%p) op-id %d base-frm %d->%d frm-cnt %d->%d %s",
-                     smcb, fip->frame, smcb->op,
+                     "[SM pop_frame] smcb (%p) frame (%p)%s op-id %d base-frm %d->%d frm-cnt %d->%d %s",
+                     smcb, fip->frame, PINT_sm_lookup_ftype(fip->ftype), smcb->op,
                      old_base_frame, smcb->base_frame, old_frame_count, smcb->frame_count, endstr);
 
         frame = fip->frame;

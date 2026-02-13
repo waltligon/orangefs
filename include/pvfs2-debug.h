@@ -518,9 +518,7 @@ do {                                     \
 #endif
 
 #define PVFS_to_string_PVFS_object_attrmask(_mask, _string, _print) \
-do { \
-    _string[0] = 0; \
-} while (0)
+        PVFS_to_string_uint64_t(_mask, _string, _print)
 
 #define PVFS_to_string_job_status_s(_stat_p, _string, _print) \
 do { \

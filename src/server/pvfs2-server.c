@@ -475,7 +475,7 @@ int main(int argc, char **argv)
                 /*
                  * If we received a signal and we have drained all the state
                  * machines that were in progress, we initiate a shutdown of
-                 * the server. Find out if we can exit now * by checking if
+                 * the server. Find out if we can exit now by checking if
                  * all s_ops (for expected messages) have either finished or
                  * timed out,
                  */

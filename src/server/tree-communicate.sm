@@ -604,8 +604,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
 
                 ts_op->local_index = i; /* index into tree arrays */
 
-                PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG,
-                                           &s_op->req->u.tree_get_dirent_count.credential);
+                //PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG,
+                //                           &s_op->req->u.tree_get_dirent_count.credential);
                 //PINT_debug_capability(&s_op->req->capability, "from request");
 
 
@@ -642,8 +642,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                 //ts_op->req->u.getattr.credential =
                 //      s_op->req->u.getattr.credential;
                 //PINT_server_req_get_credential(s_op->req, &cred);
-                PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG,
-                                           &s_op->req->u.tree_getattr.credential);
+                //PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG,
+                //                           &s_op->req->u.tree_getattr.credential);
 
                 PINT_SERVREQ_GETATTR_FILL(
                     *ts_req,
@@ -874,8 +874,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             case PVFS_SERV_TREE_GET_DIRENT_COUNT:
             {
                 gossip_lsdebug(GOSSIP_SERVER_DEBUG, "TREE_GET_DIRENT_CNT\n");
-                PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG,
-                                           &s_op->req->u.tree_get_dirent_count.credential);       
+                //PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG,
+                //                           &s_op->req->u.tree_get_dirent_count.credential);       
                 PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
                         msg_p->req,
                         capability,
@@ -894,7 +894,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                               s_op, s_op->op, &msg_p->req, msg_p->req.op);
 
                 PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &msg_p->req);
-                PVFS_debug_PVFS_capability(GOSSIP_SERVER_DEBUG, &capability);
+                //PVFS_debug_PVFS_capability(GOSSIP_SERVER_DEBUG, &capability);
                 //PINT_server_req_get_credential(s_op->req, &cred);
                 //PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG, cred);       
 

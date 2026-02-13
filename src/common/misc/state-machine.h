@@ -291,7 +291,10 @@ int PINT_sm_lookup_fsize(int id);
  * initialization.  Probably not used again after that.
  */
 int PINT_sm_set_fsize(int id, int size);
-
+/* This function looks up the string description of a
+ * frame type
+ */
+const char *PINT_sm_lookup_ftype(int id);
 
 #define ENCODE_TYPE 0
 #define SM_STATE_RETURN -1

@@ -1132,7 +1132,7 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         }
     }
 
-    PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
+    //PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
 
     if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST)
     {
@@ -1159,7 +1159,7 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         //PINT_dist_decode(&s_op->resp.u.getattr.attr.u.meta.dist, s_op->val_a[1].buffer);
         PINT_dist_copy(&s_op->resp.u.getattr.attr.u.meta.dist, s_op->val_a[1].buffer);
 
-        PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->resp.u.getattr.attr.u.meta.dist);
+        //PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->resp.u.getattr.attr.u.meta.dist);
 
         if(s_op->resp.u.getattr.attr.u.meta.dist == NULL)
         {
@@ -1176,7 +1176,7 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Clearing Dist won't be returned\n");
         memset(s_op->val_a[1].buffer, 0, sizeof(struct PINT_dist_s));
         memset(s_op->resp.u.getattr.attr.u.meta.dist, 0, s_op->val_a[1].buffer_sz);
-        PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
+        //PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
     }
     //respattr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
     if (s_op->u.getattr.attrmask & PVFS_ATTR_FASTEST)
@@ -1493,9 +1493,9 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
     keep_keyval_buffers(s_op, 2);
     /*----------------------------------------------------------------------------*/
 
-    PVFS_credential *cred;
-    PINT_server_req_get_credential(s_op->req, &cred);
-    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
+    //PVFS_credential *cred;
+    //PINT_server_req_get_credential(s_op->req, &cred);
+    //PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Calling trove keyval read list: fs_id %d\n",
                                          s_op->target_fs_id);
@@ -1837,7 +1837,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
 
     PVFS_credential *cred;
     PINT_server_req_get_credential(s_op->req, &cred);
-    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
+    //PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     PINT_copy_credential(cred, &s_op->u.getattr.credential);
     if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
@@ -2051,8 +2051,8 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                  attr_p->u.dir.dist_dir_bitmap,
                  PVFS_OID_str(attr_p->parent));
 
-    PINT_server_req_get_credential(s_op->req, &cred);
-    PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
+    //PINT_server_req_get_credential(s_op->req, &cred);
+    //PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     return SM_ACTION_COMPLETE;
 }
 
@@ -2079,7 +2079,7 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
      * parent frame, and reasonable data in the req.  We copy the resp
      * too just in case.
      */
-    PVFS_credential *cred;
+//    PVFS_credential *cred;
 //    PINT_server_req_get_credential(s_op->req, &cred);
 //    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
 
@@ -2089,8 +2089,8 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
 
     new_op->op = PVFS_SERV_TREE_GET_DIRENT_COUNT; /* tree op we are about to jump to */
 
-    PINT_server_req_get_credential(new_op->req, &cred);
-    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
+    //PINT_server_req_get_credential(new_op->req, &cred);
+    //PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
 
     new_op->msgarray_op.msgarray = &(new_op->msgarray_op.msgpair);
     new_op->req = &(new_op->msgarray_op.msgpair.req);  /* don't malloc if we don't have to */
@@ -2143,7 +2143,7 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
 
     /* set up the tree op */
 //    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(s_op->req->u.getattr.credential));
-      PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(getattr_p->credential));
+//      PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(getattr_p->credential));
 //    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(new_op->req->u.getattr.credential));
     PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
                                     msg_p->req, /* dest is new_op */
@@ -2462,7 +2462,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "mapping credentials\n");
     //PINT_server_req_get_credential(s_op->req, &cred);
     //PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
-    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
+    //PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
 
     ret = PINT_map_credential(&s_op->u.getattr.credential, 
                               &uid, 
@@ -2549,10 +2549,10 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
                                  
     respattr->mask |= PVFS_ATTR_CAPABILITY;
 
-    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
+    //PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &s_op->u.getattr.credential);
                           /*uid, num_groups, group_array);*/
 
-    PVFS_debug_PVFS_capability(GOSSIP_GETATTR_DEBUG, &respattr->capability);
+    //PVFS_debug_PVFS_capability(GOSSIP_GETATTR_DEBUG, &respattr->capability);
 
 #ifdef ENABLE_CAPCACHE
     /* Cache the new capability */

@@ -436,8 +436,6 @@ static PINT_sm_action rmdirent_update_dirdata_attr(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Old dirdata dirent_count %d\n",
                    dspace_attr->u.dirdata.dirent_count);
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "DSATTR dirdata dirent_count %ld\n",
-                   s_op->ds_attr.u.dirdata.dirent_count);
 
     dspace_attr->u.dirdata.dirent_count -= 1;
 
@@ -513,6 +511,13 @@ static PINT_sm_action rmdirent_update_local_parent_dir(struct PINT_smcb *smcb,
     int ret = -1;
     PVFS_ds_attributes *ds_attr = NULL;
     job_id_t j_id;
+
+    if (js_p->error_code != 0)
+    {
+        /* previous state failed */
+        gossip_lerr("Read of local parent dspace failed %d\n", js_p->error_code);
+        return SM_ACTION_COMPLETE;
+    }
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Write attrs to local parent dspace\n");
 
@@ -674,7 +679,7 @@ static PINT_sm_action rmdirent_setup_resp(
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     /* clean up mop pushed before the msgpair jump */
-    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
+    //PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
     /* Set the handle if it was removed */
     if(js_p->error_code == 0)
@@ -693,6 +698,7 @@ static PINT_sm_action rmdirent_setup_resp(
     }
     else
     {
+        /* should this be an error? */
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "sending error response\n");
     }
 
