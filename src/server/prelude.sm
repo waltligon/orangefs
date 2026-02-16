@@ -88,10 +88,6 @@ nested machine pvfs2_prelude_work_sm
     {
         run prelude_validate;
         CREATE_OBJECT => create_object_if_allowed;
-/*
-        CREATE_DATA_OBJECT => create_data_object_if_allowed;
-        CREATE_DIRDATA_OBJECT => create_dirdata_object_if_allowed;
-*/
         default => return;
     }
 
@@ -101,15 +97,6 @@ nested machine pvfs2_prelude_work_sm
         success => write_new_object_attr;
         default => return;
     }
-
-/*
-    state create_dirdata_object_if_allowed
-    {
-        run prelude_create_dirdata_object_if_allowed;
-        success => write_new_object_attr;
-        default => return;
-    }
-*/
 
     state write_new_object_attr
     {
@@ -161,16 +148,16 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     if (cred)
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "copying credentials to s_op\n");
-        PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG, cred);
+        //PVFS_debug_PVFS_credential(GOSSIP_SERVER_DEBUG, cred);
         COPY_PVFS_CREDENTIAL(&s_op->orig_cred, cred);
     }
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->req->op = %d\n", s_op->req->op);
 //    if (smcb->op == PVFS_SERV_MKDIR)
-    if (s_op->req->op == PVFS_SERV_MKDIR)
-    {
-        PVFS_debug_servreq_mkdir(GOSSIP_MKDIR_DEBUG, s_op->req);
-    }
+//    if (s_op->req->op == PVFS_SERV_MKDIR)
+//    {
+//        PVFS_debug_servreq_mkdir(GOSSIP_MKDIR_DEBUG, s_op->req);
+//    }
 
     /* gets the target fs_id and handle from the request and copies
      * them in the s_op
@@ -210,7 +197,7 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     ret = PINT_add_user_to_uid_mgmt(s_op->req->credentials.uid);
     if (ret != 0)
     {
-        gossip_debug(GOSSIP_MIRROR_DEBUG, "Unable to add user id to uid"
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Unable to add user id to uid"
                       "management interface\n");
     }
 #endif
@@ -522,33 +509,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         if (s_op->attr.objtype == PVFS_TYPE_DIRDATA)
         {
             s_op->attr.u.dirdata.dirent_count = 0; /* new object no items */
-
-            /* we copied from the req attr to the s_op attr so all of this should be
-             * there, no need to copy it all again
-             */
-#if 0            
-            /* We don't know this is a setattr request - have to fix this! */
-            s_op->attr.u.dirdata.dist_dir_attr.tree_height =
-                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.tree_height;
-        
-            s_op->attr.u.dirdata.dist_dir_attr.dirdata_count =
-                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.dirdata_count;
-
-            s_op->attr.u.dirdata.dist_dir_attr.sid_count =
-                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.sid_count;
-
-            s_op->attr.u.dirdata.dist_dir_attr.bitmap_size =
-                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.bitmap_size;
-
-            s_op->attr.u.dirdata.dist_dir_attr.split_size =
-                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.split_size;
-
-            s_op->attr.u.dirdata.dist_dir_attr.server_no =
-                            s_op->req->u.setattr.attr.u.dirdata.dist_dir_attr.server_no;
-#endif
         }
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                       "prelude: validate: create_object is %d\n", create_object);
+                       "create_object is %d\n", create_object);
     } /* endif object not found */
     else
     {

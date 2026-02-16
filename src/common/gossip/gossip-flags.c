@@ -106,6 +106,7 @@ PVFS_DEBUG_MASK_DECL(GOSSIP_SM_JOBQ_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_SM_FRMSTK_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_ATTRMASK_DEBUG);
 PVFS_DEBUG_MASK_DECL(GOSSIP_SM_TEST_DEBUG);
+PVFS_DEBUG_MASK_DECL(GOSSIP_COMMON_DEBUG);
 
 /* NOTE you MUST add coresponding entries in
  * include/pvfs2-debug.h
@@ -243,6 +244,8 @@ const __keyword_mask_t s_keyword_mask_map[] =
     { "attrmask", {GOSSIP_ATTRMASK_DEBUG_INIT} },
     /* Debugging for periodic threads - generates a lot of  messages */
     { "sm_test", {GOSSIP_SM_TEST_DEBUG_INIT} },
+    /* Debugging for code common to client and server */
+    { "common", {GOSSIP_COMMON_DEBUG_INIT} },
     /* Prints debug for test calls */
     { "verbose", { __DEBUG_ALL_INIT } },
     /* No debug output */

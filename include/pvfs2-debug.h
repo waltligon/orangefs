@@ -189,6 +189,8 @@ PVFS_DEBUG_MASK(GOSSIP_SM_FRMSTK_DEBUG);
 PVFS_DEBUG_MASK(GOSSIP_ATTRMASK_DEBUG);
 #define GOSSIP_SM_TEST_DEBUG_INIT            ((uint64_t)1 << 12) , (uint64_t)0
 PVFS_DEBUG_MASK(GOSSIP_SM_TEST_DEBUG);
+#define GOSSIP_COMMON_DEBUG_INIT             ((uint64_t)1 << 13) , (uint64_t)0
+PVFS_DEBUG_MASK(GOSSIP_COMMON_DEBUG);
 
 /* NOTE, you MUST add coresponding entries in
  * src/common/gossip/gossip-flags.c

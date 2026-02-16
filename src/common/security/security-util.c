@@ -140,7 +140,7 @@ PVFS_capability *PINT_dup_capability(const PVFS_capability *cap)
  */
 int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
 {
-    gossip_ldebug(GOSSIP_SERVER_DEBUG, "src (%p) dest (%p)\n", src, dest);
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "src (%p) dest (%p)\n", src, dest);
     if (!src || !dest || (src == dest))
     {
         gossip_lerr("src and dest are the same!\n");

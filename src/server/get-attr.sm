@@ -355,7 +355,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
     /* We are using this routine (which normally would be hidden) because
      * the attr we are copying from was just read from dspace and it has
      * none of its variable length fields yet. If we try  to copy the
-     * var fields we will get a seg fault on encode,, so only copy the
+     * var fields we will get a seg fault on encode, so only copy the
      * fixed size fields.
      */
     PINT_copy_object_attr_fixed(respattr, &s_op->attr);
@@ -486,24 +486,6 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
              * review of this.
              */
 #if 0
-            /* check for Distdir struct now integrated into attr */
-            /* so always read it */
-            if (s_op->u.getattr.attrmask & PVFS_ATTR_DISTDIR_ATTR)
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                             " getattr: distdir_struct needed.\n");
-                assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
-                respattr->mask |= PVFS_ATTR_DISTDIR_ATTR;
-                js_p->error_code = STATE_DIR;
-            }   
-            else
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                             " getattr: distdir_struct not needed.\n");
-                js_p->error_code = 0;
-                assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
-            }   
-
             /* Check for Dirdata handles */
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRDATA)
             {
@@ -534,7 +516,6 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
    */
 
 #if 0
-
             /* this should be controlled by LATEST vs FASTEST */
             /* Check for Dirent Count */
             if (s_op->u.getattr.attrmask & PVFS_ATTR_LATEST)
@@ -551,22 +532,6 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                             " getattr: dirent_count not needed\n");
                 assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
             }
-
-            /* check fir Dir Hints */
-            if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT)
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            " getattr: dir hint needed.\n");
-                assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
-                respattr->mask |= PVFS_ATTR_DIR_HINT;
-                js_p->error_code = STATE_DIR;
-            }
-            else
-            {
-                gossip_debug(GOSSIP_GETATTR_DEBUG,
-                            " getattr: dir hint not needed\n");
-                assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
-            }
 #endif
             /* respattr->mask |= PVFS_ATTR_DIR_ALL; */
             js_p->error_code = STATE_DIR;
@@ -580,6 +545,11 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                            "handle %s refers to a dirdata\n",
                            PVFS_OID_str(&s_op->u.getattr.handle));
 #if 0
+            /* if this is a dirdata and we have a DIRENT_COUNT
+             * then we just return the dirent_count in the dspace
+             * which is already in the attrs.  As such not sure
+             * what in this is needed - maybe nothering
+             */
             if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
             {
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -614,6 +584,9 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
 */
 #endif
+            PVFS_debug_PVFS_dist_dir_attr(GOSSIP_GETATTR_DEBUG,
+                      &(respattr->u.dirdata.dist_dir_attr));
+#if 0
             gossip_debug(
                 GOSSIP_GETATTR_DEBUG,
                 "\t\ttree_height   = %d\n"
@@ -636,10 +609,10 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
                 (int)respattr->u.dirdata.dist_dir_attr.server_no,
                 (int)respattr->u.dirdata.dist_dir_attr.branch_level,
                 (int)respattr->u.dirdata.dirent_count);
+#endif
             respattr->mask |= PVFS_ATTR_DIRDATA_ALL;
             js_p->error_code = 0;
             break;
-
 
         case PVFS_TYPE_SYMLINK:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
@@ -656,12 +629,10 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             js_p->error_code = STATE_SYMLINK;
             break;
 
-
         case PVFS_TYPE_INTERNAL:
             PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: internal\n");
             /* nothing interesting to add; this is meaningless to a client */
             break;
-
 
         default:
             /* if we don't understand the object type, then it probably indicates
@@ -675,8 +646,6 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             js_p->error_code = -PVFS_ENOENT;
             break;
     }/* end switch on object type */
-    /* DEBUG_attr_mask(respattr->mask); makes a lot ot output  */
-
 
     return SM_ACTION_COMPLETE;
 }
@@ -1616,7 +1585,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
      * function 
      */
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "trying to getxattr of %s,%s,%s,%s "
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "trying to read keyvals of %s,%s,%s,%s "
                  "of dir handle (fs_id = %d, handle = %s)\n",
                  Trove_Special_Keys[DIST_NAME_KEY].key,
                  Trove_Special_Keys[DIST_PARAMS_KEY].key, 
@@ -2079,9 +2048,6 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
      * parent frame, and reasonable data in the req.  We copy the resp
      * too just in case.
      */
-//    PVFS_credential *cred;
-//    PINT_server_req_get_credential(s_op->req, &cred);
-//    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
 
     PINT_sm_push_dup_frame(smcb, sizeof(PINT_server_op));
 
@@ -2089,15 +2055,11 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
 
     new_op->op = PVFS_SERV_TREE_GET_DIRENT_COUNT; /* tree op we are about to jump to */
 
-    //PINT_server_req_get_credential(new_op->req, &cred);
-    //PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, cred);
-
     new_op->msgarray_op.msgarray = &(new_op->msgarray_op.msgpair);
     new_op->req = &(new_op->msgarray_op.msgpair.req);  /* don't malloc if we don't have to */
     /* new_op->req = (struct PVFS_server_req *)malloc(sizeof(struct PVFS_server_req)); */
 
     memcpy(new_op->req, s_op->req, sizeof(struct PVFS_server_req));
-    //new_op->req = s_op->req;
     memcpy(&new_op->resp, &s_op->resp, sizeof(struct PVFS_server_resp));
     new_op->msgarray_op.msgarray = NULL;
     new_op->key_a = NULL;
@@ -2113,11 +2075,9 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
     /*attr = &s_op->attr; */
     attr_p = &new_op->resp.u.getattr.attr;
 
-    assert(attr_p);
     /* Note: permission not required for tree_get_dirent_count op */
     PINT_null_capability(&capability);
 
-    /* should we not initialize the new_op msg_array_op? */
     PINT_msgpair_init(&s_op->msgarray_op);
     PINT_msgpair_init(&new_op->msgarray_op);
     msg_p = &new_op->msgarray_op.msgpair;
@@ -2139,19 +2099,13 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                    "getattr->dirent_array (%p)\n",
                    (void *)new_op->u.getattr.dirent_array);
-                   //(void *)getattr_p->dirent_array);
 
     /* set up the tree op */
-//    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(s_op->req->u.getattr.credential));
-//      PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(getattr_p->credential));
-//    PVFS_debug_PVFS_credential(GOSSIP_GETATTR_DEBUG, &(new_op->req->u.getattr.credential));
     PINT_SERVREQ_TREE_GET_DIRENT_COUNT_FILL(
                                     msg_p->req, /* dest is new_op */
                                     capability,
                                     getattr_p->credential, /* is this right? */
-                                    //new_op->req->u.getattr.credential,
                                     s_op->target_fs_id,
-                                    //getattr_p->fs_id,
                                     0,
                                     attr_p->u.dir.dist_dir_attr.dirdata_count,
                                     attr_p->u.dir.dirdata_handles,
