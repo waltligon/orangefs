@@ -323,7 +323,7 @@ static int remove_rmdirent_comp_fn(void *v_p,
                resp_p->u.rmdirent.sid_count * sizeof(PVFS_SID));
 
         gossip_ldebug(GOSSIP_CLIENT_DEBUG,
-                     "  remove_rmdirent_comp_fn: metafile handle = %s\n",
+                     "metafile handle = %s\n",
                      PVFS_OID_str(&sm_p->object_ref.handle));
     }
     return resp_p->status;
@@ -338,7 +338,7 @@ static int remove_crdirent_comp_fn(void *v_p,
     if (resp_p->status == 0)
     {
         gossip_ldebug(GOSSIP_CLIENT_DEBUG,
-                     "  remove_crdirent_comp_fn: OK\n");
+                     "OK\n");
     }
     return resp_p->status;
 }

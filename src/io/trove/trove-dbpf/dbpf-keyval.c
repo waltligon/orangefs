@@ -1,4 +1,4 @@
-/*
+dbpf_keyval_remove handle/*
  * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
@@ -545,7 +545,7 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
     }
 
     gossip_ldebug(GOSSIP_TROVE_DEBUG,
-                  "trove: dbpf_keyval_remove handle: %s\n)",
+                  "trove: dbpf_keyval_remove handle: %s\n",
                   PVFS_OID_str(&handle));
                          
     ret = dbpf_op_init_queued_or_immediate(&op,
@@ -649,7 +649,7 @@ static int dbpf_keyval_remove_list(TROVE_coll_id coll_id,
     }
 
     gossip_ldebug(GOSSIP_TROVE_DEBUG,
-                  "trove: dbpf_keyval_remove_list\n)");
+                  "trove: dbpf_keyval_remove_list\n");
                          
 
     ret = dbpf_op_init_queued_or_immediate(&op,
@@ -726,7 +726,7 @@ static int dbpf_keyval_remove_list_op_svc(struct dbpf_op *op_p)
         }
         else if(ret != 0)
         {
-            gossip_err("TROVE:DBPF: keyval dbpf_db_get");
+            gossip_err("TROVE:DBPF: keyval dbpf_db_get\n");
             return -ret;
         }
 
@@ -1391,7 +1391,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         if(!(op_p->flags & TROVE_BINARY_KEY))
         {
             gossip_ldebug(GOSSIP_DBPF_KEYVAL_DEBUG,
-                          "keyval_db->put(handle= %s, key= %*s (%d)) size=%zu\n",
+                          "keyval_db->put(handle %s, key %*s (%d)) size%zu\n",
                           PVFS_OID_str(&key_entry.handle), 
                           op_p->u.k_write_list.key_array[k].buffer_sz,
                           key_entry.key,

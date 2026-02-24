@@ -467,20 +467,20 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     int ret = 0;
     void *buf = NULL;
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"encode_common\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"encode_common\n");
     /* this encoder always uses just one buffer */
     BF_ENCODE_TARGET_MSG_INIT(target_msg);
 
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"\tmaxsize:%d\tinitializing_sizes:%d\n"
-                                      ,maxsize,initializing_sizes);
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"maxsize %d  initializing_sizes %d\n"
+                                      maxsize, initializing_sizes);
 
     /* allocate the max size buffer to avoid the work of calculating it */
     buf = (initializing_sizes ? malloc(maxsize) :
            BMI_memalloc(target_msg->dest, maxsize, BMI_SEND));
     if (!buf)
     {
-        gossip_err("Error: failed to BMI_malloc memory for response.\n");
-        gossip_err("Error: is BMI address %llu still valid?\n",
+        gossip_lerr("Error: failed to BMI_malloc memory for response.\n");
+        gossip_lerr("Error: is BMI address %llu still valid?\n",
                    llu(target_msg->dest));
         ret = -PVFS_ENOMEM;
         goto out;
@@ -649,14 +649,12 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
     {
         goto out;
     }
-    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "lebf_encode_resp\n");
 
     gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "resp->op %d \n", resp->op);
 
     /* every response has these fields */
     p = &target_msg->ptr_current;
     encode_PVFS_server_resp(p, resp);
-    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "1\n");
 
 #define CASE(tag,var) \
     case tag: encode_PVFS_servresp_##var(p,&resp->u.var); break
@@ -735,11 +733,10 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
-            gossip_err("%s: invalid operation %d\n", __func__, resp->op);
+            gossip_lerr("invalid operation %d\n", resp->op);
             ret = -PVFS_ENOSYS;
             break;
         }
-        gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "2\n");
     } 
 
 #undef CASE
@@ -752,13 +749,12 @@ static int lebf_encode_resp(struct PVFS_server_resp *resp,
     if (target_msg->total_size > max_size_array[resp->op].resp)
     {
         ret = -PVFS_ENOMEM;
-        gossip_err("%s: op %d needed %lld bytes but alloced only %d\n",
-                   __func__, resp->op, lld(target_msg->total_size),
-                   max_size_array[resp->op].resp);
+        gossip_lerr("op %d needed %lld bytes but alloced only %d\n",
+                    resp->op, lld(target_msg->total_size),
+                    max_size_array[resp->op].resp);
     }
 
 out:
-    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "3\n");
     return ret;
 }
 
@@ -785,7 +781,6 @@ static int lebf_decode_req(void *input_buffer, /* decoding from this buff */
 
     /* decode generic part of request (enough to get op number) */
     decode_PVFS_server_req(p, req);
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_req\n");
 
 #define CASE(tag,var) \
     case tag: decode_PVFS_servreq_##var(p, &req->u.var); break
@@ -857,7 +852,7 @@ static int lebf_decode_req(void *input_buffer, /* decoding from this buff */
         case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
-            gossip_lerr("%s: invalid operation %d.\n", __func__, req->op);
+            gossip_lerr("invalid operation %d.\n", req->op);
             ret = -PVFS_EPROTO;
             goto out;
     }
@@ -866,8 +861,8 @@ static int lebf_decode_req(void *input_buffer, /* decoding from this buff */
 
     if (ptr != (char *) input_buffer + input_size)
     {
-        gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
-                    __func__, req->op, (long)(ptr - (char *) input_buffer),
+        gossip_lerr("op %d consumed %ld bytes, but message was %d bytes.\n",
+                    req->op, (long)(ptr - (char *) input_buffer),
                     input_size);
         ret = -PVFS_EPROTO;
     }
@@ -974,7 +969,7 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
         case PVFS_SERV_JOB_TIMER:
         case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
-            gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
+            gossip_lerr("invalid operation %d.\n", resp->op);
             ret = -PVFS_EPROTO;
             goto out;
     }
@@ -983,9 +978,8 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
 
     if (ptr != (char *) input_buffer + input_size)
     {
-        gossip_lerr("%s: op %d consumed %ld bytes, but message was %d bytes.\n",
-                    __func__, resp->op, (long)(ptr - (char *) input_buffer),
-                    input_size);
+        gossip_lerr("op %d consumed %ld bytes, but message was %d bytes.\n",
+                    resp->op, (long)(ptr - (char *) input_buffer), input_size);
         ret = -PVFS_EPROTO;
     }
 
@@ -1002,7 +996,6 @@ out:
 static void lebf_encode_rel(struct PINT_encoded_msg *msg,
                             enum PINT_encode_msg_type input_type)
 {
-    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_rel\n");
     /* just a single buffer to free */
     if (initializing_sizes)
     {
@@ -1090,14 +1083,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 decode_free(req->u.mkdir.attr.capability.signature);
             }
             /* points to all malloc'd space in mkdir req */
-            gossip_debug(GOSSIP_MKDIR_DEBUG,
-                    "%s: mkdir req pointers:\n"
+            gossip_ldebug(GOSSIP_MKDIR_DEBUG,
+                    "mkdir req pointers:\n"
                     "\t\tsid array        (%p)\n"
                     "\t\tparent           (%p)\n"
                     "\t\tparent_sid_array (%p)\n"
                     "\t\tdirdata_handles  (%p)\n"
                     "\t\tdirdata_sid_array(%p)\n",
-                    __func__,
                     req->u.mkdir.newdir_sid_array,
                     req->u.mkdir.parent,
                     req->u.mkdir.parent_sid_array,
@@ -1294,8 +1286,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
         case PVFS_SERV_GET_CONFIG:
         case PVFS_SERV_PROTO_ERROR:
         case PVFS_SERV_NUM_OPS:  /* sentinel */
-            gossip_lerr("%s: invalid request operation %d.\n",
-              __func__, req->op);
+            gossip_lerr("invalid request operation %d.\n", req->op);
             break;
         }
     }
@@ -1603,8 +1594,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
             case PVFS_SERV_JOB_TIMER:
             case PVFS_SERV_GET_CONFIG:
             case PVFS_SERV_NUM_OPS:  /* sentinel */
-                gossip_lerr("%s: invalid response operation %d.\n",
-                            __func__, resp->op);
+                gossip_lerr("invalid response operation %d.\n",
+                            resp->op);
                 break;
             }/*end switch*/
         }/*end if*/
