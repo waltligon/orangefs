@@ -467,11 +467,11 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     int ret = 0;
     void *buf = NULL;
 
-    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"encode_common\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "encode_common\n");
     /* this encoder always uses just one buffer */
     BF_ENCODE_TARGET_MSG_INIT(target_msg);
 
-    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,"maxsize %d  initializing_sizes %d\n"
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "maxsize %d  initializing_sizes %d\n",
                                       maxsize, initializing_sizes);
 
     /* allocate the max size buffer to avoid the work of calculating it */

@@ -2568,7 +2568,6 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                  llu(respattr->ctime), llu(respattr->ntime),
                  (int)respattr->u.meta.dist_size,
                  (int)respattr->u.dir.dirent_count);
-#endif
 
     if (respattr->parent)
     {
@@ -2576,6 +2575,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                        "\t\tparent %s\n",
                        PVFS_OID_str(respattr->parent));
     }
+#endif
 
     switch (respattr->objtype)
     {
@@ -2637,11 +2637,8 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
         break;
     case PVFS_TYPE_DIRECTORY :
     {
-        uint32_t dd_count_i;
-        int bcount;
-        unsigned char *c GCC_UNUSED;
-
         /* !!! may change later */
+#if 0
         gossip_debug(GOSSIP_GETATTR_DEBUG, " SERVER RETURNING DIR:\n"
                      "\t\tdirdata_max            = %d \n"
                      "\t\tdirdata_min            = %d \n"
@@ -2688,6 +2685,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                            "dirdata_handle[%d] = %s\n", dd_count_i,
                            PVFS_OID_str(&respattr->u.dir.dirdata_handles[dd_count_i]));
         }
+#endif
     }
     break;
     default :
