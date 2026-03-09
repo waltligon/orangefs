@@ -357,6 +357,14 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     PINT_smcb *smcb = v_p;
     PINT_smcb *parent_smcb = smcb->parent_smcb;
     PINT_client_sm *psm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
+    if (smcb->parent_smcb)
+    {
+        psm_p = PINT_sm_frame(smcb->parent_smcb, PINT_MSGPAIR_PARENT_SM);
+    }
+    else
+    {
+        psm_p = PINT_sm_frame(smcb, PINT_MSGPAIR_PARENT_SM);
+    }
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                    "(%p) ----- OBJECT GETATTR COMP_FN\n", psm_p);

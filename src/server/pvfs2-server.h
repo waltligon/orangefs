@@ -43,6 +43,11 @@ extern job_context_id server_job_context;
 #define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      1000
 #define BMI_UNEXPECTED_OP                    999
 
+/*
+ * NOTICE
+ * Some of these are also defined in client_state_machine.h
+ */
+
 /* BMI operation timeout if not specified in config file */
 #define PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT         30
 /* Flow operation timeout if not specified in config file */
@@ -60,6 +65,11 @@ extern job_context_id server_job_context;
 #define PVFS2_CLIENT_RETRY_LIMIT_DEFAULT     (5)
 /* number of milliseconds that clients will delay between retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
+/* whether MPA uses PJMP or not */
+#define PVFS2_CLIENT_FORK_FLAG_DEFAULT 1
+/* whether MPA uses QUIET or not */
+#define PVFS2_CLIENT_QUIET_FLAG_DEFAULT 0
+
 
 /* types of permission checking that a server may need to perform for
  * incoming requests

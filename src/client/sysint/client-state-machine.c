@@ -588,7 +588,11 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
       start state machine and continue advancing while we're getting
       immediate completions
     */
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "Calling state machine start\n");
     sm_ret = PINT_state_machine_start(smcb, &js);
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "Returning from state machine start\n");
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "js.error_code %d sm_ret %d\n", js.error_code, sm_ret);
+
     assert(SM_ACTION_ISVALID(sm_ret));
 
     if(sm_ret < 0)
@@ -639,6 +643,7 @@ PVFS_error PINT_client_state_machine_post(PINT_smcb *smcb,
                        lld((op_id ? *op_id : -1)));
     }
     gen_mutex_unlock(&test_mutex);
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "js.error_code = %d\n", js.error_code);
     return js.error_code;
 }
 

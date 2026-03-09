@@ -64,6 +64,8 @@ static inline int io_post_flow(PINT_smcb *smcb, PINT_sm_msgpair_state *msg_p);
 
 enum
 {
+    MSGPAIRS_FORK = 187,
+    MSGPAIRS_NOFORK = 188,
     REQ_COMPLETE = 189,
     MSGPAIRS_COMPLETE = 190,
     MSGPAIRS_RETRY_REQ = 191,
@@ -123,12 +125,33 @@ nested machine pvfs2_msgpairarray_work_sm
     {
         run msgpairarray_complete_msg;
         MSGPAIRS_RETRY_REQ => retry_recv_send;
-        default => terminate;
+        default => return;
     }
 
     state msg_failure
     {
         run msgpairarray_failure;
+        default => return;
+    }
+}
+
+nested machine pvfs2_msgpairarray_fork_work_sm
+{
+    state mpa_prepare_work
+    {
+        run mpa_prepare;
+        default => mpa_work;
+    }
+
+    state mpa_work
+    {
+        jump pvfs2_msgpairarray_work_sm;
+        default => mpa_terminate;
+    }
+
+    state mpa_terminate
+    {
+        run mpa_terminate_work;
         default => terminate;
     }
 }
@@ -138,14 +161,22 @@ nested machine pvfs2_msgpairarray_sm
     state init
     {
         run msgpairarray_init;
-        default => fork;
+        MSGPAIRS_FORK => fork;
+        MSGPAIRS_NOFORK => nofork;
+        default => nofork;
+    }
+
+    state nofork
+    {
+        jump pvfs2_msgpairarray_work_sm;
+        default => done;
     }
 
     state fork
     {
         pjmp msgpairarray_fork
         {
-            default => pvfs2_msgpairarray_work_sm;
+            default => pvfs2_msgpairarray_fork_work_sm;
         }
         default => fork_cleanup;
     }
@@ -180,15 +211,6 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
 
     js_p->error_code = 0;
 
-    /* rather than one global message count, we count different types of
-     * messages that are active - increment when they post and decrement
-     * when they complete
-     */
-    mop->params.send_ct = 0;
-    mop->params.recv_ct = 0;
-    mop->params.flow_ct = 0;
-    mop->params.ack_ct = 0;
-
     for(i = 0; i < mop->count; i++)
     {
         msg_p = &mop->msgarray[i];
@@ -205,13 +227,19 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
 
     }
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray init done.\n");
+    if (mop->params.fork_flag)
+    {
+        js_p->error_code = MSGPAIRS_FORK;
+    }
+    else
+    {
+        js_p->error_code = MSGPAIRS_NOFORK;
+    }
     return SM_ACTION_COMPLETE;
 }
 
 /* Recall that this code may be called by the Server or the Client, and
- * in either case you can't tell what type of frame it is.  We could
- * fix this, but it isn't clear its actually needed.  In most cases
- * referencing a particular frame is mostly for debug printing.
+ * We can now determine what type of frame it is.
  */
 /* This pushes frames to start new SMs with a PJMP
  */
@@ -220,6 +248,12 @@ static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
+
+    /* Zero out js_p->error_code what used for navigation */
+    if (js_p->error_code >= 0)
+    {
+        js_p->error_code = 0;
+    }
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                    "Setting up SMCBs to fork on mop (%p)\n", mop);
@@ -245,9 +279,16 @@ static PINT_sm_action msgpairarray_fork(struct PINT_smcb *smcb,
 static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {
-    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int i = 0;
+    PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray fork cleanup\n");
+
+    /* Zero out js_p->error-code used for navigation */
+    if (js_p->error_code >= 0)
+    {
+        js_p->error_code = 0;
+    }
+
     for(i = 0; i < mop->count; i++)
     {
         PINT_sm_msgarray_op *submop;
@@ -296,15 +337,24 @@ static PINT_sm_action msgpairarray_fork_cleanup(struct PINT_smcb *smcb,
 static PINT_sm_action msgpairarray_done(struct PINT_smcb *smcb,
                                         job_status_s *js_p)
 {
-    /*int task_id, error_code, remaining;*/
-    /* can we pop this before we return? */
-    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray done\n");
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                   "msgpairarray done js_p->error_code %d\n", js_p->error_code);
     PVFS_perror_gossip_verbose();
-    /* This may be in error - need to check and see if this
-     * is the right place to pop this.  It generates an error
-     */
-    /*PINT_sm_pop_frame(smcb, &task_id, &error_code, &remaining, NULL);*/
     return SM_ACTION_COMPLETE;
+}
+
+/* This function prevents a PJMP into a JUMP which doesn't work */
+static PINT_sm_action mpa_prepare (struct PINT_smcb *smcb,
+                                   job_status_s *js_p)
+{
+    return SM_ACTION_COMPLETE;
+}
+
+/* This function terminates a SM at the end of of a PJMP */
+static PINT_sm_action mpa_terminate_work (struct PINT_smcb *smcb,
+                                          job_status_s *js_p)
+{
+    return SM_ACTION_TERMINATE;
 }
 
 /* <================ NESTED STATE ACTION FUNCTIONS ===============> */
@@ -338,6 +388,12 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     struct filesystem_configuration_s *cur_fs = NULL;
     int must_loop_encodings = 0;
     int local_enc_and_alloc = 0;
+
+    /* Zero out js_p->error_code used for navigation */
+    if (js_p->error_code >= 0)
+    {
+        js_p->error_code = 0;
+    }
 
 #if 0
     if (msg_p->req.op == PVFS_SERV_CRDIRENT)
@@ -614,7 +670,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     }
     else
     {
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Successful post, no immediate completions\n");
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "Successful Send post, no immediate completions\n");
         /* successful post, no immediate completion */
         mop->params.send_ct++;
     }
@@ -626,6 +682,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
     /* we are still waiting on operations to complete, next state
      * transition will handle them
      */
+    js_p->error_code = 0; /* success */
     return SM_ACTION_DEFERRED;
 }
 
@@ -641,9 +698,14 @@ static PINT_sm_action msgpairarray_retry_recv_send(struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     job_id_t tmp_id;
 
+    /* zero out js_p->error_code used for navigation */
+    if (js_p->error_code >= 0)
+    {
+        js_p->error_code = 0;
+    }
+
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "wait %d ms\n", mop->params.retry_delay);
 
-    js_p->error_code = 0;  /* do not leak MSGPAIRS_RETRY through to wait */
     return job_req_sched_post_timer(mop->params.retry_delay,
                                     smcb,
                                     0,
@@ -666,6 +728,12 @@ static PINT_sm_action msgpairarray_complete_recv_send(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                    "frame (%p) status_user_tag %d msgarray_count %d\n",
                     mop, (int)js_p->status_user_tag, mop->count);
+
+    /* Zero out js_p->error_code used for navigation */
+    if (js_p->error_code >= 0)
+    {
+        js_p->error_code = 0;
+    }
 
 #if 0
     /* match operation with something in the msgpair array */
@@ -771,6 +839,12 @@ static PINT_sm_action msgpairarray_post_ack_flow (struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[js_p->status_user_tag];
     int ret = -PVFS_EINVAL;
+
+    /* zero out js_p->error_code used for navigation */
+    if (js_p->error_code >= 0)
+    {
+        js_p->error_code = 0;
+    }
 
     /* First decode the server response */
     ret = io_process_message_recv(mop, js_p);
@@ -911,6 +985,12 @@ static PINT_sm_action msgpairarray_retry_ack_flow (struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    /* Zero out js_p->error_code used for navigation */
+    if (js_p->error_code >= 0)
+    {
+        js_p->error_code = 0;
+    }
 
     job_id_t tmp_id;
 
@@ -1248,6 +1328,7 @@ retry_message:
                  */
                 gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                        "msgpair skipping retry delay.\n");
+                /* This doesn't seem to be used */
                 js_p->error_code = MSGPAIRS_RETRY_NODELAY;
             }
             else
@@ -1310,8 +1391,9 @@ retry_message:
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
                    "Finished complete_message error_code: %d\n", js_p->error_code);
 
-    return SM_ACTION_TERMINATE; /* Done with this message / child SM */
+    return SM_ACTION_COMPLETE; /* ready to return to caller */
 } /* end of msgpairarray_complete_msg */
+
 
 /*  This message failed in a bad way we could not retry or otherwise
  *  recover from
@@ -1326,7 +1408,7 @@ static PINT_sm_action msgpairarray_failure (struct PINT_smcb *smcb,
     /* something failed - free up anything we can make sure return codes
      * are good and then terminate
      */
-    return SM_ACTION_TERMINATE;
+    return SM_ACTION_COMPLETE; /* ready to return to caller */
 }
 
 /* <==================== HELPER FUNCTIONS ====================> */

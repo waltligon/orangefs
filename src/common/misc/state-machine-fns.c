@@ -165,11 +165,13 @@ int PINT_state_machine_terminate(struct PINT_smcb *smcb, job_status_s *r)
  *           returned)
  */
 PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
-                                         job_status_s *r)
+                                         job_status_s *js_p)
 {
     PINT_sm_action retval;
     const char *state_name;
     const char *machine_name;
+
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "flag %d action.func (%p)\n", smcb->current_state->flag, smcb->current_state->action.func);
 
     if (!(smcb) ||
         !(smcb->current_state) ||
@@ -177,7 +179,7 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
           smcb->current_state->flag == SM_PJMP) ||
         !(smcb->current_state->action.func))
     {
-        gossip_err("SM invoke called on invalid smcb or state\n");
+        gossip_lerr("SM invoke called on invalid smcb or state\n");
         return SM_ERROR;
     }
 
@@ -187,13 +189,13 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
                  "[SM Entering] (%p) %s:%s (status: %d)\n",
                  smcb, machine_name, state_name,
-                 (int32_t)r->status_user_tag);
+                 (int32_t)js_p->status_user_tag);
     /*
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                    "Calling State Action\n");
     */
     /* call state action function */
-    retval = (smcb->current_state->action.func)(smcb, r);
+    retval = (smcb->current_state->action.func)(smcb, js_p);
     /* process return code */
     switch (retval)
     {
@@ -217,13 +219,13 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
         char *ctype GCC_UNUSED;
         char *em GCC_UNUSED;
         char emsg[256];
-        PVFS_strerror_r(r->error_code, emsg, 256);
+        PVFS_strerror_r(js_p->error_code, emsg, 256);
         em = emsg;
         ctype = "Error";
-        if (r->error_code >= 0)
+        if (js_p->error_code >= 0)
         {
             ctype = "Return";
-            if (r->error_code == 0)
+            if (js_p->error_code == 0)
             {
                em = "Success";
             }
@@ -235,7 +237,7 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
                      "[SM Exiting] (%p) %s:%s (%s Code %d(%s)), (Action %s)\n",
                      smcb, machine_name, state_name, ctype,
-                     r->error_code, em, SM_ACTION_STRING(retval));
+                     js_p->error_code, em, SM_ACTION_STRING(retval));
     }
 
     if (retval == SM_ACTION_COMPLETE && smcb->current_state->flag == SM_PJMP)
@@ -251,12 +253,15 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
          * issues a job_null that will drive progress from here and we don't
          * want to cause a double transition.
          */
+        gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, "pjmp_frame_count %d\n", smcb->pjmp_frame_count);
         if (smcb->pjmp_frame_count > 0)
         {
-            retval = SM_ACTION_DEFERRED;;
+            gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, "Returning DEFERRED\n");
+            retval = SM_ACTION_DEFERRED;
         }
         else
         {
+            gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, "Returning COMPLETE\n");
             retval = SM_ACTION_COMPLETE;
         }
     }
@@ -273,9 +278,10 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
  *           Asssumes smcb created with smcb_alloc and set to initial condition.
  */
 
-PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
+PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     PINT_sm_action ret;
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "state machine start js_p->error_code %d\n", js_p->error_code);
 
     /* set the state machine to being completed immediately.  We
      * unset this bit once the state machine is deferred.
@@ -293,15 +299,19 @@ PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
     smcb->base_frame = smcb->frame_count - 1;
 
     /* run the current state action function */
-    ret = PINT_state_machine_invoke(smcb, r);
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "calling invoke js_p->error_code %d\n", js_p->error_code);
+    ret = PINT_state_machine_invoke(smcb, js_p);
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "after invoke js_p->error_code %d\n", js_p->error_code);
     if (ret == SM_ACTION_COMPLETE || ret == SM_ACTION_TERMINATE)
     {
         /* keep running until state machine deferrs or terminates */
-        ret = PINT_state_machine_continue(smcb, r);
+        ret = PINT_state_machine_continue(smcb, js_p);
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "after continue js_p->error_code %d\n", js_p->error_code);
     }
 
     if(ret == SM_ACTION_DEFERRED)
     {
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "returning deferred\n");
         /* this state machine isn't completing immediately */
         smcb->immediate = 0;
     }
@@ -316,7 +326,7 @@ PINT_sm_action PINT_state_machine_start(struct PINT_smcb *smcb, job_status_s *r)
  *           call.  Calls that function.  If that function returned COMPLETED
  *           loop and repeat.
  */
-PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
+PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int i; /* index for transition table */
     struct PINT_tran_tbl_s *transtbl;
@@ -390,7 +400,7 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
              * the new state action function */
             for (i = 0; transtbl[i].return_value != DEFAULT_ERROR; i++)
             {
-                if (transtbl[i].return_value == r->error_code)
+                if (transtbl[i].return_value == js_p->error_code)
                 {
                     break;
                 }
@@ -410,13 +420,13 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
 	    {
                 if (!(transtbl[i].flag == SM_TERM))
                 {
-	            gossip_lerr("Error: SM returned"
-                           " SM_ACTION_TERMINATE but didn't reach terminate\n");
+	            gossip_lerr("Error: SM reached SM_ACTION_TERMINATE "
+                                "but didn't reach terminate\n");
                 }
                 if (!smcb->op_terminate)
                 {
-	              gossip_lerr("Error: SM reached terminate"
-                            " without returning SM_ACTION_TERMINATE\n");
+	            gossip_lerr("Error: SM reached terminate "
+                                "without returning SM_ACTION_TERMINATE\n");
                     smcb->op_terminate = 1;
                 }
                 gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
@@ -484,7 +494,9 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
             }
         }
         /* runs state_action and returns the return code */
-        ret = PINT_state_machine_invoke(smcb, r);
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Calling SM invoke js_p->error_code %d\n", js_p->error_code);
+        ret = PINT_state_machine_invoke(smcb, js_p);
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Returning SM invoke js_p->error_code %d ret %d\n", js_p->error_code, ret);
 
     } while (ret == SM_ACTION_COMPLETE || ret == SM_ACTION_TERMINATE);
 
@@ -506,7 +518,7 @@ PINT_sm_action PINT_state_machine_next(struct PINT_smcb *smcb, job_status_s *r)
  *           terminates).
  */
 PINT_sm_action PINT_state_machine_continue(struct PINT_smcb *smcb,
-                                           job_status_s *r)
+                                           job_status_s *js_p)
 {
     PINT_sm_action ret;
 
@@ -516,13 +528,14 @@ PINT_sm_action PINT_state_machine_continue(struct PINT_smcb *smcb,
         return SM_ACTION_TERMINATE;
     }
     gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "calling sm_next\n");
-    ret = PINT_state_machine_next(smcb, r);
+    ret = PINT_state_machine_next(smcb, js_p);
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "return from SM next js_p->error_code %d ret %d\n", js_p->error_code, ret);
 
     if(ret == SM_ACTION_TERMINATE)
     {
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "ret == SM_ACTION_TERMINATE\n");
         /* process terminating SM */
-        PINT_state_machine_terminate(smcb, r);
+        PINT_state_machine_terminate(smcb, js_p);
     }
 
     return ret;

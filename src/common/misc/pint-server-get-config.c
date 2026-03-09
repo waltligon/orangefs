@@ -77,6 +77,12 @@ int PINT_server_get_config(struct server_configuration_s *config,
     sm_p->msgarray_op.params.job_timeout = 30;   /* 30 second job timeout */
     sm_p->msgarray_op.params.retry_delay = 2000; /* 2 second retry delay */
     sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
+    sm_p->msgarray_op.params.fork_flag = PVFS2_CLIENT_FORK_FLAG_DEFAULT;
+    sm_p->msgarray_op.params.quiet_flag = PVFS2_CLIENT_QUIET_FLAG_DEFAULT;
+    sm_p->msgarray_op.params.send_ct = 0;
+    sm_p->msgarray_op.params.recv_ct = 0;
+    sm_p->msgarray_op.params.flow_ct = 0;
+    sm_p->msgarray_op.params.ack_ct = 0;
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     PINT_init_sysint_credential(sm_p->cred_p, credential);

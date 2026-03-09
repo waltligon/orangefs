@@ -134,9 +134,7 @@ PVFS_error PVFS_isys_fs_add(struct PVFS_sys_mntent *mntent,
                             void* user_ptr)
 {
     int ret = -PVFS_EINVAL;
-    int i,try_again_count
-         ,try_again
-         ,try_again_limit=3;
+    int i, try_again_count, try_again, try_again_limit=3;  /* limits should never be literals */
     struct server_configuration_s *new_server_config = NULL;
     PVFS_BMI_addr_t test_addr;
     PINT_smcb *smcb = NULL;
@@ -242,14 +240,27 @@ PVFS_error PVFS_isys_fs_add(struct PVFS_sys_mntent *mntent,
     memset(sm_p->u.get_config.config, 0, sizeof(struct server_configuration_s));
 
     /* NOTE: we set these fields manually here rather than use
-     * PINT_init_msgarray_params(), because we don't yet have a server
+     * PINT_init_msgarray_params(), because we have not read the server
      * configuration file to override default parameters.
      */
     /* V3 debug values, fix */
+    /* All of these consts should be symbols not literals */
     sm_p->msgarray_op.params.job_context = pint_client_sm_context;
-    sm_p->msgarray_op.params.job_timeout = 300;   /* 30 second job timeout */
-    sm_p->msgarray_op.params.retry_delay = 200000; /* 2 second retry delay */
-    sm_p->msgarray_op.params.retry_limit = 5;    /* retry up to 5 times */
+    /* 30 second job timeout */
+    sm_p->msgarray_op.params.job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT; /* 30 vs 300 */
+    /* 2 second retry delay */
+    sm_p->msgarray_op.params.retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT; /* 2000 vs 200000 */
+    /* retry up to 5 times */
+    sm_p->msgarray_op.params.retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT; /* 5 */
+    /* Whether or not MPA uses PJMP */
+    sm_p->msgarray_op.params.fork_flag = PVFS2_CLIENT_FORK_FLAG_DEFAULT; /* 0 */
+    /* Whether or not MPA runs quiet */
+    sm_p->msgarray_op.params.quiet_flag = PVFS2_CLIENT_QUIET_FLAG_DEFAULT; /* 0 */
+    sm_p->msgarray_op.params.send_ct = 0;
+    sm_p->msgarray_op.params.recv_ct = 0;
+    sm_p->msgarray_op.params.flow_ct = 0;
+    sm_p->msgarray_op.params.ack_ct = 0;
+
 
     PINT_msgpair_init(&sm_p->msgarray_op);
 

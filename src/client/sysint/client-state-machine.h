@@ -41,9 +41,12 @@
 
 /* Default client timeout in seconds used to set the timeout for jobs that
  * send or receive request messages.
+ *
+ * NOTICE!
+ * Some of these are also defined in src/server/pvfs2-server.h!
  */
 #ifndef PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT
-#define PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT 30
+#define PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT 300
 #endif
 
 /* Default number of times to retry restartable client operations. */
@@ -54,6 +57,12 @@
 
 /* grab a new capability if the current one expires in 2 minutes or less */
 #define CAP_TIMEOUT_BUFFER 120
+
+/* Define whether MPA uses PJMP or not */
+#define PVFS2_CLIENT_FORK_FLAG_DEFAULT 1
+
+/* Define whether MPA uses QUIET or not */
+#define PVFS2_CLIENT_QUIET_FLAG_DEFAULT 0
 
 extern job_context_id pint_client_sm_context;
 
@@ -962,6 +971,12 @@ do {                                                                \
     struct server_configuration_s *server_config =                  \
         PINT_get_server_config_struct(__fsid);                      \
     mpp->job_context = pint_client_sm_context;                      \
+    mpp->quiet_flag = PVFS2_CLIENT_QUIET_FLAG_DEFAULT;              \
+    mpp->fork_flag = PVFS2_CLIENT_FORK_FLAG_DEFAULT;                \
+    mpp->send_ct = 0;                                               \
+    mpp->recv_ct = 0;                                               \
+    mpp->flow_ct = 0;                                               \
+    mpp->ack_ct = 0;                                                \
     if (server_config)                                              \
     {                                                               \
         mpp->job_timeout = server_config->client_job_bmi_timeout;   \

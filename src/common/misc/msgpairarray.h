@@ -180,6 +180,7 @@ typedef struct PINT_sm_msgpair_params
     int retry_limit;
     job_context_id job_context;
     int quiet_flag;   /* if set, cuts down on error messages during retry */
+    int fork_flag;    /* indicates if MPA should PJMP */
 
     /* comp_ct used to keep up with number of operations remaining */
     int send_ct;
@@ -243,25 +244,6 @@ typedef struct PINT_sm_msgarray_op
         (op)->msgarray = &(op)->msgpair;                          \
     } while(0)
 
-#if 0
-/*----------------------------------------------------------------*/
-/* This does not appear to be used any more - it is pre-mpa_op
- * It should be deleted after a suitable confirmation period
- * WBL
- */
-#define PINT_init_msgpair(__sm_p, __msg_p)                           \
-do {                                                                 \
-    __msg_p = &__sm_p->msgpair;                                      \
-    memset(__msg_p, 0, sizeof(PINT_sm_msgpair_state));               \
-    if (__sm_p->msgarray && (__sm_p->msgarray != &(__sm_p->msgpair)))\
-    {                                                                \
-        free(__sm_p->msgarray);                                      \
-        __sm_p->msgarray = NULL;                                     \
-    }                                                                \
-    __sm_p->msgarray = __msg_p;                                      \
-    __sm_p->msgarray_count = 1;                                      \
-} while(0)
-#endif
 /*----------------------------------------------------------------*/
 
 #define foreach_msgpair(__msgarray_op, __msg_p, __i)          \

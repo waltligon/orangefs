@@ -68,12 +68,16 @@ do {                                                             \
       mpp->job_timeout = server_config->client_job_bmi_timeout;  \
       mpp->retry_limit = server_config->client_retry_limit;      \
       mpp->retry_delay = server_config->client_retry_delay_ms;   \
+      mpp->fork_flag = 0;                                        \
+      mpp->quiet_flag = 0;                                       \
    }                                                             \
    else                                                          \
    {                                                             \
       mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;   \
       mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;       \
       mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;    \
+      mpp->fork_flag = PVFS2_CLIENT_FORK_FLAG_DEFAULT;           \
+      mpp->quiet_flag = PVFS2_CLIENT_QUIET_FLAG_DEFAULT;         \
    }                                                             \
 } while (0)                                                      
 
