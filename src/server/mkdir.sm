@@ -492,6 +492,9 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
     ds_attr = (&s_op->ds_attr);
     PVFS_ds_init_time(ds_attr); /* this determines the time of dir creation */
 
+    PVFS_debug_PVFS_ds_attr(GOSSIP_MKDIR_DEBUG, ds_attr);
+    PVFS_debug_PVFS_ds_dir_attr(GOSSIP_MKDIR_DEBUG, ds_attr);
+#if 0
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "writing directory attributes (ds):\n\t\t"
                  "object type     %d\n\t\t"
                  "uid             %d\n\t\t"
@@ -512,7 +515,7 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
                  ds_attr->u.directory.bitmap_size,
                  ds_attr->u.directory.split_size,
                  ds_attr->u.directory.branch_level);
-
+#endif
 
     ret = job_trove_dspace_setattr(s_op->u.mkdir.fs_id,
                                    s_op->u.mkdir.handle,

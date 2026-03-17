@@ -109,14 +109,14 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_COMMON_ATIME       (1UL << 3)
 #define PVFS_ATTR_COMMON_CTIME       (1UL << 4)
 #define PVFS_ATTR_COMMON_MTIME       (1UL << 5)
-#define PVFS_ATTR_COMMON_NTIME       (1UL << 6)
-#define PVFS_ATTR_COMMON_TYPE        (1UL << 7)
+#define PVFS_ATTR_COMMON_NTIME       (1UL << 6) /* read only */
+#define PVFS_ATTR_COMMON_TYPE        (1UL << 7) /* read only */
 #define PVFS_ATTR_COMMON_ATIME_SET   (1UL << 8)
 #define PVFS_ATTR_COMMON_CTIME_SET   (1UL << 9)
 #define PVFS_ATTR_COMMON_MTIME_SET   (1UL << 10)
 #define PVFS_ATTR_COMMON_NTIME_SET   (1UL << 11)
-#define PVFS_ATTR_COMMON_PARENT      (1UL << 12)
-#define PVFS_ATTR_COMMON_SID_COUNT   (1UL << 13)
+#define PVFS_ATTR_COMMON_PARENT      (1UL << 12) /* read only */
+#define PVFS_ATTR_COMMON_SID_COUNT   (1UL << 13) /* read only */
 
 #define PVFS_ATTR_COMMON_NOTIME                           \
         (PVFS_ATTR_COMMON_UID  | PVFS_ATTR_COMMON_GID   | \
@@ -161,13 +161,13 @@ typedef uint64_t PVFS_object_attrmask;
  * Items that must be get or put of variable side and are stored
  * in the keyval db, thus requiring extra reads to get the data
  */
-#define PVFS_ATTR_META_DIST        (1UL << 14) /*** GET the distribution */
-#define PVFS_ATTR_META_DIST_SIZE   (1UL << 15)     /* dist size */
-#define PVFS_ATTR_META_DFILES      (1UL << 16) /*** GET dfile oids and sids */
-#define PVFS_ATTR_META_DFILE_COUNT (1UL << 17)     /* buff size */
-#define PVFS_ATTR_META_SID_COUNT   (1UL << 18)     /* buff size */
+#define PVFS_ATTR_META_DIST        (1UL << 14) /*** GET the distribution */    /* read only */
+#define PVFS_ATTR_META_DIST_SIZE   (1UL << 15)     /* dist size */             /* read only */
+#define PVFS_ATTR_META_DFILES      (1UL << 16) /*** GET dfile oids and sids */ /* read only */
+#define PVFS_ATTR_META_DFILE_COUNT (1UL << 17)     /* buff size */             /* read only */
+#define PVFS_ATTR_META_SID_COUNT   (1UL << 18)     /* buff size */             /* read only */
 #define PVFS_ATTR_META_MIRROR_MODE (1UL << 19)   /* writable *???? */
-#define PVFS_ATTR_META_SIZE        (1UL << 20)     /* writable */
+#define PVFS_ATTR_META_SIZE        (1UL << 20)   /* writable */
 #define PVFS_ATTR_META_FLAGS       (1UL << 21)   /* writable */
 
 #define PVFS_ATTR_META_ALL                                       \
@@ -237,7 +237,7 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_DIR_DIRDATA_MIN          (1UL << 35)   /* buff */
 #define PVFS_ATTR_DIR_DIRDATA_MAX          (1UL << 36)   /* buff */
 #define PVFS_ATTR_DIR_DIRDATA_COUNT        (1UL << 37)   /* buff */
-#define PVFS_ATTR_DIR_SID_COUNT            (1UL << 38)
+#define PVFS_ATTR_DIR_SID_COUNT            (1UL << 38)      /* read only ? */
 #define PVFS_ATTR_DIR_BITMAP_SIZE          (1UL << 39)   /* buff */
 #define PVFS_ATTR_DIR_SPLIT_SIZE           (1UL << 40)
 #define PVFS_ATTR_DIR_SERVER_NO            (1UL << 41)
@@ -275,14 +275,14 @@ typedef uint64_t PVFS_object_attrmask;
 #define PVFS_ATTR_DIRDATA_DIRENT_COUNT_INCR   (1UL << 56) /* number of servers */
 #define PVFS_ATTR_DIRDATA_DIRENT_COUNT_DECR   (1UL << 57) /* number of servers */
 
-/* These are the same attributes shown abive under dir, but they are
- * also part of dirdata s they are repeated here but with a name change
+/* These are the same attributes shown above under dir, but they are
+ * also part of dirdatas they are repeated here but with a name change
  */
 #define PVFS_ATTR_DIRDATA_TREE_HEIGHT         (1UL << 46)
 #define PVFS_ATTR_DIRDATA_DIRDATA_MIN         (1UL << 47) /* min number of servers */
 #define PVFS_ATTR_DIRDATA_DIRDATA_MAX         (1UL << 48) /* max number of servers */
 #define PVFS_ATTR_DIRDATA_DIRDATA_COUNT       (1UL << 49) /* number of servers */
-#define PVFS_ATTR_DIRDATA_SID_COUNT           (1UL << 50)
+#define PVFS_ATTR_DIRDATA_SID_COUNT           (1UL << 50)     /* read only ? */
 #define PVFS_ATTR_DIRDATA_BITMAP_SIZE         (1UL << 51)   /* buff */
 #define PVFS_ATTR_DIRDATA_SPLIT_SIZE          (1UL << 52)
 #define PVFS_ATTR_DIRDATA_SERVER_NO           (1UL << 53)
@@ -1150,7 +1150,7 @@ struct PVFS_object_attr
     PVFS_time ctime;           /* change (metadata) time */
     PVFS_time ntime;           /* new (create) time */
     uint32_t meta_sid_count;   /* number of metadata sids in this FS */
-    PVFS_capability capability;
+    PVFS_capability capability; /** This is only for returning a cap in getattr or other req **/
     PVFS_handle *parent;       /* handle for parent object - load from keyval */
     PVFS_SID *parent_sids;     /* num parent sids is meta_sid_count - from keyval */
 

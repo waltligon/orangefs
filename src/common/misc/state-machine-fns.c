@@ -1113,6 +1113,28 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
     fip = PINT_sm_frame_info(smcb, index);
     return fip->frame;
 }
+
+/* Function PINT_get_parent_smcb
+ * Params: pointer to smcb
+ * Returns: pointer to an smcb
+ * Synopsis: returns the parent smcb of the given smcb
+ * There isn't always a parent smcb, and in that case
+ * this returns the smcb given as input.  This is used
+ * generally to find the parent frame for returning a
+ * response to a request, which may be on the current
+ * smcb or a previous one.
+ */
+struct PINT_smcb *PINT_get_parent_smcb(struct PINT_smcb *smcb)
+{
+    if (smcb && smcb->parent_smcb)
+    {
+        return smcb->parent_smcb;
+    }
+    else
+    {
+        return smcb;
+    }
+}
    
 Frame_type fsizes[] = {
     {0, "Unknown", 0},

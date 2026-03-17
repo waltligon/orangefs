@@ -849,7 +849,7 @@ static int lookup_get_dirent_comp_fn(void *v_p,
                                      int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
     PINT_server_op *s_op = PINT_sm_frame(parent_smcb, (PINT_MSGPAIR_PARENT_SM));
 
     PVFS_debug_servresp_mgmt_get_dirent(GOSSIP_LOOKUP_DEBUG, resp_p);
@@ -1178,7 +1178,7 @@ static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
 static int read_remote_metadata_comp_fn(void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
     PINT_server_op *p_op = PINT_sm_frame(parent_smcb, PINT_FRAME_PARENT);
 
     gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "parent frame (%p)\n", p_op);

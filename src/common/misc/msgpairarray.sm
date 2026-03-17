@@ -1182,7 +1182,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
     gossip_if(GOSSIP_MSGPAIR_DEBUG)
     {
         gossip_lsadebug("PINT_serv_decode_resp: return code: (%d)\n", ret);
-        gossip_lsadebug("PINT_serv_decode_resp: msg_p op_status: (%d)\n", msg_p->op_status);
+        gossip_lsadebug("PINT_serv_decode_resp: msg_p->op_status: (%d)\n", msg_p->op_status);
         gossip_lsadebug("PINT_serv_decode_resp: resp_p->status: (%d)\n", resp_p->status);
         gossip_lsadebug("mop (%p) resp_p->op %d\n", mop, resp_p->op);
     }
@@ -1215,6 +1215,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
          * will be an op and a status.
          */
         js_p->error_code = msg_p->op_status = resp_p->status;
+        gossip_lsadebug("js_p->error_code %d\n", js_p->error_code);
 
         /* compute sizes based on message class */
         switch (msg_p->msgclass)
@@ -1286,7 +1287,9 @@ cleanup:
 
     if (ret)
     {
-        PVFS_perror_gossip("Failed to free msgpair resources (%d)", ret);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "PINT_serv_free_msgpair_resources FAILED %d\n", ret);
+        //PVFS_perror_gossip("Failed to free msgpair resources (%d)", ret);
         js_p->error_code = ret;
     }
 
@@ -1803,9 +1806,6 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
     
     if (ret > -1)
     {
-        /* correct return, so why this message? */
-        /* PVFS_perror_gossip("PINT_decode returns an error", ret); */
-
         *resp_out_pp = (struct PVFS_server_resp *)decoded_msg_p->buffer;
 
         gossip_ldebug(GOSSIP_MSGPAIR_DEBUG,

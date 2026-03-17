@@ -1092,7 +1092,7 @@ static int tree_setattr_comp_fn(void *v_p,
                                 int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
     PINT_server_op *s_op = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     /*PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));*/
     struct PVFS_server_resp *op_resp = &(s_op->resp); /*op resp structure*/
@@ -1347,7 +1347,7 @@ static int tree_remove_comp_fn(void *v_p,
                                int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
     PINT_server_op *s_op = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     /*PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));*/
     struct PVFS_server_resp *op_resp = &(s_op->resp); /*op resp structure*/
@@ -1622,7 +1622,7 @@ static int tree_get_file_size_comp_fn(void *v_p,
                                       int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
     PINT_server_op *s_op = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     /*PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM));*/
     struct PVFS_server_resp *op_resp = &(s_op->resp); /*op resp structure*/
@@ -1972,7 +1972,7 @@ static int tree_get_dirent_count_comp_fn(void *v_p,
                                          int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
     PINT_server_op *s_op = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     struct PVFS_server_resp *s_op_resp = &(s_op->resp); /*op resp structure*/
     struct PVFS_servresp_tree_get_dirent_count *op_tree =
@@ -2184,7 +2184,7 @@ static int tree_getattr_comp_fn(void *v_p,
                                 int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
     PINT_server_op *s_op = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     /*PINT_server_op *s_op = PINT_sm_frame(smcb, (PINT_MSGPAIR_PARENT_SM)); */
     struct PVFS_server_resp *op_resp = &(s_op->resp); /*op resp structure*/

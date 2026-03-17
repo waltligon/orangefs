@@ -361,6 +361,8 @@ int PINT_smcb_alloc(struct PINT_smcb **,
 
 void PINT_smcb_free(struct PINT_smcb *);
 
+struct PINT_smcb *PINT_get_parent_smcb(struct PINT_smcb *smcb);
+
 struct PINT_frame_info_s *PINT_sm_frame_info(struct PINT_smcb *, int);
 
 void *PINT_sm_frame(struct PINT_smcb *, int);

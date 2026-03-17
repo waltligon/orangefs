@@ -783,8 +783,8 @@ static PINT_sm_action setattr_directory_write_distr_dir_data_if_required(
     }
 
     /* verify that the requested number of servers is sane */
-    dirdata_count =
-                  s_op->req->u.setattr.attr.u.dir.dist_dir_attr.dirdata_count;
+    dirdata_count = s_op->req->u.setattr.attr.u.dir.dist_dir_attr.dirdata_count;
+
     if ((dirdata_count < 1) ||
         (dirdata_count > PVFS_REQ_LIMIT_DIRENT_FILE_COUNT))
     {
@@ -1277,33 +1277,50 @@ static int PINT_perm_setattr(PINT_server_op *s_op)
     PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS];
     uint32_t num_groups = PVFS_REQ_LIMIT_GROUPS, i;
 
+gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG, "attr->u.meta.dfile_count %d\n", attr->u.meta.dfile_count);
+gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG, "attr->u.meta.dist %p\n", attr->u.meta.dist);
+gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG, "attr->owner %d\n", attr->owner);
+
     /* attrs may always be set for a file with uninitialized metadata */
     if (attr->u.meta.dfile_count == 0 && attr->u.meta.dist == NULL &&
         attr->owner == 0)
     {
+        gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG,
+                      "uninitialized metadata returning\n");
         return 0;
     }
 
-    gossip_debug(GOSSIP_SETATTR_DEBUG, "%s: attr mask = %lx\n", 
-                 __func__, req_attr->mask);
+    gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG, "attr mask = 0x%016x\n",
+                  (unsigned int)req_attr->mask);
+
+    gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG,
+                  "s_op->req->capability.op_mask 0x%016x\n",
+                  (unsigned int)s_op->req->capability.op_mask);
 
     /* check set attrs against perm table */
     for (i = 0; i < PERM_TABLE_COUNT; i++)
     {
+        gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG,
+                      "perm_table[%d][PERM_TABLE_ATTR] 0x%016x\n",
+                      i, (unsigned int)perm_table[i][PERM_TABLE_ATTR]);
+        gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG,
+                      "perm_table[%d][PERM_TABLE_PERM] 0x%016x\n",
+                      i, (unsigned int)perm_table[i][PERM_TABLE_PERM]);
+
         if (req_attr->mask & perm_table[i][PERM_TABLE_ATTR])
         {
             /* check permission for this attr */
             if (perm_table[i][PERM_TABLE_PERM] == PERM_STATIC)
             {
                 /* static attributes can only be changed on new files */
-                gossip_err("%s: WARNING: attempt to set static attribute 0x%016lx\n",
-                           __func__, perm_table[i][PERM_TABLE_ATTR]);
+                gossip_lerr("WARNING: attempt to set static attribute 0x%016x\n",
+                            (unsigned int)perm_table[i][PERM_TABLE_ATTR]);
             }
             else if (!(s_op->req->capability.op_mask & perm_table[i][PERM_TABLE_PERM]))
             {
-                gossip_debug((GOSSIP_SETATTR_SECURITY_DEBUG), 
-                             "%s: ERROR: no permissions to set attr 0x%016lx\n", __func__, 
-                             perm_table[i][PERM_TABLE_ATTR]);
+                gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG, 
+                              "ERROR: no permissions to set attr 0x%016x\n",
+                              (unsigned int)perm_table[i][PERM_TABLE_ATTR]);
                 return -PVFS_EACCES;
             }
         }
@@ -1327,9 +1344,8 @@ static int PINT_perm_setattr(PINT_server_op *s_op)
         /* check current owner */
         if (attr->owner != uid)
         {
-            gossip_debug((GOSSIP_SETATTR_SECURITY_DEBUG),
-                         "%s: ERROR: only owner of a file can change its "
-                         "ownership\n", __func__);
+            gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG,
+                          "ERROR: only owner of a file can change its ownership\n");
             return -PVFS_EPERM;
         }
 
@@ -1337,9 +1353,8 @@ static int PINT_perm_setattr(PINT_server_op *s_op)
         if (req_attr->mask & PVFS_ATTR_COMMON_UID &&
             uid != req_attr->owner)
         {
-            gossip_debug((GOSSIP_SETATTR_SECURITY_DEBUG),
-                         "%s: ERROR: non-admin may only change owner to self\n",
-                         __func__);
+            gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG,
+                          "ERROR: non-admin may only change owner to self\n");
             return -PVFS_EPERM;
         }
 
@@ -1360,9 +1375,9 @@ static int PINT_perm_setattr(PINT_server_op *s_op)
             /* no group matches */
             if (i >= num_groups)
             {
-                gossip_debug((GOSSIP_SETATTR_SECURITY_DEBUG),
-                             "%s: ERROR: only members of a group may change ownership "
-                             "to that group\n", __func__);
+                gossip_ldebug(GOSSIP_SETATTR_SECURITY_DEBUG,
+                              "ERROR: only members of a group may change ownership "
+                              "to that group\n");
                 return -PVFS_EPERM;
             }
         }

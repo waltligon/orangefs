@@ -59,7 +59,7 @@
 #define CAP_TIMEOUT_BUFFER 120
 
 /* Define whether MPA uses PJMP or not */
-#define PVFS2_CLIENT_FORK_FLAG_DEFAULT 1
+#define PVFS2_CLIENT_FORK_FLAG_DEFAULT 0
 
 /* Define whether MPA uses QUIET or not */
 #define PVFS2_CLIENT_QUIET_FLAG_DEFAULT 0

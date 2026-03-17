@@ -273,7 +273,7 @@ static int getattr_datafile_getattr_comp_fn(void *v_p,
                                             int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
     PINT_server_op *s_op = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
     struct PINT_server_getattr_op *getattr = &(s_op->u.getattr);
 

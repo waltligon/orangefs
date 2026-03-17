@@ -75,6 +75,35 @@ struct PVFS_ds_directory_attr_s
     uint32_t    hint_dir_layout_list_cnt;  /* servers in list */
 };
 
+#define PVFS_debug_PVFS_ds_dir_attr(_mask, _ds_attr)                          \
+do {                                                                          \
+    gossip_if (_mask)                                                         \
+    {                                                                         \
+        gossip_lsadebug("DS_DIR_ATTR:\n");                                        \
+        gossip_lsadebug("ds_attr = (%p)\n", (_ds_attr));                      \
+        PVFS_debug_afield((_ds_attr)->u.directory.dirent_count, uint64_t);   \
+        PVFS_debug_afield((_ds_attr)->u.directory.tree_height, uint32_t);     \
+        PVFS_debug_afield((_ds_attr)->u.directory.dirdata_min, uint32_t);     \
+        PVFS_debug_afield((_ds_attr)->u.directory.dirdata_max, uint32_t);     \
+        PVFS_debug_afield((_ds_attr)->u.directory.dirdata_count, uint32_t);   \
+        PVFS_debug_afield((_ds_attr)->u.directory.bitmap_size, uint32_t);     \
+        PVFS_debug_afield((_ds_attr)->u.directory.split_size, uint32_t);      \
+        PVFS_debug_afield((_ds_attr)->u.directory.branch_level, int32_t);     \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_dist_name_len, uint32_t); \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_dist_params_len, uint32_t); \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_dfile_count, uint32_t); \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_layout_algorithm, uint32_t); \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_layout_list_cnt, uint32_t); \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_dirdata_min, uint32_t); \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_dirdata_max, uint32_t); \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_split_size, uint32_t); \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_dir_layout_algorithm, uint32_t); \
+        PVFS_debug_afield((_ds_attr)->u.directory.hint_dir_layout_list_cnt, uint32_t); \
+        gossip_lsadebug("DS_DIR_ATTR End:\n");                                    \
+    }                                                                         \
+    gossip_end;                                                               \
+} while (0)
+
 struct PVFS_ds_dirdata_attr_s
 {
     uint64_t dirent_count;  /* number of dirents in this dirdata */
@@ -135,6 +164,29 @@ struct PVFS_ds_attributes_s
     } u;
 } ;
 typedef struct PVFS_ds_attributes_s PVFS_ds_attributes;
+
+#define PVFS_debug_PVFS_ds_attr(_mask, _ds_attr)                  \
+do {                                                              \
+    gossip_if (_mask)                                             \
+    {                                                             \
+        gossip_lsadebug("DS_ATTR:\n");                            \
+        gossip_lsadebug("ds_attr = (%p)\n", (_ds_attr));          \
+        PVFS_debug_afield((_ds_attr)->type, PVFS_ds_type);        \
+        PVFS_debug_afield((_ds_attr)->fs_id, PVFS_fs_id);         \
+        PVFS_debug_afield(&(_ds_attr)->handle, PVFS_handle);      \
+        PVFS_debug_afield((_ds_attr)->uid, PVFS_uid);             \
+        PVFS_debug_afield((_ds_attr)->gid, PVFS_gid);             \
+        PVFS_debug_afield((_ds_attr)->mode, PVFS_permissions);    \
+        PVFS_debug_afield((_ds_attr)->ctime, PVFS_time);          \
+        PVFS_debug_afield((_ds_attr)->mtime, PVFS_time);          \
+        PVFS_debug_afield((_ds_attr)->atime, PVFS_time);          \
+        PVFS_debug_afield((_ds_attr)->ntime, PVFS_time);          \
+        PVFS_debug_afield((_ds_attr)->meta_sid_count, uint32_t);  \
+        gossip_lsadebug("DS_ATTR End:\n");                        \
+    }                                                             \
+    gossip_end;                                                   \
+} while (0)
+
 
 #define PVFS_ds_init_time(__dsa)                        \
 do {                                                    \

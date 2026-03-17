@@ -178,7 +178,7 @@ static int mgmt_remove_dirent_comp_fn(void *v_p,
                                       int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
 #ifdef WIN32
     PINT_client_sm *sm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 #else

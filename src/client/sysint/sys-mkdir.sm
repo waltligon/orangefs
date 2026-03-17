@@ -24,11 +24,13 @@
 #include "dist-dir-utils.h"
 #include "client-capcache.h"
 
+/* Navigation Return Codes */
 enum
 {
     MKDIR_RETRY = 180,
     MKDIR_SKIP_EATTR = 181,
-    CRDIRENT_RETRY = 182
+    CRDIRENT_RETRY = 182,
+    SKIP_SETATTR = 183
 };
 
 static int mkdir_msg_comp_fn(void *v_p,
@@ -86,7 +88,8 @@ machine pvfs2_client_mkdir_sm
     state mkdir_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => mkdir_setattr_setup_msgpair;
+        /* success => mkdir_setattr_setup_msgpair; */
+        success => mkdir_crdirent_setup_msgpair;
         default => mkdir_msg_failure;
     }
 
@@ -98,6 +101,8 @@ machine pvfs2_client_mkdir_sm
 
 /* This sends setattrs to all remote dirdatas
  * I don't think we want to do this any more.
+ * I am bypassing these states since the mkdir
+ * req on the server creates the dirdatas
  */
 /* change the setattr timestamp - why is this not
  * handled during the servers mkdir.sm?  This can
@@ -107,6 +112,7 @@ machine pvfs2_client_mkdir_sm
     state mkdir_setattr_setup_msgpair
     {
         run mkdir_setattr_setup_msgpair;
+        SKIP_SETATTR => mkdir_crdirent_setup_msgpair;
         success => mkdir_setattr_xfer_msgpair;
         default => mkdir_setattr_failure;
     }
@@ -443,7 +449,7 @@ static int mkdir_msg_comp_fn(void *v_p,
                              int index)
 {
     PINT_smcb *smcb = v_p;
-    PINT_smcb *parent_smcb = smcb->parent_smcb;
+    PINT_smcb *parent_smcb = PINT_get_parent_smcb(smcb);
     /* These are not sm_p's, the are mops! */
     /* PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT); */
     /* PINT_client_sm *psm_p = PINT_sm_frame(parent_smcb, PINT_FRAME_CURRENT); */
@@ -467,6 +473,7 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     PINT_debug_capability(&resp_p->u.mkdir.capability, "mkdir returned");
     /* where do we want to copy this? */
+    /* BROKEN - COPIES TO ITSELF */
     PINT_copy_capability(&resp_p->u.mkdir.capability, &resp_p->u.mkdir.capability);
 
     /* What needs to be copied from sm_p to psm_p? */
@@ -1024,6 +1031,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *msg_p = NULL;
     int ret = -PVFS_EINVAL;
     PVFS_object_attr dirdata_attr;
+    int remote_dirdatas = 0;
 
     /* NOTE: any memory allocated here will be free'd in the cleanup function */
 
@@ -1031,7 +1039,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
 
     PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
 
-    memset(&dirdata_attr, 0, sizeof(PVFS_object_attr));
+    memset(&(dirdata_attr), 0, sizeof(PVFS_object_attr));
 
     /* this copies the attr created for the mkdir request to be modified
      * and used in the upcomming setattr call
@@ -1057,6 +1065,7 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
                             );
 
     /* these are not handled in above func */
+    /* what should these values be?  They are comming out 0 is that right? */
     dirdata_attr.u.dirdata.dist_dir_attr.dirdata_max =
               sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max;
     dirdata_attr.u.dirdata.dist_dir_attr.dirdata_min =
@@ -1068,7 +1077,8 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
     /* since we are doing mkdir, and these are remote dirdatas, we know
      * the objects don't exist yet, so we aren't really doing setattrs, we're
      * doing create dirdata objects.  prelude will create the objects before the
-     * setattr but then there really isnt anything for the setattr code to do.  */ /* we just copied the attr in s_op, which included copying these two arrays
+     * setattr but then there really isnt anything for the setattr code to do.  */
+    /* we just copied the attr in s_op, which included copying these two arrays
      * if they exist (should exist) and now copying another pointer on top?
      * maybe these pointers are null in the attr
      */
@@ -1090,8 +1100,21 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
 
     /* send a msgpair for each dirdata */
     /* should we send as a batch, or multiple singles? */
+    //remote_dirdatas = sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_count;
+    //gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "remote_dirdatas %d\n", remote_dirdatas);
+    //gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "newdir SID %s\n", PVFS_SID_str(&(sm_p->u.mkdir.newdir_sid_array[0])));
+
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
+        //gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "dirdata SID %d %s\n", i, PVFS_SID_str(&(sm_p->u.mkdir.dirdata_sid_array[i])));
+        /* Don't send a message to a dirdata local to the directory */
+        //if (PVFS_SID_EQ(&(sm_p->u.mkdir.dirdata_sid_array[i]),
+        //                &(sm_p->u.mkdir.newdir_sid_array[0])))
+        //{
+        //    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "remote_dirdatas decremented %d\n", remote_dirdatas);
+        //    remote_dirdatas -= 1;
+        //    continue;
+        //}
         /* need to set dirdata_attr->u.dir.dist_dir_attr.server_no to i 
          * this is ok because this FILL macro copies the attributes
          */
@@ -1148,7 +1171,15 @@ static PINT_sm_action mkdir_setattr_setup_msgpair(struct PINT_smcb *smcb,
         }
     }
 
-    PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
+    //gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "final remote_dirdatas %d\n", remote_dirdatas);
+    //if (remote_dirdatas > 0)
+    //{
+        PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
+    //}
+    //else
+    //{
+    //    js_p->error_code = SKIP_SETATTR;
+    //}
     free(dirdata_attr.u.dirdata.dist_dir_bitmap);
     return SM_ACTION_COMPLETE;
 }
@@ -1209,29 +1240,27 @@ static PINT_sm_action mkdir_crdirent_setup_msgpair(struct PINT_smcb *smcb,
     {
         gossip_lsadebug("selecting bucket No.%d from dist_dir_bitmap.\n",
                         dirdata_server_index);
-
         gossip_lsadebug("posting crdirent req\n");
-
         gossip_lsadebug("hooking dirent %s (%s)\n",
                         sm_p->u.mkdir.object_name,
                         PVFS_OID_str(sm_p->u.mkdir.newdir_handle));
-
         gossip_lsadebug("under parent handle %s\n",
                         PVFS_OID_str(&sm_p->parent_ref.handle));
-
         gossip_lsadebug("dirdata_handle %s\n",
                         PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[dirdata_server_index]));
-
         gossip_lsadebug("with server_no %d\n",
                         dirdata_server_index);
     }
     gossip_end;
 
     /* Clean up previous use of msgpair */
+    /* this assumes we did a setattr - but we took that out */
+#if 0
     foreach_msgpair(&sm_p->msgarray_op, msg_p, i)
     {
-        PINT_free_object_attr(&msg_p->req.u.setattr.attr);
+        PINT_free_object_attr(&msg_p->req.u.setattr.attr); /* was u.setattr */
     }
+#endif
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;

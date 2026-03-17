@@ -887,15 +887,19 @@ static int lebf_decode_resp(void *input_buffer, /* decoding from this buff */
     char **p = &ptr;
     struct PVFS_server_resp *resp = &target_msg->stub_dec.resp;
 
-    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Sstarting decode method\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "Starting decode method\n");
     target_msg->buffer = resp;
 
     /* decode generic part of response (including op number) */
-    gossip_ldebug(GOSSIP_ENDECODE_DEBUG, "decoding generic part of resp\n");
+    gossip_ldebug(GOSSIP_ENDECODE_DEBUG,
+                  "decoding generic part of resp resp-status %d\n", resp->status);
     decode_PVFS_server_resp(p, resp);
 
     if (resp->status != 0) 
     {
+        gossip_ldebug(GOSSIP_ENDECODE_DEBUG,
+                      "decode_PVFS_server_resp returns resp->status %d request failed\n",
+                      resp->status);
         goto out;
     }
 

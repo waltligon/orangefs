@@ -66,7 +66,7 @@ extern job_context_id server_job_context;
 /* number of milliseconds that clients will delay between retries */
 #define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 /* whether MPA uses PJMP or not */
-#define PVFS2_CLIENT_FORK_FLAG_DEFAULT 1
+#define PVFS2_CLIENT_FORK_FLAG_DEFAULT 0
 /* whether MPA uses QUIET or not */
 #define PVFS2_CLIENT_QUIET_FLAG_DEFAULT 0
 

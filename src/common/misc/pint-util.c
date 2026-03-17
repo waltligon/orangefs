@@ -556,20 +556,24 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 
 void PINT_free_object_attr(PVFS_object_attr *attr)
 {
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "attr (%p)\n", attr);
     if (!attr)
     {
         return;
     }
 
     /* first cleanup the cap */
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "attr->cap (%p)\n", &attr->capability);
     PINT_cleanup_capability(&attr->capability);
 
     /* free parent oid/sids */
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "attr->parent_sids (%p)\n", attr->parent_sids);
     if (attr->parent_sids != (PVFS_SID *)(attr->parent + 1))
     { 
         /* not packed */ 
         free(attr->parent_sids); 
     } 
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "attr->parent (%p)\n", attr->parent);
     free(attr->parent); 
     attr->parent = NULL; 
     attr->parent_sids = NULL; 
