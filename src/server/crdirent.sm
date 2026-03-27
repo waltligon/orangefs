@@ -60,7 +60,7 @@ nested machine pvfs2_crdirent_work_sm
     {
         jump pvfs2_prelude_sm;
         success => get_bitmap_and_dirdata_handles;
-        default => return;
+        default => crdirent_work_return;
     }
 
     /* these are used to validate the new entry */
@@ -68,21 +68,21 @@ nested machine pvfs2_crdirent_work_sm
     {
         run crdirent_get_bitmap_and_dirdata_handles;
         success => validate;
-        default => return;
+        default => crdirent_work_return;
     }
 
     state validate
     {
         run crdirent_validate;
         success => write_dirent;
-        default => return;
+        default => crdirent_work_return;
     }
 
     state write_dirent
     {
         run crdirent_write_dirent;
         success => update_dirdata_attr;
-        default => return;
+        default => crdirent_work_return;
     }
 
     state update_dirdata_attr
@@ -90,15 +90,19 @@ nested machine pvfs2_crdirent_work_sm
         run crdirent_update_dirdata_attr;
         REMOTE_DIR => remote_dir_update;
         success => read_local_parent_dir;
-        default => return;
+        default => crdirent_work_return;
     }
 
-    /* read parent dir attrs so that CTIME and dirent_count can be updated */
+    /* read parent dir attrs so that CTIME and
+     * dirent_count can be updated 
+     * wasn't this read by prelude?  Need to keep
+     * a copy rather than read again 
+     */
     state read_local_parent_dir
     {
         run crdirent_read_local_parent_dir;
         success => update_local_parent_dir;
-        default => return;
+        default => crdirent_work_return;
     }
 
     state update_local_parent_dir
@@ -111,14 +115,14 @@ nested machine pvfs2_crdirent_work_sm
     {
         run crdirent_remote_dir_update;
         success => remote_dir_update_msgpair;
-        default => return;
+        default => crdirent_work_return;
     }
 
     state remote_dir_update_msgpair
     {
         jump pvfs2_msgpairarray_sm;
         success => msgpair_pop_frame;
-        default => return;
+        default => crdirent_work_return;
     }
 
     state msgpair_pop_frame
@@ -132,7 +136,7 @@ nested machine pvfs2_crdirent_work_sm
     {
         run crdirent_check_for_split;
         SPLIT_REQUIRED => do_split;
-        default => return;
+        default => crdirent_work_return;
     }
 
     state do_split
@@ -145,6 +149,12 @@ nested machine pvfs2_crdirent_work_sm
     state final_update_dirdata_attr
     {
         run crdirent_final_update_dirdata_attr;
+        default => crdirent_work_return;
+    }
+
+    state crdirent_work_return
+    {
+        run crdirent_work_return;
         default => return;
     }
 }
@@ -182,7 +192,16 @@ static PINT_sm_action crdirent_debug(struct PINT_smcb *smcb,
                                     job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_debug_servreq_crdirent(GOSSIP_MKDIR_DEBUG, s_op->req);
+    PVFS_debug_servreq_crdirent(GOSSIP_SERVER_DEBUG, s_op->req);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action crdirent_work_return(struct PINT_smcb *smcb,
+                                           job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Returning s_op (%p) from crdirent work ret %d\n",
+                                         s_op, js_p->error_code);
     return SM_ACTION_COMPLETE;
 }
 
@@ -257,8 +276,11 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     PVFS_object_attr *attr_p = NULL;
     job_id_t j_id;
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "ENTERED crdirent new %s parent %s\n",
-                   PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle),
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "ENTERED crdirent new %s\n",
+                   PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle));
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "ENTERED crdirent parent %s\n",
                    PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_SERVER_DEBUG,
@@ -284,9 +306,19 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
      * want to eliminate some this data from the req once we know
      * all of the dirdata are created (not sure how) so for now I'm
      * leaving this here.
+     *
+     * The logic behind this is we don't need to ready the DB
+     * because we have the data - but we can't leave the
+     * struct without these things in place or later code will
+     * crash, so I'm trying to link the keyval items to the
+     * dspace attrs.
      */
+
     if(s_op->new_target_object) /* set in prelude */
     {
+        /* link bitmap and dirdatas to the main attrs */
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "new_target_object %d exiting early\n",
+                       s_op->new_target_object);
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
     }
@@ -300,21 +332,19 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
            attr_p->u.dirdata.dist_dir_attr.bitmap_size > 0);
 
     /* dump dirdata related attribs */
+    PVFS_debug_PVFS_dirdata_attr(GOSSIP_SERVER_DEBUG, attr_p);
+
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-            "target dirdata handle %s "
-            "with tree_height %d, dirdata_count %d, bitmap_size %d, "
-            "split_size %d, server_no %d and branch_level %d dirent_count %d\n",
+            "target dirdata handle %s\n",
             PVFS_OID_str(&s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
-                          s_op->req->u.crdirent.dd_server_index]),
-            attr_p->u.dirdata.dist_dir_attr.tree_height,
-            attr_p->u.dirdata.dist_dir_attr.dirdata_count,
-            attr_p->u.dirdata.dist_dir_attr.bitmap_size,
-            attr_p->u.dirdata.dist_dir_attr.split_size,
-            attr_p->u.dirdata.dist_dir_attr.server_no,
-            attr_p->u.dirdata.dist_dir_attr.branch_level,
-            attr_p->u.dirdata.dirent_count);
+                          s_op->req->u.crdirent.dd_server_index]));
+
+    PVFS_debug_PVFS_dirdata_attr(GOSSIP_SERVER_DEBUG, attr_p);
 
     /* allocate space for bitmap and dirdata handles */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "bitmap_size %d\n",
+                   attr_p->u.dirdata.dist_dir_attr.bitmap_size);
+
     attr_p->u.dirdata.dist_dir_bitmap =
                 malloc(attr_p->u.dirdata.dist_dir_attr.bitmap_size *
                        sizeof(PVFS_dist_dir_bitmap_basetype));
@@ -325,6 +355,7 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
 
     if(!attr_p->u.dirdata.dist_dir_bitmap || !attr_p->u.dirdata.dirdata_handles)
     {
+        gossip_lerr("bitmap and/or dirdata_handles are NULL");
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -436,7 +467,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     char *ptr = NULL;
     int i = 0;
-    unsigned char *c __attribute__ ((unused)) = NULL;
+    unsigned char *c GCC_UNUSED = NULL;
     PVFS_object_attr *attr_p = NULL;
     PVFS_dist_dir_hash_type dirdata_hash;
     int dirdata_server_index;
@@ -453,6 +484,9 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
 
     /* gossip bitmap, since jump from get_bitmap_and_dirdata_handles */
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "bitmap:\n");
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "attr_p (%p)\n", attr_p);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "bitmap (%p)\n", attr_p->u.dirdata.dist_dir_bitmap);
 
     for(i = attr_p->u.dirdata.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {       
@@ -803,6 +837,7 @@ static PINT_sm_action crdirent_read_local_parent_dir(struct PINT_smcb *smcb,
                                    &tmp_id,
                                    server_job_context,
                                    s_op->req->hints);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "exiting with ret %d\n", ret);
     return ret;
 }
 
@@ -822,6 +857,8 @@ static PINT_sm_action crdirent_update_local_parent_dir(struct PINT_smcb *smcb,
     PVFS_object_attr *dir_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Return from dspace getattr %d\n",
+                                        js_p->error_code);
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "writing back local dir updates\n");
 
     /* convenience pointers to referring to attrs
@@ -1283,6 +1320,13 @@ static int PINT_get_object_ref_crdirent(struct PVFS_server_req *req,
     return 0;                       
 }
 
+static int crdirent_get_attr(struct PVFS_server_req *req,
+                              struct PVFS_object_attr *attr)
+{
+    PINT_copy_object_attr(attr, &(req->u.crdirent.parent_attr));
+    return 0;
+}
+
 static void crdirent_get_ctrl(struct PVFS_server_req *req,
                               struct PINT_server_req_ctrl *ctrl)
 {
@@ -1314,6 +1358,7 @@ struct PINT_server_req_params pvfs2_crdirent_params =
     .get_object_ref = PINT_get_object_ref_crdirent,
     .get_credential = PINT_get_credential_crdirent,
     .get_ctrl       = crdirent_get_ctrl,
+    .get_attr       = crdirent_get_attr,
     .state_machine  = &pvfs2_crdirent_sm
 };
 

@@ -1007,7 +1007,7 @@ do {                                                              \
     struct PVFS_dirdata_attr_s *tattr = &((_attr)->u.dirdata);    \
     gossip_if (_mask)                                             \
     {                                                             \
-        gossip_ladebug("PVFS_dirdata_attr:\n" #_attr " = (%p)\n", (_attr)); \
+        gossip_ladebug("PVFS_dirdata_attr:" #_attr " = (%p)\n", (_attr)); \
         PVFS_debug_afield(tattr->dirent_count, int32_t);          \
         PVFS_debug_afield(tattr, PVFS_dist_dir_bitmap);           \
         PVFS_debug_afield(tattr->dirdata_handles, PVFS_handle);   \
@@ -1188,15 +1188,17 @@ do {                                                             \
             PVFS_debug_afield(_tattr->parent_sids, PVFS_SID);    \
             PVFS_debug_afield(&_tattr->capability, PVFS_capability); \
         }                                                        \
-        gossip_ladebug("PVFS Object Attrs End:\n");             \
+        gossip_ladebug("PVFS Object Attrs End:\n");              \
     }                                                            \
     gossip_end;                                                  \
 } while (0)
 
 #define PVFS_debug_PVFS_attr(_mask, _attr)                       \
 do {                                                             \
+    gossip_ladebug("PVFS Attr:" #_attr " = (%p)\n", (_attr));    \
     PVFS_debug_PVFS_object_attr(_mask, _attr);                   \
-    switch ((_attr)->objtype) {                                  \
+    switch ((_attr)->objtype)                                    \
+    {                                                            \
         case PVFS_TYPE_METAFILE:                                 \
             PVFS_debug_PVFS_metafile_attr(_mask, _attr);         \
             break;                                               \
@@ -1215,6 +1217,7 @@ do {                                                             \
         default:                                                 \
             break;                                               \
     }                                                            \
+    gossip_ladebug("PVFS Attr End:\n");                          \
 } while (0)
 
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

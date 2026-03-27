@@ -30,7 +30,7 @@ static int tree_setattr_comp_fn(
         int index);
 */
 
-#define STATE_DIRDATA_DONE 1
+#define STATE_DIRDATA_DONE 401
 
 %%
 
@@ -83,11 +83,15 @@ nested machine pvfs2_mkdir_work_sm
     state dirdata_keyval
     {
         run mkdir_dirdata_keyvals;
-        default => dirdata_create; /* LOOP for multiple dirdatas */
+        default => dirdata_create; /* LOOP for multiple local dirdatas */
     }
 
     /* create remote dirdatas */
     /* eventually we want this PJMP so we can return before completion */
+    /* at the moment we are skipping this (FORCED option) because
+     * we are letting dirdatas be created on demand at their respective
+     * servers
+     */
 
     state setup_dirdata_create
     {
@@ -494,28 +498,6 @@ static PINT_sm_action mkdir_setattrib(struct PINT_smcb *smcb,
 
     PVFS_debug_PVFS_ds_attr(GOSSIP_MKDIR_DEBUG, ds_attr);
     PVFS_debug_PVFS_ds_dir_attr(GOSSIP_MKDIR_DEBUG, ds_attr);
-#if 0
-    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "writing directory attributes (ds):\n\t\t"
-                 "object type     %d\n\t\t"
-                 "uid             %d\n\t\t"
-                 "gid             %d\n\t\t"
-                 "mode            %d\n\t\t"
-                 "meta_sids       %d\n\t\t"
-                 "dirent_count    %d\n\t\t"
-                 "tree_height     %d\n\t\t"
-                 "dirdata_count   %d\n\t\t"
-                 "bitmap_size     %d\n\t\t"
-                 "split_size      %d\n\t\t"
-                 "branch_level    %d\n",
-                 ds_attr->type, ds_attr->uid, ds_attr->gid, ds_attr->mode,
-                 ds_attr->meta_sid_count,
-                 (int)ds_attr->u.directory.dirent_count,
-                 ds_attr->u.directory.tree_height,
-                 ds_attr->u.directory.dirdata_count,
-                 ds_attr->u.directory.bitmap_size,
-                 ds_attr->u.directory.split_size,
-                 ds_attr->u.directory.branch_level);
-#endif
 
     ret = job_trove_dspace_setattr(s_op->u.mkdir.fs_id,
                                    s_op->u.mkdir.handle,
@@ -730,7 +712,7 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
             k++;
         }
     /* not sure we have KEYs and such set up for this */
-    #if 0
+#if 0
         if (pattr->u.dir.hint.dir_layout.algorithm > PVFS_SYS_LAYOUT_NONE &&
             pattr->u.dir.hint.dir_layout.algorithm <= PVFS_SYS_LAYOUT_MAX)
         {
@@ -806,6 +788,9 @@ static PINT_sm_action mkdir_write_keyvals(struct PINT_smcb *smcb,
  * Function: mkdir_dirdata_create
  *
  * Synopsis: Create dspace record for DIRDATA object
+ * Search for local dirdatas and make a list of remote dirdatas
+ * the for loop checks each dirdata and breaks on a local so
+ * it can be created directly.  Remotes are passed on to the next state.
  *
  */
 
@@ -817,6 +802,12 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     job_id_t j_id;
     int i = 0;
     int j = 0;
+
+    /* clear return code used for navigation */
+    if (js_p->error_code > 0)
+    {
+         js_p->error_code = 0;
+    }
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Start s_op (%p)\n", s_op);
 
@@ -861,6 +852,9 @@ static PINT_sm_action mkdir_dirdata_create(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Final i %d j %d\n", i, j);
 
     /* if i is (less than?) zero there are no more dirdata to test/create */
+    /* This return code breaks the local loop and heads to the
+     * remote create part of the SM
+     */
     if (i < 0)
     {
         gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,

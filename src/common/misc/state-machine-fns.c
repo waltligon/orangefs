@@ -1126,12 +1126,19 @@ void *PINT_sm_frame(struct PINT_smcb *smcb, int index)
  */
 struct PINT_smcb *PINT_get_parent_smcb(struct PINT_smcb *smcb)
 {
+    return smcb;
     if (smcb && smcb->parent_smcb)
     {
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                       "Parent SMCB fstk_cnt %d fstk_base %d\n",
+                       smcb->parent_smcb->frame_count, smcb->parent_smcb->base_frame);
         return smcb->parent_smcb;
     }
     else
     {
+        gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
+                       "No parent SMCB fstk_cnt %d fstk_base %d\n",
+                       smcb->frame_count, smcb->base_frame);
         return smcb;
     }
 }

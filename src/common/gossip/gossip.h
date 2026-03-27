@@ -117,7 +117,7 @@ do {                                                             \
 
 #define gossip_lsadebug(format, f...)                            \
 do {                                                             \
-    gossip_debug('D', "%s (%p): " format, __func__ , smbc, ##f); \
+    gossip_debug('D', "%s (%p): " format, __func__ , smcb, ##f); \
 } while(0)
 
 
@@ -331,8 +331,8 @@ int __gossip_debug_stub(PVFS_debug_mask mask,
                         char prefix,
                         const char *format,
                         ...);
-int __gossip_always(consst char, const char *format, ...);
-int __gossip_always_stub(consst char, const char *format, ...);
+int __gossip_always(const char, const char *format, ...);
+int __gossip_always_stub(const char, const char *format, ...);
 int gossip_log(const char *format, ...);
 int gossip_err(const char *format, ...);
 

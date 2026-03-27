@@ -1084,6 +1084,27 @@ AC_ARG_ENABLE(threaded,
     [build_threaded=yes])
 AC_SUBST(build_threaded)
 
+dnl Method to enable MPA PJMP default on
+AC_ARG_ENABLE(mpapjmp,
+   [  --enable-mpapjmp        Set Default for MPA PJMP on.],
+   [if test "x$enableval" = "xyes" ; then
+       AC_DEFINE(PVFS_ENABLE_MPAPJMP, 1,
+                 [Should we enable the MPA PJMP.])
+       ENABLE_MPAPJMP=1
+    else
+       AC_DEFINE(PVFS_ENABLE_MPAPJMP, 0,
+                 [Should we enable the MPA PJMP.])
+       ENABLE_MPAPJMP=0
+    fi
+    enable_mpapjmp=$enableval
+   ],
+   [AC_DEFINE(PVFS_ENABLE_MPAPJMP, 0,
+              [Should we enable the MPA PJMP.])
+    enable_mpapjmp=no
+    ENABLE_MPAPJMP=0
+   ])
+AC_SUBST(enable_mpapjmp)
+
 dnl Method to enable build of user interface libraries
 AC_ARG_ENABLE(usrint,
    [  --enable-usrint        Build posix and stdio user libraries],

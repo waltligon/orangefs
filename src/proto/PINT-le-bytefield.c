@@ -33,8 +33,8 @@ char PVFS2_BLANK_ISSUER[] = "";
 /* defined later */
 static int check_req_size(struct PVFS_server_req *req);
 static int check_resp_size(struct PVFS_server_resp *resp);
-static void zero_capability(PVFS_capability*);
-static void zero_credential(PVFS_credential*);
+static void zero_capability(PVFS_capability *);
+static void zero_credential(PVFS_credential *);
 
 static int initializing_sizes = 0;
 

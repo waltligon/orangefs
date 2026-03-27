@@ -108,7 +108,7 @@ nested machine pvfs2_prelude_work_sm
     state write_new_object_keyval
     {
         run prelude_write_new_object_keyval;
-        success => validate;
+        /* success => validate; */
         default => return;
     }
 }
@@ -272,7 +272,7 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                   "s_op (%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
+                   "s_op (%p) %s (prelude sm)\n", s_op,
                    PINT_map_server_op_to_string(s_op->req->op));
 
     /* if the handle is 0, that indicates that the request does not
@@ -334,10 +334,11 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     {
         gossip_lsadebug("s_op (%p) %s (prelude sm)\n", s_op,
                         PINT_map_server_op_to_string(s_op->req->op));
-        gossip_lsadebug("Finish getattr_if_needed js_p %d\n",
+        gossip_lsadebug("Finish getattr_if_needed js_p %d -1073742082 is NOT FOUND\n",
                         js_p->error_code);
         gossip_lsadebug("s_op.ds_attr objtype %d owner %d group %d\n",
                         s_op->ds_attr.type, s_op->ds_attr.uid, s_op->ds_attr.gid);
+        gossip_lsadebug("target_handle %s\n", PVFS_OID_str(&s_op->target_handle));
         /* we have not translated yet */
         /*
         gossip_lsadebug("s_op.attr objtype %d owner %d group %d\n",
@@ -369,36 +370,42 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          * convert to a ds_attr for writing to the database.
          * First copy in the attrs sent in by the original req as a starting point.
          */
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "\ttarget_handle: %s NOT FOUND!\n",
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "target_handle: %s NOT FOUND!\n",
                      PVFS_OID_str(&s_op->target_handle));
         /** gets the target's attrs from the request using the get_attr method
          * defined in the .sm file and copy it to the s_op scratch space for the attr
          */
-        ret = PINT_server_req_get_attr(s_op->req, &s_op->attr);
+        ret = PINT_server_req_get_attr(s_op->req, &s_op->attr); /* copys parent attrs out */
+        PINT_copy_object_attr(&s_op->parent_dir_attr, &s_op->attr); /* save for a later state */
+
         s_op->target_object_attr = &s_op->attr; /* is this used? */
 
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "\trequest attributes accessed\n");
+        s_op->attr.parent = &(s_op->req->u.crdirent.parent_ref.handle);
+        s_op->attr.parent_sids = s_op->req->u.crdirent.parent_ref.sid_array;
 
-        /* Everything has a parent, but it may not have come with the request.
-         * It should have.  Don't crash if its not there, but maybe log an error!
-         */
-        if (s_op->attr.parent)
+        gossip_if(GOSSIP_SERVER_DEBUG)
         {
-            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "\tparent: %s\n",
-                         PVFS_OID_str(s_op->attr.parent));
+            gossip_lsadebug("request attributes accessed\n");
+
+            /* Everything has a parent, but it may not have come with the request.
+             * It should have.  Don't crash if its not there, but maybe log an error!
+             */
+            if (s_op->attr.parent)
+            {
+                gossip_lsadebug("parent: %s\n", PVFS_OID_str(s_op->attr.parent));
+            }
+            /* these need to be farther down once we know what kind of obj it is */
+            if (s_op->attr.u.dir.dirdata_handles) 
+            {
+                gossip_lsadebug("dirdata_handle: %s\n",
+                                PVFS_OID_str(s_op->attr.u.dir.dirdata_handles));
+            }
+                if (s_op->attr.u.dir.dist_dir_bitmap)
+            {
+                gossip_lsadebug("bitmap: %04d\n", *s_op->attr.u.dir.dist_dir_bitmap);
+            }
         }
-        /* these need to be farther down once we know what kind of obj it is */
-        if (s_op->attr.u.dirdata.dirdata_handles) 
-        {
-            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "\tdirdata_handle: %s\n",
-                         PVFS_OID_str(s_op->attr.u.dirdata.dirdata_handles));
-        }
-        if (s_op->attr.u.dirdata.dist_dir_bitmap)
-        {
-            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "\tbitmap: %d\n",
-                         *s_op->attr.u.dirdata.dist_dir_bitmap);
-        }
-        /* */
+        gossip_end;
 
         create_object = 1;    /* default to create unless zero'd below */
         js_p->error_code = 0; /* Clear ENOENT */
@@ -409,6 +416,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         case PVFS_SERV_SMALL_IO :
         case PVFS_SERV_TRUNCATE :
             gossip_lsdebug(GOSSIP_SERVER_DEBUG, "create DATAFILE\n");
+            /* converting object type from dir to datafile */
             s_op->attr.objtype = PVFS_TYPE_DATAFILE;
             s_op->attr.u.data.size = 0;
             break;
@@ -422,6 +430,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         case PVFS_SERV_CHDIRENT : /* assumes existing dirdata */
         case PVFS_SERV_CRDIRENT : /* assumes existing dirdata */
             gossip_lsdebug(GOSSIP_SERVER_DEBUG, "create DIRDATA\n");
+            /* converting object type from dir to dirdata */
             s_op->attr.objtype = PVFS_TYPE_DIRDATA;
             s_op->attr.u.dirdata.dirent_count = 0;
             break;
@@ -438,6 +447,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         case PVFS_SERV_ATOMICEATTR :
             if (s_op->req->ctrl.sub == PVFS_REQ_DATAFILE)
             {
+                /* converting object type from dir to datafile */
                 s_op->attr.objtype = PVFS_TYPE_DATAFILE;
                 s_op->attr.u.data.size = 0;
                 s_op->orig_mask = s_op->attr.mask;
@@ -445,6 +455,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             }
             else if (s_op->req->ctrl.sub == PVFS_REQ_DIRDATA)
             {
+                /* converting object type from dir to dirdata */
                 s_op->attr.objtype = PVFS_TYPE_DIRDATA;
                 s_op->attr.u.dirdata.dirent_count = 0;
                 s_op->orig_mask = s_op->attr.mask;
@@ -471,7 +482,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          */
         case PVFS_SERV_REMOVE :
             gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                         "remove or rmdir of non-existing object\n");
+                           "remove or rmdir of non-existing object\n");
             create_object = 0;
             js_p->error_code = ENOENT;
             goto complete;
@@ -506,12 +517,52 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          * including this stuff, and issues the crdirent, so it could pass the attr
          * if the crdirent req had an attr field.
          */
+        /* not sure if we need all this - it should come from the P attr */
         if (s_op->attr.objtype == PVFS_TYPE_DIRDATA)
         {
-            s_op->attr.u.dirdata.dirent_count = 0; /* new object no items */
+            if (s_op->req->op == PVFS_SERV_CRDIRENT)
+            {
+                /* new object needs new attributes */
+                /*s_op->attr.u.dirdata.dirent_count = 0; filled in above */
+                s_op->attr.u.dirdata.dist_dir_attr.tree_height = 
+                      s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.tree_height;
+                s_op->attr.u.dirdata.dist_dir_attr.dirdata_min =
+                      s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.dirdata_min;
+                s_op->attr.u.dirdata.dist_dir_attr.dirdata_max =
+                      s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.dirdata_max;
+                s_op->attr.u.dirdata.dist_dir_attr.dirdata_count =
+                      s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.dirdata_count;
+                s_op->attr.u.dirdata.dist_dir_attr.sid_count =
+                      s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.sid_count;
+                s_op->attr.u.dirdata.dist_dir_attr.bitmap_size =
+                      s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.bitmap_size;
+                s_op->attr.u.dirdata.dist_dir_attr.split_size =
+                      s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.split_size;
+                s_op->attr.u.dirdata.dist_dir_attr.server_no =
+                      s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.server_no;
+                s_op->attr.u.dirdata.dist_dir_attr.branch_level =
+                      s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.branch_level;
+                BITMAP_DUP(&(s_op->attr.u.dirdata.dist_dir_bitmap),
+                           s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_bitmap,
+                           s_op->req->u.crdirent.parent_attr.u.dir.dist_dir_attr.bitmap_size);
+                s_op->attr.u.dirdata.dirdata_handles = s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles;
+                s_op->attr.u.dirdata.dirdata_sids = s_op->req->u.crdirent.parent_attr.u.dir.dirdata_sids;
+            }
+            else if (s_op->req->op == PVFS_SERV_CREATE || s_op->req->op == PVFS_SERV_MKDIR)
+            {
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Req OP is CREATE or MKDIR\n");
+            }
+            else
+            {
+                gossip_lerr("trying to create dirdata from unexpected request\n");
+            }
         }
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "After attr mods ========================\n");
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                        "create_object is %d\n", create_object);
+
     } /* endif object not found */
     else
     {
@@ -533,10 +584,6 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
         return SM_ACTION_COMPLETE;
     }
-
-    /* keeping this one to see the state of cap field after getattr
-     */
-    //PVFS_debug_PVFS_capability(GOSSIP_SECURITY_DEBUG, &s_op->req->capability);
 
     if (s_op->target_fs_id != PVFS_FS_ID_NULL)
     {
@@ -561,17 +608,13 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
      * It is used ot poke it into the credcache
      * Probably we should read this somewhere else
      */
-    //PINT_server_req_get_credential(s_op->req, &cred);
-    /* keeping this one to see the state of cred field after getattr
-     */
-    //PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     if (cred != NULL)
     {
 #ifdef ENABLE_CREDCACHE
         credcache_hit = (PINT_credcache_lookup(cred) != NULL);
 
         gossip_lsdebug(GOSSIP_SECURITY_DEBUG, "cred cache %s\n",
-                     (credcache_hit) ? "hit" : "miss");
+                       (credcache_hit) ? "hit" : "miss");
 #endif
         /* do not verify credential on credcache hit */
         ret = (credcache_hit) ? 1 : PINT_verify_credential(cred);
@@ -588,9 +631,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             char sig_buf[16] __attribute__ ((unused));
 
             gossip_lsdebug(GOSSIP_SECURITY_DEBUG, 
-                         "Credential (%s) from %s failed verification.\n",
-                         PINT_util_bytes2str(cred->signature, sig_buf, 4),
-                         cred->issuer);
+                           "Credential (%s) from %s failed verification.\n",
+                           PINT_util_bytes2str(cred->signature, sig_buf, 4),
+                           cred->issuer);
 
             /* have client try again on timeout */
             if (PINT_util_get_current_time() > cred->timeout)
@@ -607,11 +650,16 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     }
     gossip_lsdebug(GOSSIP_SECURITY_DEBUG, "cred passed signature verification\n");
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "1 ========================\n");
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+
     if ((s_op->target_fs_id != PVFS_FS_ID_NULL) && (cred != NULL))
     {
         PVFS_uid uid, translated_uid;
         PVFS_gid group_array[PVFS_REQ_LIMIT_GROUPS], translated_gid;
         uint32_t num_groups;
+
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Checking credentials\n");
         
         /* map the credential */
         ret = PINT_map_credential(cred, &uid, &num_groups, group_array);
@@ -632,6 +680,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
          */
         /* TODO: testing */
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling translate_ids\n");
+
         if (translate_ids(s_op->target_fs_id,
                           uid, 
                           group_array[0],
@@ -680,6 +729,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "2 =======================\n");
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "checking capability\n");
     /* check capability cache for non-null capabilities */
 #ifdef ENABLE_CAPCACHE
@@ -688,12 +740,16 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     {        
         capcache_hit = (PINT_capcache_lookup(&s_op->req->capability) != NULL);        
         gossip_lsdebug(GOSSIP_SECURITY_DEBUG, "cap cache %s!\n",
-                     (capcache_hit) ? "hit" : "miss");
+                       (capcache_hit) ? "hit" : "miss");
     }
 #endif
 
     /* do not verify cap on cache hit */
     ret = (capcache_hit) ? 1 : PINT_verify_capability(&s_op->req->capability);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "3 ========================\n");
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+
 
     /* check operation permissions */
     if (ret)
@@ -703,12 +759,12 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         {
             ret = PINT_perm_check(s_op);
             gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                         "return from PINT_perm_check = %d\n",ret);
+                           "return from PINT_perm_check = %d\n",ret);
         }
         else
         {
             gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                         "skipping PINT_perm_check\n" );
+                           "skipping PINT_perm_check\n" );
         }
     }
     else
@@ -716,10 +772,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         char sig_buf[16] __attribute__ ((unused)); 
 
         gossip_lsdebug(GOSSIP_SECURITY_DEBUG, 
-                     "Capability (%s) from %s failed verification.\n",
-                     PINT_util_bytes2str(s_op->req->capability.signature,
-                                         sig_buf, 4),
-                     s_op->req->capability.issuer);
+                       "Capability (%s) from %s failed verification.\n",
+                       PINT_util_bytes2str(s_op->req->capability.signature,
+                                           sig_buf, 4),
+                       s_op->req->capability.issuer);
 
         /* have client try again on timeout */
         if (PINT_util_get_current_time() > s_op->req->capability.timeout)
@@ -745,7 +801,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "s_op (%p) %s (req %d) (prelude sm) status %d\n",
-                   s_op, PINT_map_server_op_to_string(s_op->req->op),s_op->req->op,
+                   s_op, PINT_map_server_op_to_string(s_op->req->op),
+                   s_op->req->op,
                    js_p->error_code);
 
 complete:
@@ -859,7 +916,7 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
     int ret;
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: write_new_object_attr\n", s_op,
+                 "s_op (%p) %s (prelude sm)\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "prelude: writing attributes for new object\n");
 
@@ -870,6 +927,32 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
 
     s_op->ds_attr.fs_id =  s_op->target_fs_id;
     s_op->ds_attr.handle = s_op->target_handle;
+
+    /* make sure all attrs are set up */
+    switch(s_op->ds_attr.type)
+    {
+    case PVFS_TYPE_DIRDATA :
+        /* the previous state converted s_op->attr to a dirdata */
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Filling in DIRDATA fields\n");
+        s_op->ds_attr.u.dirdata.dirent_count = s_op->attr.u.dirdata.dirent_count;
+        s_op->ds_attr.u.dirdata.tree_height = s_op->attr.u.dirdata.dist_dir_attr.tree_height;
+        s_op->ds_attr.u.dirdata.dirdata_count = s_op->attr.u.dirdata.dist_dir_attr.dirdata_count;
+        s_op->ds_attr.u.dirdata.bitmap_size = s_op->attr.u.dirdata.dist_dir_attr.bitmap_size;
+        s_op->ds_attr.u.dirdata.split_size = s_op->attr.u.dirdata.dist_dir_attr.split_size;
+        s_op->ds_attr.u.dirdata.server_no = s_op->attr.u.dirdata.dist_dir_attr.server_no;
+        s_op->ds_attr.u.dirdata.branch_level = s_op->attr.u.dirdata.dist_dir_attr.branch_level;
+        /* bitmap dirdata_handles dirdata_sids, parent parent_sids in keyval */
+        break;
+    case PVFS_TYPE_DATAFILE :
+        break;
+    case PVFS_TYPE_METAFILE :
+    case PVFS_TYPE_DIRECTORY :
+    case PVFS_TYPE_SYMLINK :
+    case PVFS_TYPE_INTERNAL :
+    default :
+        gossip_lerr("attempting to dynamically create the wrong type\n");
+        break;
+    }
 
     /* post dspace setattr job */
     ret = job_trove_dspace_setattr(s_op->target_fs_id,
@@ -889,8 +972,8 @@ static PINT_sm_action prelude_write_new_object_attr(struct PINT_smcb *smcb,
         s_op->attr.mask = PVFS_ATTR_NULL; 
             
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                     "prelude: marking all attributes written mask: %ld\n",
-                     s_op->attr.mask);
+                       "prelude: marking all attributes written mask: %ld\n",
+                       s_op->attr.mask);
     }
     return ret;
 }
@@ -910,8 +993,7 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
     job_id_t j_id;
     int keyval_count = 1; /* for a DATAFILE - PARENT key */
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: write_new_object_keyval\n",
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op (%p) %s (prelude sm)\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
 
     if (s_op->req->ctrl.sub == PVFS_REQ_DIRDATA)
@@ -957,7 +1039,7 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
  */
     s_op->val_a[0].buffer_sz = OSASZ(1, s_op->attr.meta_sid_count);
     s_op->val_a[0].buffer = (void *)s_op->attr.parent;
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals2 %p sz %d\n",
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals0 %p sz %d\n",
                                       (void *)s_op->val_a[0].buffer,
                                       s_op->val_a[0].buffer_sz);
 
@@ -973,14 +1055,14 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
         s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
         s_op->key_a[1].buffer = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
 
-        s_op->val_a[1].buffer_sz = OSASZ(s_op->attr.u.dirdata.dist_dir_attr.dirdata_count,
-                                        s_op->attr.u.dirdata.dist_dir_attr.sid_count);
+        s_op->val_a[1].buffer_sz = OSASZ(s_op->attr.u.dir.dist_dir_attr.dirdata_count,
+                                        s_op->attr.u.dir.dist_dir_attr.sid_count);
 /* aren't getting the right data here 
  */
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "prelude: dirdata_handles: %s\n",
-                     PVFS_OID_str(s_op->attr.u.dirdata.dirdata_handles));
+                     PVFS_OID_str(s_op->attr.u.dir.dirdata_handles));
 
-        s_op->val_a[1].buffer = (void *)s_op->attr.u.dirdata.dirdata_handles;
+        s_op->val_a[1].buffer = (void *)s_op->attr.u.dir.dirdata_handles;
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals1 %p sz %d\n",
                                         (void *)s_op->val_a[1].buffer,
                                         s_op->val_a[1].buffer_sz);
@@ -994,15 +1076,15 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
         s_op->key_a[2].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
         s_op->key_a[2].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
 
-        s_op->val_a[2].buffer_sz = s_op->attr.u.dirdata.dist_dir_attr.bitmap_size *
+        s_op->val_a[2].buffer_sz = s_op->attr.u.dir.dist_dir_attr.bitmap_size *
                                 sizeof(PVFS_dist_dir_bitmap_basetype);
 /* aren't getting the right data here 
  */
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "prelude: bitmap: %d\n",
-                     *s_op->attr.u.dirdata.dist_dir_bitmap);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "prelude: bitmap: %04d\n",
+                     *s_op->attr.u.dir.dist_dir_bitmap);
 
-        s_op->val_a[2].buffer = (void *)s_op->attr.u.dirdata.dist_dir_bitmap;
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals0 %p sz %d\n",
+        s_op->val_a[2].buffer = (void *)s_op->attr.u.dir.dist_dir_bitmap;
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "prelude setting up kvals2 %p sz %d\n",
                                         (void *)s_op->val_a[2].buffer,
                                         s_op->val_a[2].buffer_sz);
 
@@ -1012,8 +1094,8 @@ static PINT_sm_action prelude_write_new_object_keyval(struct PINT_smcb *smcb,
 /*---------------------------------------------------------------------------*/
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "  writing kvals for dirdata: %s "
-                 "\t with server_no=%d and branch_level=%d \n",
+                 "writing kvals for dirdata: %s "
+                 "with server_no=%d and branch_level=%d \n",
                  PVFS_OID_str(&s_op->target_handle),
                  s_op->attr.u.dirdata.dist_dir_attr.server_no,
                  s_op->attr.u.dirdata.dist_dir_attr.branch_level);

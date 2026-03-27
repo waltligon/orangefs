@@ -970,6 +970,21 @@ typedef uint32_t PVFS_dist_dir_bitmap_basetype;
 typedef uint32_t *PVFS_dist_dir_bitmap;
 typedef uint64_t PVFS_dist_dir_hash_type;
 
+/* THis macro expets
+ * dest to be a pointer to a pointer to a bitmap
+ * src is a pointer to a bitmap
+ * n is an integer and is the number of bitmap basetypes
+ */
+#define BITMAP_DUP(_dest, _src, _n) \
+do { \
+    *(_dest) = (PVFS_dist_dir_bitmap)malloc(sizeof(*(_src)) * (_n)); \
+    if (!*(_dest)) \
+    { \
+        gossip_lerr("out of memory\n"); \
+    } \
+    memcpy(*(_dest), (_src), (sizeof(*_dest) * (_n)));  \
+} while(0)
+
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_dist_dir_bitmap_basetype encode_uint32_t
 #define decode_PVFS_dist_dir_bitmap_basetype decode_uint32_t
@@ -1606,42 +1621,42 @@ do { \
     gossip_ladebug("PVFS_debug_PVFS_capablility: " #_cap " = (%p)\n", _cap); \
     if (!_cap) \
     { \
-        gossip_ladebug("capability pointer is NULL\n"); \
+        gossip_ladebug("    capability pointer is NULL\n"); \
         fail = 1; \
     } \
     else \
     { \
         if (!(_cap)->issuer) \
         { \
-            gossip_ladebug("capability issuer is NULL\n"); \
+            gossip_ladebug("    capability issuer is NULL\n"); \
         } \
         else \
         { \
             if (strlen((_cap)->issuer) == 0) \
             { \
-                gossip_ladebug("null capability\n"); \
+                gossip_ladebug("    null capability\n"); \
             } \
             else \
             { \
-                gossip_ladebug(" issuer: %s\n", (_cap)->issuer); \
+                gossip_ladebug("    issuer: %s\n", (_cap)->issuer); \
             } \
         } \
     } \
     if (!fail) \
     { \
-        gossip_ladebug(" fsid: %u\n", (_cap)->fsid); \
-        gossip_ladebug(" sig_size: %u\n", (_cap)->sig_size); \
-        gossip_ladebug(" signature: %s\n", \
+        gossip_ladebug("    fsid: %u\n", (_cap)->fsid); \
+        gossip_ladebug("    sig_size: %u\n", (_cap)->sig_size); \
+        gossip_ladebug("    signature: %s\n", \
                  PINT_util_bytes2str((_cap)->signature, sig_buf, 4)); \
-        gossip_ladebug(" timeout: %d\n", (int) (_cap)->timeout); \
-        gossip_ladebug(" op_mask: %s\n", \
+        gossip_ladebug("    timeout: %d\n", (int) (_cap)->timeout); \
+        gossip_ladebug("    op_mask: %s\n", \
                  PINT_print_op_mask((_cap)->op_mask, mask_buf)); \
-        gossip_ladebug(" num_handles: %u\n", (_cap)->num_handles); \
-        gossip_ladebug(" first handle: %s\n", \
+        gossip_ladebug("    num_handles: %u\n", (_cap)->num_handles); \
+        gossip_ladebug("    first handle: %s\n", \
                  (_cap)->num_handles > 0 ? PVFS_OID_str(&((_cap)->handle_array[0])) : 0LL); \
         for (i = 1; i < (_cap)->num_handles; i++) \
         { \
-            gossip_ladebug("  handle %d: %s\n", \
+            gossip_ladebug("      handle %d: %s\n", \
                          i + 1, PVFS_OID_str(&((_cap)->handle_array[i]))); \
         } \
     } \

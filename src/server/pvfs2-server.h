@@ -569,16 +569,16 @@ struct PINT_server_crdirent_op
     PVFS_BMI_addr_t      svr_addr;     /* destination server address */
     PVFS_error          *split_status; /* status from PVFS_SERV_MGMT_SPLIT_DIRENT */
     PINT_dist           *dist;         /* distribution structure for basic_dist */
-    int                 read_all_directory_entries;
-    int                 nentries;
-    PVFS_handle        *entry_handles;
-    PVFS_SID           *entry_sid;
-    char              **entry_names;
-    int                 num_msgs_required;
-    split_msg_boundary *msg_boundaries;
-    PVFS_ds_keyval     *entries_key_a;
-    PVFS_ds_keyval     *entries_val_a;
-    PVFS_handle        *remote_dirdata_handles;
+    int                  read_all_directory_entries;
+    int                  nentries;
+    PVFS_handle         *entry_handles;
+    PVFS_SID            *entry_sid;
+    char               **entry_names;
+    int                  num_msgs_required;
+    split_msg_boundary  *msg_boundaries;
+    PVFS_ds_keyval      *entries_key_a;
+    PVFS_ds_keyval      *entries_val_a;
+    PVFS_handle         *remote_dirdata_handles;
 };
 
 #define PVFS_debug_crdirent_op_s(_mask, _s_op)                \
@@ -1230,6 +1230,7 @@ typedef struct PINT_server_op
     PVFS_SID                  *target_sid_array;   /* not used yet */
     PVFS_fs_id                 target_fs_id;
     PVFS_object_attr          *target_object_attr;
+    PVFS_object_attr           parent_dir_attr; /* prevent re-reading attrs */
 
     PINT_prelude_flag          prelude_mask;
 

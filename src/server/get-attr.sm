@@ -1530,7 +1530,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    PVFS_debug_PVFS_directory_attr(GOSSIP_GETATTR_DEBUG, attr_p);
+    PVFS_debug_PVFS_attr(GOSSIP_GETATTR_DEBUG, attr_p);
 
 #if 0
     /* gossip parent */
@@ -2335,7 +2335,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     if (js_p->error_code == -TROVE_ENOENT)
     {
         /* no acl found */
-        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "no acl found\n");
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "no acl found - ignore error_code\n");
         acl_buf = NULL;
         acl_size = 0;
         js_p->error_code = 0;
