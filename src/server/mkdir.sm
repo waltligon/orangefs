@@ -236,6 +236,10 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
      * to be putting some attribute information into these slots as a placeholder???
      */
 
+    /* Not all requests have attributes so we may
+     * need some logic to bypass some of this 
+     */
+
     dir_attr = &(s_op->req->u.mkdir.attr);
     ds_attr = (&s_op->ds_attr);
 
@@ -272,9 +276,9 @@ static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
     dir_attr->u.dir.dist_dir_attr.bitmap_size = 1;
     dir_attr->u.dir.dirent_count = 0; /* new dir so no entries */
     
+    dir_attr->handle = s_op->req->u.mkdir.newdir_handle;
 
     s_op->u.mkdir.fs_id = s_op->req->u.mkdir.fs_id;
-    s_op->u.mkdir.handle = s_op->req->u.mkdir.newdir_handle;
 
     if (dir_attr->objtype != PVFS_TYPE_DIRECTORY)
     {

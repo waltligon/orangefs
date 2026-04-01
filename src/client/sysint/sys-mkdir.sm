@@ -940,6 +940,9 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     sm_p->object_ref.sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
     sm_p->object_ref.sid_array = sm_p->u.mkdir.newdir_sid_array;
 
+    /* objet handle also goes int attributes for debugging */
+    sm_p->u.mkdir.dir_attr.handle = sm_p->object_ref.handle;
+
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 

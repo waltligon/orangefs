@@ -35,6 +35,23 @@
  * - check permissions
  */
 
+/* When we get to getattr_if_needed and prelude_verify the
+ * big issue is whether the target object actually exists.
+ * The target_handle is the object we are going to directly
+ * read or modify.  In the case of directories this is often
+ * not the directory but the dirdata - so for example crdirent
+ * creates a dirent under the dirdata.  On the other hand the
+ * parent always points to the directory itself.  Usually
+ * the client extracts the dirdata.  Thus the request has the
+ * target handle AND it has a parent attr.  The target and
+ * parent are not neccessarily the same thing.  This needs to
+ * be worked out based on the opcode.  The parent attr is there
+ * for use in creating a missing dirdata or datafile.  The code
+ * decides if we need to do this, and if so we use the parent
+ * directory or metafile's attr in the construction of the
+ * subordinate object.
+ */
+
 static void get_anon_ids(struct filesystem_configuration_s *fsconfig,
                          PVFS_uid *uid,
                          PVFS_gid *gid);
@@ -61,11 +78,8 @@ static int permit_operation(PVFS_fs_id fsid,
                             enum PINT_server_req_access_type access_type,
                             PVFS_BMI_addr_t client_addr);
 
-#if 0
-#define CREATE_DATA_OBJECT 1
-#define CREATE_DIRDATA_OBJECT 2
-#endif
 #define CREATE_OBJECT 21
+#define PRELUDE_DONE  22
 
 %%
 
@@ -81,34 +95,44 @@ nested machine pvfs2_prelude_work_sm
     state getattr_if_needed
     {
         run prelude_getattr_if_needed;
+        PRELUDE_DONE => prelude_return;
         default => validate;
     }
 
+    /* only do the rest if we need to create
+     * a dirdata or datafile otherwise we're done
+     */
     state validate
     {
         run prelude_validate;
         CREATE_OBJECT => create_object_if_allowed;
-        default => return;
+        default => prelude_return;
     }
 
     state create_object_if_allowed
     {
         run prelude_create_object_if_allowed;
         success => write_new_object_attr;
-        default => return;
+        default => prelude_return;
     }
 
     state write_new_object_attr
     {
         run prelude_write_new_object_attr;
         success => write_new_object_keyval;
-        default => return;
+        default => prelude_return;
     }
 
     state write_new_object_keyval
     {
         run prelude_write_new_object_keyval;
         /* success => validate; */
+        default => prelude_return;
+    }
+
+    state prelude_return
+    {
+        run prelude_return;
         default => return;
     }
 }
@@ -132,11 +156,26 @@ nested machine pvfs2_prelude_sm
 
 /******************* Action Functions *******************/
 
+static PINT_sm_action prelude_return(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Returning from prelude work\n");
+    /* clear navigation return codes */
+    if (js_p->error_code > 0)
+    {
+        js_p->error_code = 0;
+    }
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     int ret;
     PVFS_credential *cred = NULL;
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op (%p)\n", s_op);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->req (%p)\n", s_op->req);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SM %s\n", PINT_map_server_op_to_string(s_op->req->op));
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "s_op (%p) %s (prelude sm) s_op->req (%p)\n", s_op,
@@ -215,23 +254,24 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "s_op (%p) %s (prelude sm) state: req_sched\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                 "\tbase_frame:%d\tframe_count:%d\n",
-                 smcb->base_frame,smcb->frame_count);
-
+    PINT_perf_count(PINT_server_pc, PINT_PERF_REQUESTS, 1, PINT_PERF_ADD);
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_REQUESTS, 1, PINT_PERF_ADD);
-
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "posting schedule for op type %d, "
-                 "fs_id is %d handle is %s\n", s_op->req->op, s_op->target_fs_id,
-                 PVFS_OID_str(&s_op->target_handle));
+    gossip_if(GOSSIP_SERVER_DEBUG)
+    {
+        gossip_lsadebug("s_op (%p) %s (prelude sm)\n", s_op,
+                        PINT_map_server_op_to_string(s_op->req->op));
+        gossip_lsadebug("\tbase_frame:%d\tframe_count:%d\n",
+                        smcb->base_frame,smcb->frame_count);
+        gossip_lsadebug("posting schedule for op type %d, "
+                        "fs_id %d handle %s\n", s_op->req->op,
+                        s_op->target_fs_id, PVFS_OID_str(&s_op->target_handle));
+    }
+    gossip_end;
 
     if (!(s_op->prelude_mask & PRELUDE_NO_SCHEDULE))
     {
+        /* should this be target handle or parent handle? */
         ret = job_req_sched_post(s_op->req->op,
                                  s_op->target_fs_id,
                                  s_op->target_handle,
@@ -283,7 +323,7 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                        "Null handle - prelude bypass getattr\n");
-        js_p->error_code = 0;
+        js_p->error_code = PRELUDE_DONE; /* skip auto create */
         return SM_ACTION_COMPLETE;
     }
 
@@ -304,7 +344,9 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "About to retrieve attributes for local handle %s\n",
                    PVFS_OID_str(&s_op->target_handle));
-
+    /* This is reading the attr of target,
+     * this goes in d_attr, don't confuse with attr 
+     */
     ret = job_trove_dspace_getattr(s_op->target_fs_id,
                                    s_op->target_handle,
                                    smcb,
@@ -315,7 +357,8 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
                                    server_job_context,
                                    s_op->req->hints);
 
-    /* this getattr will not include parent, dirdata/dfile handles, or bitmaps */
+    /* this getattr will not include parent, dirdata/dfile handles, or bitmaps 
+     * but none of those things should change, presumably */
     return ret;
 }
 
@@ -356,6 +399,27 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     /* Get the errno value from the getattr to use for comparison */
     error_code = PVFS_get_errno_mapping(js_p->error_code);
 
+    /* setting up the attributes
+     * the attributes are for the parent dir
+     * we tried to read the parent dirdata, if we didn't find it
+     * we need to create it
+     * in either case we want the parent attributes saved
+     */
+    gossip_lsadebug("before attributes accessed\n");
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+    ret = PINT_server_req_get_attr(s_op->req, &s_op->attr); /* copys parent attrs out */
+    gossip_lsadebug("request attributes accessed\n");
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+
+    PINT_copy_object_attr(&s_op->parent_dir_attr, &s_op->attr); /* save for a later state */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Saved Parent Attrs  ========================\n");
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->parent_dir_attr);
+
+    s_op->target_object_attr = &s_op->attr; /* is this used? */
+
+    s_op->attr.parent = &(s_op->req->u.crdirent.parent_ref.handle);
+    s_op->attr.parent_sids = s_op->req->u.crdirent.parent_ref.sid_array;
+
     /* Next we see if we need to create a new object.
      * The only objects created by prelude are DATAFILE and DIRDATA objects
      * that were not created during the original CREATE or MKDIR operations.
@@ -375,18 +439,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         /** gets the target's attrs from the request using the get_attr method
          * defined in the .sm file and copy it to the s_op scratch space for the attr
          */
-        ret = PINT_server_req_get_attr(s_op->req, &s_op->attr); /* copys parent attrs out */
-        PINT_copy_object_attr(&s_op->parent_dir_attr, &s_op->attr); /* save for a later state */
-
-        s_op->target_object_attr = &s_op->attr; /* is this used? */
-
-        s_op->attr.parent = &(s_op->req->u.crdirent.parent_ref.handle);
-        s_op->attr.parent_sids = s_op->req->u.crdirent.parent_ref.sid_array;
-
         gossip_if(GOSSIP_SERVER_DEBUG)
         {
-            gossip_lsadebug("request attributes accessed\n");
-
             /* Everything has a parent, but it may not have come with the request.
              * It should have.  Don't crash if its not there, but maybe log an error!
              */
@@ -407,6 +461,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         }
         gossip_end;
 
+        /* this logic is part of auto-create */
         create_object = 1;    /* default to create unless zero'd below */
         js_p->error_code = 0; /* Clear ENOENT */
         switch (s_op->req->op)
@@ -498,8 +553,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             break;
         }
 
-        /* initialize the time members */
+        /* initialize the time members for new object (dirdata) */
         /* these are used for whole second time values in file timestamps */
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Setting time stamps\n");
             current_time = time(NULL);
         s_op->attr.atime = current_time;
         s_op->attr.mtime = current_time;
@@ -557,8 +613,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
                 gossip_lerr("trying to create dirdata from unexpected request\n");
             }
         }
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "After attr mods ========================\n");
-    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Auto Create Target ========================\n");
+        PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
 
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                        "create_object is %d\n", create_object);
@@ -568,9 +624,11 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     {
         /* Translate the dspace attributes read from db into object attributes */
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                       "Translating attributes into s_op->attr\n");
+                       "Translating target attributes into s_op->attr\n");
         PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
         s_op->target_object_attr = &s_op->attr;
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Not Auto Create Target ========================\n");
+        PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
     }
 
     /* Remaining logic deals with new or existing object. */
@@ -628,12 +686,12 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 #endif
         if (!ret)
         {
-            char sig_buf[16] __attribute__ ((unused));
+            char sig_buf[16] GCC_UNUSED;
 
             gossip_lsdebug(GOSSIP_SECURITY_DEBUG, 
-                           "Credential (%s) from %s failed verification.\n",
+                           "Credential (%s) from %s failed verification. ret %d\n",
                            PINT_util_bytes2str(cred->signature, sig_buf, 4),
-                           cred->issuer);
+                           cred->issuer, ret);
 
             /* have client try again on timeout */
             if (PINT_util_get_current_time() > cred->timeout)

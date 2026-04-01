@@ -1140,6 +1140,7 @@ do {                                                           \
 /* generic attributes; applies to all objects */
 struct PVFS_object_attr
 {
+    PVFS_handle handle;        /* the OID of the object that owns these attribs */
     PVFS_ds_type objtype;      /* defined in pvfs2-types.h */
     PVFS_object_attrmask mask; /* indicates which fields are currently valid */
     PVFS_uid owner;            /* uid */
@@ -1172,8 +1173,9 @@ do {                                                             \
     gossip_if (_mask)                                            \
     {                                                            \
         gossip_ladebug("PVFS Object Attr:" #_attr " = (%p)\n", (_attr)); \
-        if (_attr != NULL)                                        \
+        if (_attr != NULL)                                       \
         {                                                        \
+            PVFS_debug_afield(&_tattr->handle, PVFS_handle);     \
             PVFS_debug_afield(_tattr->objtype, PVFS_ds_type);    \
             PVFS_debug_afield(_tattr->mask, PVFS_object_attrmask); \
             PVFS_debug_afield(_tattr->owner, PVFS_uid);          \

@@ -199,6 +199,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     /* should we copy the capability? */
     if (src->parent && (src->mask &  PVFS_ATTR_COMMON_PARENT))
     {
+        memcpy(&dest->handle, &src->handle, OASZ(1));
         dest->parent = malloc(OSASZ(1, src->meta_sid_count));
         dest->parent_sids = (PVFS_SID *)(dest->parent + 1);
         memcpy(dest->parent, src->parent, OASZ(1));
@@ -577,6 +578,10 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
     free(attr->parent); 
     attr->parent = NULL; 
     attr->parent_sids = NULL; 
+
+    /* free handle */
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "attr->handle (%p)\n", &attr->handle);
+    memset(&attr->handle, 0, sizeof(attr->handle));
 
     /* clean up rest of attr based on type */
     switch(attr->objtype)

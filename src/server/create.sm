@@ -493,6 +493,11 @@ static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
      */
     PVFS_object_attr_overwrite_setable(dspace_a_p, a_p);
 
+    /* put object handle in the attributes */
+    memcpy(&dspace_a_p->handle,
+           &s_op->req->u.create.object.handle,
+           sizeof(dspace_a_p->handle));
+
     /* update fields passed in the request but stored in the dspace
      * attributes.
      * for whatever reason we aren't getting the time passed from the
@@ -586,6 +591,10 @@ static PINT_sm_action setup_resp(struct PINT_smcb *smcb,
      * original request structure, so there's no need to
      * send the same information back.
      */
+    memcpy(&s_op->resp.u.create.metafile_attrs.handle,
+           &s_op->attr.handle,
+           sizeof(s_op->resp.u.create.metafile_attrs.handle));
+
     if (s_op->attr.owner >= 0)
     {
         s_op->resp.u.create.metafile_attrs.owner = s_op->attr.owner;
