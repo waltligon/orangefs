@@ -220,6 +220,8 @@ static int make_directory(PVFS_credential      * credentials,
     PVFS_object_ref     parent_ref;
     PVFS_sysresp_mkdir  resp_mkdir;
 
+    fprintf(stdout, "Client is running make_directory\n");
+
     /* Initialize any variables */
     memset(&attr,        0, sizeof(attr));
     memset(&resp_lookup, 0, sizeof(resp_lookup));
@@ -262,6 +264,7 @@ static int make_directory(PVFS_credential      * credentials,
     /* Clear out any info from previous calls */
     memset(&resp_lookup,  0, sizeof(resp_lookup));
 
+    fprintf(stdout, "Client is running PVFS_sys_lookup\n");
     ret = PVFS_sys_lookup(fs_id, 
                           parentdir_ptr, 
                           credentials, 
@@ -279,7 +282,7 @@ static int make_directory(PVFS_credential      * credentials,
         PVFS_perror("PVFS_sys_lookup", ret);
         return(ret);
     }
-    
+
     /* The parent directory did not exist. Let's create the parent directory */
     if(ret == -PVFS_ENOENT && make_parent_dirs)
     {
@@ -299,6 +302,7 @@ static int make_directory(PVFS_credential      * credentials,
                              
         if(ret == 0)
         {
+            fprintf(stdout, "Client is running PVFS_sys_lookup 2\n");
             ret = PVFS_sys_lookup(fs_id, 
                                   parentdir_ptr, 
                                   credentials, 
@@ -340,6 +344,7 @@ static int make_directory(PVFS_credential      * credentials,
         fprintf(stdout, "\t perms [%o]\n",  attr.perms);
     }
 
+    fprintf(stdout, "Client is running PVFS_sys_mkdir\n");
     ret = PVFS_sys_mkdir(basename_ptr, 
                          parent_ref, 
                          attr,

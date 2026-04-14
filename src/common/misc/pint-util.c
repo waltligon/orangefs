@@ -199,7 +199,6 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     /* should we copy the capability? */
     if (src->parent && (src->mask &  PVFS_ATTR_COMMON_PARENT))
     {
-        memcpy(&dest->handle, &src->handle, OASZ(1));
         dest->parent = malloc(OSASZ(1, src->meta_sid_count));
         dest->parent_sids = (PVFS_SID *)(dest->parent + 1);
         memcpy(dest->parent, src->parent, OASZ(1));
@@ -378,6 +377,8 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
      * referenced here
      */
     /* copy_attr(mask, 0); */
+    /* always copy this */
+    dest->handle = src->handle;
     copy_attr(objtype, PVFS_ATTR_COMMON_TYPE);
     copy_attr(owner, PVFS_ATTR_COMMON_UID);
     copy_attr(group, PVFS_ATTR_COMMON_GID);
@@ -587,14 +588,17 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
     switch(attr->objtype)
     {
     case PVFS_TYPE_METAFILE:
+        gossip_debug(GOSSIP_COMMON_DEBUG, "Freeing MetaFile\n");
         FREEFIELD(meta.dist);
         FREEPACK(meta.dfile_array,
                  meta.sid_array,
                  meta.dfile_count);
         break;
     case PVFS_TYPE_DATAFILE:
+        gossip_debug(GOSSIP_COMMON_DEBUG, "Freeing DataFile\n");
         break;
     case PVFS_TYPE_DIRECTORY:
+        gossip_debug(GOSSIP_COMMON_DEBUG, "Freeing Dir\n");
         FREEFIELD(dir.hint.dist_name);
         FREEFIELD(dir.hint.dist_params);
         FREEFIELD(dir.dist_dir_bitmap);
@@ -603,12 +607,14 @@ void PINT_free_object_attr(PVFS_object_attr *attr)
                  dir.dist_dir_attr.dirdata_count);
         break;
     case PVFS_TYPE_DIRDATA:
+        gossip_debug(GOSSIP_COMMON_DEBUG, "Freeing DirData\n");
         FREEFIELD(dirdata.dist_dir_bitmap);
         FREEPACK(dirdata.dirdata_handles,
                  dirdata.dirdata_sids,
                  dirdata.dist_dir_attr.dirdata_count);
         break;
     case PVFS_TYPE_SYMLINK:
+        gossip_debug(GOSSIP_COMMON_DEBUG, "Freeing SymLink\n");
         FREEFIELD(sym.target_path);
         break;
     default :

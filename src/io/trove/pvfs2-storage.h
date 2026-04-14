@@ -209,7 +209,7 @@ do {                                                    \
 #define PVFS_object_attr_from_ds_attr(__oa, __dsa)                     \
 do {                                                                   \
     memset((__oa), 0, sizeof(*(__oa)));                                \
-    memcpy(&((__oa)->handle), &((__dsa)->handle), sizeof((__oa)->handle));   \
+    (__oa)->handle = (__dsa)->handle;                                  \
     (__oa)->owner = (__dsa)->uid;                                      \
     (__oa)->group = (__dsa)->gid;                                      \
     (__oa)->perms = (__dsa)->mode;                                     \
@@ -310,6 +310,7 @@ do {                                                                   \
 
 #define PVFS_ds_attr_from_object_attr(__dsa, __oa)                     \
 do {                                                                   \
+    (__dsa)->handle = (__oa)->handle;                                  \
     (__dsa)->uid = (__oa)->owner;                                      \
     (__dsa)->gid = (__oa)->group;                                      \
     (__dsa)->mode = (__oa)->perms;                                     \

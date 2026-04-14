@@ -1803,16 +1803,22 @@ endecode_fields_1a1a1a_struct(
     int32_t, sid_count,
     PVFS_SID, sid_array);
 
-#define PVFS_debug_servresp_lookup_path(_mask, _resp)         \
+/* This expects a pointer to a server response struct */
+
+#define PVFS_debug_servresp_lookup_path(_mask, _resp)       \
 do {                                                        \
+    int i;                                                  \
     struct PVFS_servresp_lookup_path *tresp =               \
-                                  &((_resp)->u.lookup_path); \
-    gossip_if (_mask)                                        \
+                                &((_resp)->u.lookup_path);  \
+    gossip_if (_mask)                                       \
     {                                                       \
         gossip_lsadebug("Lookup Path Response: " #_resp " = (%p)\n", (_resp)); \
         PVFS_debug_afield(tresp->attr_count, uint32_t);     \
         PVFS_debug_afield(tresp->handle_count, uint32_t);   \
-        PVFS_debug_afield(tresp->handle_array, PVFS_handle);\
+        for (i = 0; i < tresp->handle_count; i++)           \
+        {                                                   \
+            PVFS_debug_afield(&tresp->handle_array[i], PVFS_handle);\
+        }                                                   \
         PVFS_debug_afield(tresp->sid_count, int32_t);       \
         PVFS_debug_afield(tresp->sid_array, PVFS_SID);      \
         if (tresp->attr_count > 0)                          \
@@ -1850,6 +1856,7 @@ struct PVFS_servreq_mkdir
     int32_t dist_dir_split_size;  /* # of dirents to reach for split to occur */
 };
 
+/* expects a pointer to a PVFS_request that is a mkdir */
 #define PVFS_debug_servreq_mkdir(_mask, _req)                \
 do {                                                        \
     struct PVFS_servreq_mkdir *treq =                       \
@@ -1858,7 +1865,6 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("PVFS_debug_servreq_mkdir Request: " #_req " = (%p)\n", (_req)); \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
-        PVFS_debug_afield(&((treq)->credential), PVFS_credential); \
         PVFS_debug_afield(&treq->newdir_handle, PVFS_handle);\
         PVFS_debug_afield(treq->newdir_sid_count, int32_t); \
         PVFS_debug_afield(treq->newdir_sid_array, PVFS_SID);\
@@ -1870,6 +1876,7 @@ do {                                                        \
         PVFS_debug_afield(treq->dirdata_sid_array, PVFS_SID);\
         PVFS_debug_afield(treq->dist_dir_servers_initial, int32_t);\
         PVFS_debug_afield(treq->dist_dir_split_size, int32_t);\
+        PVFS_debug_afield(&((treq)->credential), PVFS_credential); \
         PVFS_debug_PVFS_attr(_mask, &treq->attr);     \
         gossip_lsadebug("PVFS_debug_servreq_mkdir End:\n"); \
     }                                                       \

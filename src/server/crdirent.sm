@@ -39,11 +39,11 @@ static int tree_setattr_comp_fn(
 enum
 {
     SPLIT_REQUIRED = 131,
-    SPLIT_FATAL_ERROR,
-    NOTIFY_DIRDATA,
-    LOCAL_DIR,
-    REMOTE_DIR,
-    REMOVE_ENTRIES_REQUIRED
+    SPLIT_FATAL_ERROR = 132,
+    NOTIFY_DIRDATA = 133,
+    LOCAL_DIR = 134,
+    REMOTE_DIR = 135,
+    REMOVE_ENTRIES_REQUIRED = 136
 };
 
 %%
@@ -88,8 +88,15 @@ nested machine pvfs2_crdirent_work_sm
     state update_dirdata_attr
     {
         run crdirent_update_dirdata_attr;
+        success => update_dirdata_switch;
+        default => crdirent_work_return;
+    }
+
+    state update_dirdata_switch
+    {
+        run crdirent_update_dirdata_switch;
         REMOTE_DIR => remote_dir_update;
-        success => read_local_parent_dir;
+        LOCAL_DIR => read_local_parent_dir;
         default => crdirent_work_return;
     }
 
@@ -192,6 +199,7 @@ static PINT_sm_action crdirent_debug(struct PINT_smcb *smcb,
                                     job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Start of crdirent request <==================");
     PVFS_debug_servreq_crdirent(GOSSIP_SERVER_DEBUG, s_op->req);
     return SM_ACTION_COMPLETE;
 }
@@ -208,7 +216,8 @@ static PINT_sm_action crdirent_work_return(struct PINT_smcb *smcb,
 static PINT_sm_action crdirent_init(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_debug_servreq_crdirent(GOSSIP_SERVER_DEBUG, s_op->req);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "Init crdirent request - s_op (%p)<==================\n", s_op);
     return SM_ACTION_COMPLETE;
 }
 
@@ -276,8 +285,6 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     PVFS_object_attr *attr_p = NULL;
     job_id_t j_id;
 
-    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
-
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "ENTERED crdirent new %s\n",
                    PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle));
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "ENTERED crdirent parent %s\n",
@@ -317,7 +324,8 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     if(s_op->new_target_object) /* set in prelude */
     {
         /* link bitmap and dirdatas to the main attrs */
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "new_target_object %d exiting early\n",
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "new_target_object %d exiting early\n",
                        s_op->new_target_object);
         js_p->error_code = 0;
         return SM_ACTION_COMPLETE;
@@ -332,13 +340,12 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
            attr_p->u.dirdata.dist_dir_attr.bitmap_size > 0);
 
     /* dump dirdata related attribs */
-    PVFS_debug_PVFS_dirdata_attr(GOSSIP_SERVER_DEBUG, attr_p);
-
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
             "target dirdata handle %s\n",
             PVFS_OID_str(&s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                           s_op->req->u.crdirent.dd_server_index]));
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Getting attributes <==================");
     PVFS_debug_PVFS_dirdata_attr(GOSSIP_SERVER_DEBUG, attr_p);
 
     /* allocate space for bitmap and dirdata handles */
@@ -752,7 +759,6 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
 
     dirdata_attr->mask |= PVFS_ATTR_DIRDATA_DIRENT_COUNT;
 
-    /*PVFS_object_attr_to_ds_attr(dirdata_attr, ds_attr);*/
     PVFS_ds_attr_from_object_attr(ds_attr, dirdata_attr);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to update dirdata %s dirent_count %ld\n",
@@ -776,18 +782,34 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
     if (ret < 0)
     {
         gossip_lerr("post of dspace_setattr failed\n");
-        return ret;
     }
+    return ret;
+}
 
+static PINT_sm_action crdirent_update_dirdata_switch(struct PINT_smcb *smcb,
+                                                     job_status_s *js_p)
+{       
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    if (js_p->error_code)
+    {
+        /* error from dspace setattr above */
+        return -1;
+    }
+    js_p->error_code = 0;
+   
     /* decide if parent is local or not */
     if(!PINT_cached_config_server_local(&s_op->req->u.crdirent.parent_ref.sid_array[0]))
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Remote DIR entry\n");
         js_p->error_code = REMOTE_DIR;
     }
-
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Local DIR entry\n");
-    return ret;
+    else
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Local DIR entry\n");
+        js_p->error_code = LOCAL_DIR;
+    }
+    return SM_ACTION_COMPLETE;;
 }
 
 /*
@@ -814,7 +836,12 @@ static PINT_sm_action crdirent_read_local_parent_dir(struct PINT_smcb *smcb,
     job_id_t tmp_id;
 
     /* check the result of dirent write to keyval */
-    if (js_p->error_code != 0)
+    /* also clear navigation flags */
+    if (js_p->error_code > 0)
+    {
+        js_p->error_code = 0;
+    }
+    else if (js_p->error_code < 0)
     {
         return SM_ACTION_COMPLETE;
     }
@@ -922,11 +949,16 @@ static PINT_sm_action crdirent_remote_dir_update(struct PINT_smcb *smcb,
          * setenv request.  Still not clear about local values versus
          * remote values, for now We are updating both.
          */
+
+        /* clear navigation flags */
+        if (js_p->error_code > -1)
+        {
+            js_p->error_code = 0;
+        }
+
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to send setattr "
                      "request for directory handle %s\n",
                      PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
-        /* if we get an error somewhere we will not take this jump */
-        js_p->error_code = REMOTE_DIR;
 
         PINT_sm_msgpair_state *msg_p = NULL;
         PVFS_handle *capability_handles = NULL;
@@ -978,6 +1010,7 @@ static PINT_sm_action crdirent_remote_dir_update(struct PINT_smcb *smcb,
 #endif
 
         /* Capability was initialized earlier. */
+        /* Does an attr copy */
         PINT_SERVREQ_SETATTR_FILL(msg_p->req,
                                   PVFS_REQ_DIRDATA,
                                   s_op->u.crdirent.capability,
@@ -988,6 +1021,12 @@ static PINT_sm_action crdirent_remote_dir_update(struct PINT_smcb *smcb,
                                   s_op->req->u.crdirent.parent_ref.sid_array,
                                   tmp_attr,
                                   s_op->req->hints);
+
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "handle %s\n",
+                       PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
+
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "sid %s\n",
+                       PVFS_SID_str(&s_op->req->u.crdirent.parent_ref.sid_array[0]));
 
         msg_p->msgclass = PVFS_IO_METADATA;
         msg_p->msgdir = PVFS_IO_WRITE;

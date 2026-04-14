@@ -225,6 +225,11 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
         msg_p->op_status = 0;
         msg_p->op_action = PVFS_MPA_OK;
 
+      /*   gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "handle %s\n", */
+      /*                 PVFS_OID_str(&msg_p->handle)); */
+      /*  gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "sid %s\n", */
+      /*                 PVFS_SID_str(&msg_p->sid_array[i])); */
+
     }
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairarray init done.\n");
     if (mop->params.fork_flag)
@@ -455,7 +460,7 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         } 
         if (!ENCODING_IS_VALID(msg_p->enc_type))
         {
-            PRINT_ENCODING_ERROR("supported", msg_p->enc_type);
+            PRINT_ENCODING_ERROR("valid", msg_p->enc_type);
             must_loop_encodings = 1;
             msg_p->enc_type = (ENCODING_INVALID_MIN + 1);
         }
@@ -509,15 +514,19 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         }
 
         /* calculate max response msg size and allocate space */
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "calc max response size\n");
         msg_p->max_resp_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
                                                        msg_p->req.op,
                                                        msg_p->enc_type);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "calc max response size %d\n",
+                       msg_p->max_resp_sz);
 
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "allocate BMI mem\n");
         msg_p->encoded_resp_p = BMI_memalloc(msg_p->svr_addr,
                                              msg_p->max_resp_sz,
                                              BMI_RECV);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "allocate BMI mem (%p)\n",
+                       msg_p->encoded_resp_p);
 
         if (msg_p->encoded_resp_p == NULL)
         {
@@ -528,12 +537,12 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         local_enc_and_alloc = 1;
     } /*  if (msg_p->encoded_resp_p == NULL)  */
 
+    /* store the session tag for this msgpair, so the msgpair completion */
+    /* function can pass it to the caller of msgpairarray.               */
     msg_p->session_tag = PINT_util_get_next_tag();
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpair session tag %d\n",
                    msg_p->session_tag);
 
-    /*store the session tag for this msgpair, so the msgpair completion */
-    /*function can pass it to the caller of msgpairarray.               */
     mop->params.recv_ct = 0;
     mop->params.send_ct = 0;
 

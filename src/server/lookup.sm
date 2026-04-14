@@ -492,21 +492,8 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(struct PINT_smcb *smcb,
              s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.array_index ];
     }
 
-    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
-                   "lookup: get dist-dir-attr for dir meta handle %s "
-                   "with tree_height=%d, dirdata_min=%d, dirdata_max=%d, "
-                   "dirdata_count=%d, sid_count=%d, bitmap_size=%d, "
-                   "split_size=%d, server_no=%d and branch_level=%d\n",
-                   PVFS_OID_str(&handle),
-                   attr->u.dir.dist_dir_attr.tree_height,
-                   attr->u.dir.dist_dir_attr.dirdata_min,
-                   attr->u.dir.dist_dir_attr.dirdata_max,
-                   attr->u.dir.dist_dir_attr.dirdata_count,
-                   attr->u.dir.dist_dir_attr.sid_count,
-                   attr->u.dir.dist_dir_attr.bitmap_size,
-                   attr->u.dir.dist_dir_attr.split_size,
-                   attr->u.dir.dist_dir_attr.server_no,
-                   attr->u.dir.dist_dir_attr.branch_level);
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Lookup dir attrs");
+    PVFS_debug_PVFS_dist_dir_attr(GOSSIP_LOOKUP_DEBUG, &attr->u.dir.dist_dir_attr);
 
     /* I don't think any of this is needed - except maybe on the first handle
      * The code below calls getattr to get the attributes, and it gets the
@@ -598,8 +585,9 @@ static PINT_sm_action lookup_get_dirdata_from_keyval(struct PINT_smcb *smcb,
                                      server_job_context,
                                      s_op->req->hints);
 
-    return ret;
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "kv_rd_list returns %d\n", ret);
 
+    return ret;
 
 error_out:
     if ( attr->u.dir.dist_dir_bitmap )

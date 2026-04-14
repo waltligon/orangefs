@@ -1311,11 +1311,11 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret;
     job_id_t tmp_id;
-    PVFS_object_attr *attr;
+    PVFS_object_attr *respattr;
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "frame (%p)\n", s_op);
 
-    attr = &s_op->resp.u.getattr.attr;
+    respattr = &s_op->resp.u.getattr.attr;
 
     /* DEBUG_attr_mask(attr->mask); makes a lot of output */
 
@@ -1326,11 +1326,10 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
      */
     if (js_p->error_code == -TROVE_ENOENT)
     {
-        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                       "no DIRECTORY dspace present!!\n");
-        attr->u.dir.dist_dir_bitmap = NULL;
-        attr->u.dir.dirdata_handles = NULL;
-        attr->parent = NULL;
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "no DIRECTORY dspace present!!\n");
+        respattr->u.dir.dist_dir_bitmap = NULL;
+        respattr->u.dir.dirdata_handles = NULL;
+        respattr->parent = NULL;
         return SM_ACTION_COMPLETE;
     }
 
@@ -1342,9 +1341,9 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
      * are best.
      * Validity of the inputs should go earlier in the path, no?
      */
-    assert(attr->u.dir.dist_dir_attr.dirdata_count > 0);
-    assert(attr->u.dir.dist_dir_attr.bitmap_size > 0);
-    assert(attr->meta_sid_count > 0);
+    assert(respattr->u.dir.dist_dir_attr.dirdata_count > 0);
+    assert(respattr->u.dir.dist_dir_attr.bitmap_size > 0);
+    assert(respattr->meta_sid_count > 0);
 
     /******************************
      * This starts to make sense
@@ -1357,20 +1356,20 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
      */
 
     /* allocate space for bitmap, dirdata OIDS and SIDS, parent OID and SIDS */
-    attr->u.dir.dist_dir_bitmap =
-                malloc(attr->u.dir.dist_dir_attr.bitmap_size *
+    respattr->u.dir.dist_dir_bitmap =
+                malloc(respattr->u.dir.dist_dir_attr.bitmap_size *
                              sizeof(PVFS_dist_dir_bitmap_basetype));
 
-    attr->u.dir.dirdata_handles =
-                (PVFS_OID *)malloc(OSASZ(attr->u.dir.dist_dir_attr.dirdata_count, 
-                                          attr->u.dir.dist_dir_attr.sid_count));
+    respattr->u.dir.dirdata_handles =
+                (PVFS_OID *)malloc(OSASZ(respattr->u.dir.dist_dir_attr.dirdata_count, 
+                                          respattr->u.dir.dist_dir_attr.sid_count));
     
-    attr->u.dir.dirdata_sids = (PVFS_SID *)(attr->u.dir.dirdata_handles +
-                               attr->u.dir.dist_dir_attr.dirdata_count);
+    respattr->u.dir.dirdata_sids = (PVFS_SID *)(respattr->u.dir.dirdata_handles +
+                               respattr->u.dir.dist_dir_attr.dirdata_count);
 
-    attr->parent = (PVFS_OID *)malloc(OSASZ(1, attr->meta_sid_count));
+    respattr->parent = (PVFS_OID *)malloc(OSASZ(1, respattr->meta_sid_count));
 
-    attr->parent_sids = (PVFS_SID *)(attr->parent + 1);
+    respattr->parent_sids = (PVFS_SID *)(respattr->parent + 1);
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                    "arrays allocated for attr(%p)\n"
@@ -1379,27 +1378,27 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
                    "\t\tdirdata_sids=(%p)\n"
                    "\t\tparent_sids=(%p)\n"
                    "\t\tparent=(%p)\n",
-                   attr,
-                   attr->u.dir.dist_dir_bitmap,
-                   attr->u.dir.dirdata_handles,
-                   attr->u.dir.dirdata_sids,
-                   attr->parent_sids,
-                   attr->parent);
+                   respattr,
+                   respattr->u.dir.dist_dir_bitmap,
+                   respattr->u.dir.dirdata_handles,
+                   respattr->u.dir.dirdata_sids,
+                   respattr->parent_sids,
+                   respattr->parent);
 
     /* check for malloc failure */
-    if(!attr->u.dir.dist_dir_bitmap || 
-       !attr->u.dir.dirdata_handles ||
-       !attr->parent)
+    if(!respattr->u.dir.dist_dir_bitmap || 
+       !respattr->u.dir.dirdata_handles ||
+       !respattr->parent)
     {
         gossip_err("Failed to allocate memory in getattr(dir)\n");
-        free(attr->u.dir.dist_dir_bitmap);
-        free(attr->u.dir.dirdata_handles);
-        free(attr->parent);
-        attr->u.dir.dist_dir_bitmap = NULL;
-        attr->u.dir.dirdata_handles = NULL;
-        attr->u.dir.dirdata_sids = NULL;
-        attr->parent = NULL;
-        attr->parent_sids = NULL;
+        free(respattr->u.dir.dist_dir_bitmap);
+        free(respattr->u.dir.dirdata_handles);
+        free(respattr->parent);
+        respattr->u.dir.dist_dir_bitmap = NULL;
+        respattr->u.dir.dirdata_handles = NULL;
+        respattr->u.dir.dirdata_sids = NULL;
+        respattr->parent = NULL;
+        respattr->parent_sids = NULL;
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -1432,9 +1431,9 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
     s_op->key_a[0].buffer    = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
 
-    s_op->val_a[0].buffer_sz = attr->u.dir.dist_dir_attr.bitmap_size *
+    s_op->val_a[0].buffer_sz = respattr->u.dir.dist_dir_attr.bitmap_size *
                                        sizeof(PVFS_dist_dir_bitmap_basetype);
-    s_op->val_a[0].buffer    = attr->u.dir.dist_dir_bitmap;
+    s_op->val_a[0].buffer    = respattr->u.dir.dist_dir_bitmap;
 
     keep_keyval_buffers(s_op, 0);
 
@@ -1444,9 +1443,9 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
     s_op->key_a[1].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].size;
     s_op->key_a[1].buffer    = Trove_Common_Keys[DIST_DIRDATA_HANDLES_KEY].key;
 
-    s_op->val_a[1].buffer_sz = OSASZ(attr->u.dir.dist_dir_attr.dirdata_count, 
-                                     attr->u.dir.dist_dir_attr.sid_count);
-    s_op->val_a[1].buffer    = attr->u.dir.dirdata_handles;
+    s_op->val_a[1].buffer_sz = OSASZ(respattr->u.dir.dist_dir_attr.dirdata_count, 
+                                     respattr->u.dir.dist_dir_attr.sid_count);
+    s_op->val_a[1].buffer    = respattr->u.dir.dirdata_handles;
 
     keep_keyval_buffers(s_op, 1);
 
@@ -1456,8 +1455,8 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
     s_op->key_a[2].buffer_sz = Trove_Common_Keys[OBJECT_PARENT_KEY].size;
     s_op->key_a[2].buffer    = Trove_Common_Keys[OBJECT_PARENT_KEY].key;
 
-    s_op->val_a[2].buffer_sz = OSASZ(1, attr->meta_sid_count);
-    s_op->val_a[2].buffer    = attr->parent;
+    s_op->val_a[2].buffer_sz = OSASZ(1, respattr->meta_sid_count);
+    s_op->val_a[2].buffer    = respattr->parent;
 
     keep_keyval_buffers(s_op, 2);
     /*----------------------------------------------------------------------------*/
@@ -1500,14 +1499,14 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret, i, j;
     job_id_t tmp_id;
-    PVFS_object_attr *attr_p;
+    PVFS_object_attr *respattr_p;
     PVFS_credential *cred GCC_UNUSED;
     unsigned char *c GCC_UNUSED;
 
-    attr_p = &s_op->resp.u.getattr.attr;
+    respattr_p = &s_op->resp.u.getattr.attr;
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                 "frame: (%p), attr_p: (%p)\n", s_op, attr_p);
+                 "frame: (%p), respattr_p: (%p)\n", s_op, respattr_p);
     /*
      * Check for return of last database (keyval) read
      * and debugging of results
@@ -1530,7 +1529,7 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    PVFS_debug_PVFS_attr(GOSSIP_GETATTR_DEBUG, attr_p);
+    PVFS_debug_PVFS_attr(GOSSIP_GETATTR_DEBUG, respattr_p);
 
 #if 0
     /* gossip parent */
@@ -1541,18 +1540,18 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
                  "\t\tparent: %s\n"
                  "\t\tdirdata_count %d\n",
                  PVFS_OID_str(&s_op->target_handle),
-                 attr_p->u.dir.dirdata_handles,
-                 attr_p->u.dir.dist_dir_bitmap,
-                 PVFS_OID_str(attr_p->parent),
-                 attr_p->u.dir.dist_dir_attr.dirdata_count);
+                 respattr_p->u.dir.dirdata_handles,
+                 respattr_p->u.dir.dist_dir_bitmap,
+                 PVFS_OID_str(respattr_p->parent),
+                 respattr_p->u.dir.dist_dir_attr.dirdata_count);
 
     /* gossip dir bitmap */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                  "dist_dir_bitmap: \n");
 
-    for(i = attr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
+    for(i = respattr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
     {
-        c = (unsigned char *)(attr_p->u.dir.dist_dir_bitmap + i);
+        c = (unsigned char *)(respattr_p->u.dir.dist_dir_bitmap + i);
         gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                      "i=%d : %02x %02x %02x %02x\n",
                      i, c[3], c[2], c[1], c[0]);
@@ -1560,12 +1559,12 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
 
     /* gossip dirdata handles */
 
-    for(i = 0; i < attr_p->u.dir.dist_dir_attr.dirdata_count; i++)
+    for(i = 0; i < respattr_p->u.dir.dist_dir_attr.dirdata_count; i++)
     {
         gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                        "dirdata server %d: (%s %s)\n",
-                       i, PVFS_OID_str(&attr_p->u.dir.dirdata_handles[i]),
-                       PVFS_SID_str(&attr_p->u.dir.dirdata_sids[i]));
+                       i, PVFS_OID_str(&respattr_p->u.dir.dirdata_handles[i]),
+                       PVFS_SID_str(&respattr_p->u.dir.dirdata_sids[i]));
     }
 #endif
 
@@ -1599,42 +1598,42 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "mallocing space\n");
 
     /* malloc space for distribution parameters */
-    attr_p->u.dir.hint.dist_params = 
-            (char *)malloc(attr_p->u.dir.hint.dist_params_len);
+    respattr_p->u.dir.hint.dist_params = 
+            (char *)malloc(respattr_p->u.dir.hint.dist_params_len);
 
-    if (attr_p->u.dir.hint.dist_params == NULL &&
-        attr_p->u.dir.hint.dist_params_len > 0)
+    if (respattr_p->u.dir.hint.dist_params == NULL &&
+        respattr_p->u.dir.hint.dist_params_len > 0)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
     /* malloc space for distribution name */
-    attr_p->u.dir.hint.dist_name = 
-            (char *)malloc(attr_p->u.dir.hint.dist_name_len);
+    respattr_p->u.dir.hint.dist_name = 
+            (char *)malloc(respattr_p->u.dir.hint.dist_name_len);
 
-    if (attr_p->u.dir.hint.dist_name == NULL &&
-        attr_p->u.dir.hint.dist_name_len > 0)
+    if (respattr_p->u.dir.hint.dist_name == NULL &&
+        respattr_p->u.dir.hint.dist_name_len > 0)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
     /* malloc space for layout server list */
-    attr_p->u.dir.hint.layout.server_list.servers =
-        (char *)malloc(attr_p->u.dir.hint.layout.server_list.bufsize);
-    if (attr_p->u.dir.hint.layout.server_list.servers == NULL &&
-        attr_p->u.dir.hint.layout.server_list.bufsize > 0)
+    respattr_p->u.dir.hint.layout.server_list.servers =
+        (char *)malloc(respattr_p->u.dir.hint.layout.server_list.bufsize);
+    if (respattr_p->u.dir.hint.layout.server_list.servers == NULL &&
+        respattr_p->u.dir.hint.layout.server_list.bufsize > 0)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
     /* malloc space for dir layout server list */
-    attr_p->u.dir.hint.dir_layout.server_list.servers =
-        (char *)malloc(attr_p->u.dir.hint.dir_layout.server_list.bufsize);
-    if (attr_p->u.dir.hint.dir_layout.server_list.servers == NULL &&
-        attr_p->u.dir.hint.dir_layout.server_list.bufsize > 0)
+    respattr_p->u.dir.hint.dir_layout.server_list.servers =
+        (char *)malloc(respattr_p->u.dir.hint.dir_layout.server_list.bufsize);
+    if (respattr_p->u.dir.hint.dir_layout.server_list.servers == NULL &&
+        respattr_p->u.dir.hint.dir_layout.server_list.bufsize > 0)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
@@ -1692,49 +1691,49 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
          */
         if (i == DIST_PARAMS_KEY)
         {
-            if (attr_p->u.dir.hint.dist_params_len == 0)
+            if (respattr_p->u.dir.hint.dist_params_len == 0)
             {
                 continue;
             }
-            s_op->val_a[j].buffer = attr_p->u.dir.hint.dist_params;
-            s_op->val_a[j].buffer_sz = attr_p->u.dir.hint.dist_params_len;            
+            s_op->val_a[j].buffer = respattr_p->u.dir.hint.dist_params;
+            s_op->val_a[j].buffer_sz = respattr_p->u.dir.hint.dist_params_len;            
             KEEP_BUFFER(j);
             j++;
         }
         else if (i == DIST_NAME_KEY)
         {
-            if (attr_p->u.dir.hint.dist_name_len == 0)
+            if (respattr_p->u.dir.hint.dist_name_len == 0)
             {
                 continue;
             }
-            s_op->val_a[j].buffer = attr_p->u.dir.hint.dist_name;
-            s_op->val_a[j].buffer_sz = attr_p->u.dir.hint.dist_name_len;
+            s_op->val_a[j].buffer = respattr_p->u.dir.hint.dist_name;
+            s_op->val_a[j].buffer_sz = respattr_p->u.dir.hint.dist_name_len;
             KEEP_BUFFER(j);
             j++;
         }
         else if (i == SERVER_LIST_KEY)
         {
-            if (attr_p->u.dir.hint.layout.server_list.bufsize == 0)
+            if (respattr_p->u.dir.hint.layout.server_list.bufsize == 0)
             {
                 continue;
             }
             s_op->val_a[j].buffer =
-                     attr_p->u.dir.hint.layout.server_list.servers;
+                     respattr_p->u.dir.hint.layout.server_list.servers;
             s_op->val_a[j].buffer_sz =
-                     attr_p->u.dir.hint.layout.server_list.bufsize;
+                     respattr_p->u.dir.hint.layout.server_list.bufsize;
             KEEP_BUFFER(j);
             j++;
         }
         else if (i == DIR_SERVER_LIST_KEY)
         {
-            if (attr_p->u.dir.hint.dir_layout.server_list.bufsize == 0)
+            if (respattr_p->u.dir.hint.dir_layout.server_list.bufsize == 0)
             {
                 continue;
             }
             s_op->val_a[j].buffer =
-                    attr_p->u.dir.hint.dir_layout.server_list.servers;
+                    respattr_p->u.dir.hint.dir_layout.server_list.servers;
             s_op->val_a[j].buffer_sz =
-                    attr_p->u.dir.hint.dir_layout.server_list.bufsize;
+                    respattr_p->u.dir.hint.dir_layout.server_list.bufsize;
             KEEP_BUFFER(j);
             j++;
         }
@@ -1747,14 +1746,14 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
          * free memory allocated
          */
 
-        free(attr_p->u.dir.hint.dist_params);
-        attr_p->u.dir.hint.dist_params = NULL;
-        free(attr_p->u.dir.hint.dist_name);
-        attr_p->u.dir.hint.dist_name = NULL;
-        free(attr_p->u.dir.hint.layout.server_list.servers);
-        attr_p->u.dir.hint.layout.server_list.servers = NULL;
-        free(attr_p->u.dir.hint.dir_layout.server_list.servers);
-        attr_p->u.dir.hint.dir_layout.server_list.servers = NULL;
+        free(respattr_p->u.dir.hint.dist_params);
+        respattr_p->u.dir.hint.dist_params = NULL;
+        free(respattr_p->u.dir.hint.dist_name);
+        respattr_p->u.dir.hint.dist_name = NULL;
+        free(respattr_p->u.dir.hint.layout.server_list.servers);
+        respattr_p->u.dir.hint.layout.server_list.servers = NULL;
+        free(respattr_p->u.dir.hint.dir_layout.server_list.servers);
+        respattr_p->u.dir.hint.dir_layout.server_list.servers = NULL;
         //free(s_op->key_a);
         //s_op->key_a = NULL;
         //free(s_op->val_a);
@@ -1800,7 +1799,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                                                  job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PVFS_object_attr *attr_p = NULL;
+    PVFS_object_attr *respattr_p = NULL;
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "frame (%p)\n", s_op);
 
@@ -1830,7 +1829,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
      * should not redo the sizes.  This will ultimagely eliminte most of this code.
      */
 
-    attr_p = &s_op->resp.u.getattr.attr;
+    respattr_p = &s_op->resp.u.getattr.attr;
 
     if (s_op->val_a && s_op->key_a)
     {
@@ -1844,12 +1843,12 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                 s_op->val_a[DIST_NAME_KEY].read_sz,
                 (char *)s_op->val_a[DIST_NAME_KEY].buffer);
 
-            attr_p->u.dir.hint.dist_name_len = 
+            respattr_p->u.dir.hint.dist_name_len = 
                             s_op->val_a[DIST_NAME_KEY].read_sz;
         }
         else
         {
-            attr_p->u.dir.hint.dist_name_len = 0;
+            respattr_p->u.dir.hint.dist_name_len = 0;
         }            
 
         if (s_op->error_a[DIST_PARAMS_KEY] == 0  &&
@@ -1861,12 +1860,12 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                 s_op->val_a[DIST_PARAMS_KEY].read_sz,
                 (char *)s_op->val_a[DIST_PARAMS_KEY].buffer);
 
-            attr_p->u.dir.hint.dist_params_len = 
+            respattr_p->u.dir.hint.dist_params_len = 
                             s_op->val_a[DIST_PARAMS_KEY].read_sz;
         }
         else
         {
-            attr_p->u.dir.hint.dist_params_len = 0;
+            respattr_p->u.dir.hint.dist_params_len = 0;
         }
 
 #if 0
@@ -1928,7 +1927,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
         {
             /* no error, so set the count from the list */
             /* list should be in the buffer of the k/v read */
-            attr_p->u.dir.hint.layout.server_list.count = 
+            respattr_p->u.dir.hint.layout.server_list.count = 
                     strtol(s_op->val_a[SERVER_LIST_KEY].buffer,
                     NULL,
                     10);
@@ -1936,16 +1935,16 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
              * should this be s_op->val_a[SERVER_LIST_KEY].read_sz ? 
              * instead of strlen(buffer) and if not, should it be
              * strlen + 1 ? */
-            attr_p->u.dir.hint.layout.server_list.bufsize = 
+            respattr_p->u.dir.hint.layout.server_list.bufsize = 
                     strlen(s_op->val_a[SERVER_LIST_KEY].buffer) + 1;
             /* force the dfile_count */
-            attr_p->u.dir.hint.dfile_count = 
-                  attr_p->u.dir.hint.layout.server_list.count;
+            respattr_p->u.dir.hint.dfile_count = 
+                  respattr_p->u.dir.hint.layout.server_list.count;
         }
         else
         {
-            attr_p->u.dir.hint.layout.server_list.count = 0;
-            attr_p->u.dir.hint.layout.server_list.bufsize = 0;
+            respattr_p->u.dir.hint.layout.server_list.count = 0;
+            respattr_p->u.dir.hint.layout.server_list.bufsize = 0;
         }            
 
         if ((s_op->error_a[DIR_SERVER_LIST_KEY] == 0) &&
@@ -1953,7 +1952,7 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
         {
             /* no error, so set the count from the list */
             /* list should be in the buffer of the k/v read */
-            attr_p->u.dir.hint.dir_layout.server_list.count = 
+            respattr_p->u.dir.hint.dir_layout.server_list.count = 
                     strtol(s_op->val_a[DIR_SERVER_LIST_KEY].buffer,
                     NULL,
                     10);
@@ -1964,13 +1963,13 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
             s_op->resp.u.getattr.attr.u.dir.hint.dir_layout.server_list.bufsize = 
                     strlen(s_op->val_a[DIR_SERVER_LIST_KEY].buffer) + 1;
             /* force the dfile_count */
-            attr_p->u.dir.hint.dfile_count = 
-                  attr_p->u.dir.hint.dir_layout.server_list.count;
+            respattr_p->u.dir.hint.dfile_count = 
+                  respattr_p->u.dir.hint.dir_layout.server_list.count;
         }
         else
         {
-            attr_p->u.dir.hint.dir_layout.server_list.count = 0;
-            attr_p->u.dir.hint.dir_layout.server_list.bufsize = 0;
+            respattr_p->u.dir.hint.dir_layout.server_list.count = 0;
+            respattr_p->u.dir.hint.dir_layout.server_list.bufsize = 0;
         }            
 
         /* s_op->free_val = 1; free everything that is not KEEP_BUF */
@@ -1999,26 +1998,26 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
          */
         gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                        "dirent_count not needed\n");
-        assert(attr_p->mask & PVFS_ATTR_COMMON_ALL);
+        assert(respattr_p->mask & PVFS_ATTR_COMMON_ALL);
     }
     else
     {
         gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                        "dirent_count needed.\n");
-        attr_p->mask |= PVFS_ATTR_LATEST;
-        attr_p->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+        respattr_p->mask |= PVFS_ATTR_LATEST;
+        respattr_p->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
         js_p->error_code = STATE_DIRENT_CNT;
     }
 /*--------------*/
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                 "frame s_op: (%p), attr_p: (%p), "
+                 "frame s_op: (%p), respattr_p: (%p), "
                  "dirdata_handles (%p), "
                  "dist_dir_bitmap (%p), "
                  "parent %s\n",
-                 s_op, attr_p,
-                 attr_p->u.dir.dirdata_handles,
-                 attr_p->u.dir.dist_dir_bitmap,
-                 PVFS_OID_str(attr_p->parent));
+                 s_op, respattr_p,
+                 respattr_p->u.dir.dirdata_handles,
+                 respattr_p->u.dir.dist_dir_bitmap,
+                 PVFS_OID_str(respattr_p->parent));
 
     //PINT_server_req_get_credential(s_op->req, &cred);
     //PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
@@ -2729,6 +2728,8 @@ static PINT_sm_action getattr_with_prelude_init(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {
     PINT_perf_count(PINT_server_pc, PINT_PERF_GETATTR, 1, PINT_PERF_ADD);
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Getattr Prelude Init\n");
 
     js_p->error_code = 0;    
     return SM_ACTION_COMPLETE;
