@@ -1076,6 +1076,8 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
                                                       job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_object_attr *respattr;
+    respattr = &(s_op->resp.u.getattr.attr);
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p)\n", s_op);
 
@@ -1099,6 +1101,10 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
             js_p->error_code = -PVFS_EIO;
             return SM_ACTION_COMPLETE;
         }
+        /* valid data */
+        s_op->attr.u.meta.dfile_array = respattr->u.meta.dfile_array;
+        s_op->attr.u.meta.sid_array = (PVFS_SID *)s_op->attr.u.meta.dfile_array +
+                                                  respattr->u.meta.dfile_count;
     }
 
     //PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
@@ -1147,6 +1153,11 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         memset(s_op->resp.u.getattr.attr.u.meta.dist, 0, s_op->val_a[1].buffer_sz);
         //PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
     }
+
+    if (s_op->u.getattr.attrmask & PVFS_ATTR_COMMON_PARENT)
+    {
+        s_op->attr.parent = respattr->parent;
+    }
     //respattr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
     if (s_op->u.getattr.attrmask & PVFS_ATTR_FASTEST)
     {
@@ -1179,18 +1190,29 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
     PVFS_object_attr *attr_p = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
+    
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p) Request\n", s_op);
+    PVFS_debug_servreq_getattr(GOSSIP_GETATTR_DEBUG, s_op->req);
+
 #if 0
     int i = 0;
     PVFS_handle *handles;
 #endif
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "(%p) %s\n", s_op, __func__);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p)\n", s_op);
 
     PVFS_capability capability;
 
     js_p->error_code = 0;
 
-    attr_p = &s_op->attr;
+    attr_p = &s_op->attr; /* should point to parent attr */
     assert(attr_p);
+
+    //gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "attr_p\n");
+    //PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, attr_p);
+
+    //gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "getattr_p\n");
+    //PVFS_debug_getattr_op_s(GOSSIP_SERVER_DEBUG, s_op);
+
    /* Note: permission not required for tree_get_file_size op */
     PINT_null_capability(&capability);
 
@@ -1201,9 +1223,10 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
     getattr_p->size_array =
             malloc(attr_p->u.meta.dfile_count * sizeof(PVFS_size));
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG,
-                 "%s: getattr->size_array = %p\n",
-                 __func__, (void *) getattr_p->size_array);
+    gossip_lsdebug(GOSSIP_COMMON_DEBUG, "getattr->size_array (%p)\n",
+                   (void *) getattr_p->size_array);
+
+    //PINT_debug_capability(&(capability), "get file size cap");
 
     PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(msg_p->req,
                                          capability,
@@ -1217,15 +1240,19 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
                                          0,
                                          s_op->req->hints);
 
+    gossip_lsdebug(GOSSIP_COMMON_DEBUG, "Done with FILL macro\n");
+
     PINT_cleanup_capability(&capability);
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = s_op->u.getattr.fs_id;
-    msg_p->handle = attr_p->u.meta.dfile_array[0];
+    memcpy(&msg_p->handle, attr_p->u.meta.dfile_array, sizeof(msg_p->handle));;
     msg_p->sid_count = attr_p->u.meta.sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = attr_p->u.meta.sid_array;
     msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
+
+    gossip_lsdebug(GOSSIP_COMMON_DEBUG, "Done with msg_p\n");
 
     ret = PVFS_SID_get_addr(&msg_p->svr_addr, &msg_p->sid_array[0]);
     if (ret)
@@ -1238,11 +1265,13 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_lsdebug(GOSSIP_COMMON_DEBUG, "Done with address\n");
+
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     /* frame is pushed in call_msgpairarray in src/server/pjmp-machines */
     /* PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP); */
 
-   return SM_ACTION_COMPLETE;
+    return SM_ACTION_COMPLETE;
 }
 
 #if 0

@@ -488,6 +488,8 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
         gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "&msg_p->req (%p) &msg_p->encoded_req (%p) msg_p->svr_addr %ld msg_p->enc_type %d\n",
                        &(msg_p->req), &(msg_p->encoded_req), msg_p->svr_addr, msg_p->enc_type);
 
+        //PVFS_debug_servreq_tree_get_file_size(GOSSIP_MSGPAIR_DEBUG, &(msg_p->req));
+
         ret = PINT_encode(&msg_p->req,
                           PINT_ENCODE_REQ,
                           &msg_p->encoded_req,

@@ -183,10 +183,25 @@ do {                                                              \
         PVFS_debug_afield((_ds_attr)->ntime, PVFS_time);          \
         PVFS_debug_afield((_ds_attr)->meta_sid_count, uint32_t);  \
         gossip_lsadebug("DS_ATTR End:\n");                        \
+        switch ((_ds_attr)->type)                                 \
+        {                                                         \
+        case PVFS_TYPE_METAFILE:                                  \
+            break;                                                \
+        case PVFS_TYPE_DIRECTORY:                                 \
+            PVFS_debug_PVFS_ds_dir_attr(_mask, _ds_attr);         \
+            break;                                                \
+        case PVFS_TYPE_DIRDATA:                                   \
+            break;                                                \
+        case PVFS_TYPE_SYMLINK:                                   \
+        case PVFS_TYPE_DATAFILE:                                  \
+        case PVFS_TYPE_NONE:                                      \
+        case PVFS_TYPE_INTERNAL:                                  \
+        default:                                                  \
+            break;                                                \
+        }                                                         \
     }                                                             \
     gossip_end;                                                   \
 } while (0)
-
 
 #define PVFS_ds_init_time(__dsa)                        \
 do {                                                    \

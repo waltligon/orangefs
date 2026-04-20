@@ -988,7 +988,7 @@ endecode_fields_3a1a_struct(
 #define PVFS_debug_servreq_tree_get_file_size(mask, req)    \
 do {                                                        \
     struct PVFS_servreq_tree_get_file_size *treq =          \
-                                  &((req)->u.tree_get_file_size);\
+                             &((req)->u.tree_get_file_size);\
     gossip_if (mask)                                        \
     {                                                       \
         gossip_lsadebug("Tree Get File Size Request:\n");   \
@@ -996,11 +996,11 @@ do {                                                        \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
         PVFS_debug_afield(treq->retry_msgpair_at_leaf, uint32_t);\
-        PVFS_debug_afield(treq->credential, PVFS_credential);\
         PVFS_debug_afield(treq->num_data_files, uint32_t);  \
-        PVFS_debug_afield(treq->handle_array, PVFS_handle);\
+        PVFS_debug_afield(treq->handle_array, PVFS_handle); \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
-        PVFS_debug_afield(treq->sid_array, &sid_array);     \
+        PVFS_debug_afield(treq->sid_array, PVFS_SID);       \
+        PVFS_debug_afield(&(treq->credential), PVFS_credential);\
         gossip_lsadebug("Tree Get File Size End:\n");       \
     }                                                       \
     gossip_end;                                             \
@@ -2104,12 +2104,12 @@ do {                                                        \
     gossip_if (_mask)                                       \
     {                                                       \
         gossip_lsadebug("Crdirent Request: " #_req " = (%p)\n", (_req)); \
-        PVFS_debug_PVFS_credential((_mask), &((treq)->credential));\
         PVFS_debug_afield(treq->name, string);              \
         PVFS_debug_afield(&treq->new_ref, PVFS_object_ref); \
         PVFS_debug_afield(&treq->parent_ref, PVFS_object_ref);\
         PVFS_debug_afield(treq->dd_server_index, int32_t);  \
         PVFS_debug_afield(treq->dd_sid_index, int32_t);     \
+        PVFS_debug_PVFS_credential((_mask), &((treq)->credential));\
         PVFS_debug_PVFS_attr(_mask, &treq->parent_attr);    \
         gossip_lsadebug("Crdirent End:\n");                 \
     }                                                       \

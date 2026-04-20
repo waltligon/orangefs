@@ -153,6 +153,7 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
     dest->signature = NULL;
     dest->handle_array = NULL;
     
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "copying issuer\n");
     if (src->issuer)
     {
         dest->issuer = strdup(src->issuer);
@@ -162,6 +163,7 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
         }
     }
 
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "copying signature\n");
     if (src->sig_size)
     {
         dest->signature = malloc(src->sig_size);
@@ -173,6 +175,7 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
         memcpy(dest->signature, src->signature, src->sig_size);
     }
 
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "copying handles\n");
     if (src->num_handles)
     {
         dest->handle_array = calloc(src->num_handles, sizeof(PVFS_handle));
@@ -186,7 +189,7 @@ int PINT_copy_capability(const PVFS_capability *src, PVFS_capability *dest)
                src->handle_array,
                src->num_handles * sizeof(PVFS_handle));
     }
-
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "End of copy\n");
     return 0;
 }
 
@@ -201,45 +204,49 @@ void PINT_debug_capability(const PVFS_capability *cap, const char *prefix)
     char mask_buf[16] GCC_UNUSED;
     int i;
 
-    if (!cap)
+    gossip_if(GOSSIP_SECURITY_DEBUG)
     {
-        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "capability pointer is NULL\n");
-        return;
-    }
-
-    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "%s capability:\n", prefix);
-    if (!cap->issuer)
-    {
-        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "capability issuer is NULL\n");
-    }
-    else
-    {
-        if (strlen(cap->issuer) == 0)
+        if (!cap)
         {
-            gossip_ldebug(GOSSIP_SECURITY_DEBUG, "%s null capability\n", prefix);
+            gossip_ladebug("capability pointer is NULL\n");
+            return;
+        }
+    
+        gossip_ladebug("%s capability:\n", prefix);
+        if (!cap->issuer)
+        {
+            gossip_ladebug("capability issuer is NULL\n");
         }
         else
         {
-            gossip_ldebug(GOSSIP_SECURITY_DEBUG, "\tissuer: %s\n", cap->issuer);
+            if (strlen(cap->issuer) == 0)
+            {
+                gossip_ladebug("%s null capability\n", prefix);
+            }
+            else
+            {
+                gossip_ladebug("\tissuer: %s\n", cap->issuer);
+            }
+        }
+        gossip_ladebug("fsid: %u\n", cap->fsid);
+        gossip_ladebug("sig_size: %u\n", cap->sig_size);
+        gossip_ladebug("signature: %s\n",
+                       PINT_util_bytes2str(cap->signature, sig_buf, 4));
+        gossip_ladebug("timeout: %d\n",
+                       (int) cap->timeout);
+        gossip_ladebug("op_mask: %s\n",
+                       PINT_print_op_mask(cap->op_mask, mask_buf));
+        gossip_ladebug("num_handles: %u\n", 
+                       cap->num_handles);
+        gossip_ladebug("first handle: %s\n",
+                       cap->num_handles > 0 ? PVFS_OID_str(&cap->handle_array[0]) : 0LL);
+        for (i = 1; i < cap->num_handles; i++)
+        {
+            gossip_ladebug("handle %d: %s\n",
+                           i+1, PVFS_OID_str(&cap->handle_array[i]));
         }
     }
-    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "fsid: %u\n", cap->fsid);
-    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "sig_size: %u\n", cap->sig_size);
-    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "signature: %s\n",
-             PINT_util_bytes2str(cap->signature, sig_buf, 4));
-    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "timeout: %d\n",
-             (int) cap->timeout);
-    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "op_mask: %s\n",
-             PINT_print_op_mask(cap->op_mask, mask_buf));
-    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "num_handles: %u\n", 
-             cap->num_handles);
-    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "first handle: %s\n",
-             cap->num_handles > 0 ? PVFS_OID_str(&cap->handle_array[0]) : 0LL);
-    for (i = 1; i < cap->num_handles; i++)
-    {
-        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "handle %d: %s\n",
-                     i+1, PVFS_OID_str(&cap->handle_array[i]));
-    }
+    gossip_end;
 }
 
 /* PINT_cleanup_capability
@@ -406,43 +413,46 @@ void PINT_debug_credential(const PVFS_credential *cred,
 #endif
     assert(cred);
 
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "%s:\n", prefix);
-
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tissuer: %s\n", cred->issuer);
-#ifdef ENABLE_SECURITY_CERT
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tuserid (mapped): %u\n", uid);
-#else
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tuserid: %u\n", cred->userid);
-#endif
-
-    /* output groups */
-    for (i = 0, group_buf[0] = '\0', buf_left = 512; i < local_num_groups; i++)
+    gossip_if(GOSSIP_SECURITY_DEBUG)
     {
-        count = sprintf(temp_buf, "%u ", local_group_array[i]);
-        if (count > buf_left)
-        {
-            break;
-        }
-        strcat(group_buf, temp_buf);
-        buf_left -= count;
-    }
+        gossip_ladebug("%s:\n", prefix);
+
+        gossip_ladebug("\tissuer: %s\n", cred->issuer);
 #ifdef ENABLE_SECURITY_CERT
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tgroups (mapped): %s\n", group_buf);
+        gossip_ladebug("\tuserid (mapped): %u\n", uid);
 #else
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tgroups: %s\n", group_buf);
-#endif
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsig_size: %u\n", cred->sig_size);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tsignature: %s\n",
-                 PINT_util_bytes2str(cred->signature, temp_buf, 4));
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\ttimeout: %d\n", 
-                 (int) cred->timeout);
-#ifdef ENABLE_SECURITY_CERT
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tcertificate.buf_size: %u\n",
-                 cred->certificate.buf_size);
-    gossip_debug(GOSSIP_SECURITY_DEBUG, "\tcertificate.buf: %s\n",
-                 PINT_util_bytes2str(cred->certificate.buf, temp_buf, 4));
+        gossip_ladebug("\tuserid: %u\n", cred->userid);
 #endif
 
+        /* output groups */
+        for (i = 0, group_buf[0] = '\0', buf_left = 512; i < local_num_groups; i++)
+        {
+            count = sprintf(temp_buf, "%u ", local_group_array[i]);
+            if (count > buf_left)
+            {
+                break;
+            }
+            strcat(group_buf, temp_buf);
+            buf_left -= count;
+        }
+#ifdef ENABLE_SECURITY_CERT
+        gossip_ladebug("\tgroups (mapped): %s\n", group_buf);
+#else
+        gossip_ladebug("\tgroups: %s\n", group_buf);
+#endif
+        gossip_ladebug("\tsig_size: %u\n", cred->sig_size);
+        gossip_ladebug("\tsignature: %s\n",
+                       PINT_util_bytes2str(cred->signature, temp_buf, 4));
+        gossip_ladebug("\ttimeout: %d\n", 
+                       (int) cred->timeout);
+#ifdef ENABLE_SECURITY_CERT
+        gossip_ladebug("\tcertificate.buf_size: %u\n",
+                       cred->certificate.buf_size);
+        gossip_ladebug("\tcertificate.buf: %s\n",
+                       PINT_util_bytes2str(cred->certificate.buf, temp_buf, 4));
+#endif
+    }
+    gossip_end;
 }
 
 /* PINT_cleanup_credential

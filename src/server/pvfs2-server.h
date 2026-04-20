@@ -1051,6 +1051,27 @@ struct PINT_server_getattr_op
     int size;
 };
 
+#define PVFS_debug_getattr_op_s(_mask, _s_op)                         \
+do {                                                                  \
+    struct PINT_server_getattr_op *ts_op =                            \
+                                  &((_s_op)->u.getattr);              \
+    gossip_if (_mask)                                                 \
+    {                                                                 \
+        gossip_lsadebug("Server Getattr Op:\n");                      \
+        gossip_lsadebug("s_op = (%p)\n", (_s_op));                    \
+        PVFS_debug_afield(ts_op->fs_id, PVFS_fs_id);                  \
+        PVFS_debug_afield(&(ts_op->handle), PVFS_handle);             \
+        PVFS_debug_afield(ts_op->num_dfiles_req, int);                \
+        PVFS_debug_afield(ts_op->dirent_array, pointer);              \
+        PVFS_debug_afield(ts_op->size_array, pointer);                \
+        PVFS_debug_afield(ts_op->size, int);                          \
+        PVFS_debug_afield(&ts_op->credential, PVFS_credential);       \
+        PVFS_debug_PVFS_ds_attr(_mask, &(ts_op->dirdata_ds_attr));    \
+        gossip_lsadebug("Server Getattr Op End:\n");                  \
+    }                                                                 \
+    gossip_end;                                                       \
+} while (0)
+
 struct PINT_server_listattr_op
 {
     PVFS_object_attr *attr_a;

@@ -457,7 +457,7 @@ do { \
 
 #define PVFS_to_string_PVFS_OID(_oid, _string, _print) \
 do {                                     \
-    if (_oid == NULL)                    \
+    if (!_oid)                           \
     {                                    \
         sprintf(_string, "(nil)");       \
     }                                    \

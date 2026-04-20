@@ -1561,17 +1561,17 @@ static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb,
                                                job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PVFS_server_req *req = s_op->req;
     struct PVFS_server_resp *resp = &s_op->resp;
     PINT_sm_msgpair_state *msg_p = NULL;
+    msg_p = &s_op->msgarray_op.msgpair;
+    struct PVFS_server_req *req = &msg_p->req;
 
     /* the request was built in msg_p->req */
-    msg_p = &s_op->msgarray_op.msgpair;
+    /* There is no resp in msg_p so this would go in the s_op */
 
     assert(msg_p->req.op == PVFS_SERV_TREE_GET_FILE_SIZE);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s:req->retry_msgpair_at_leaf:%s\n",
-           __func__,
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"req->retry_msgpair_at_leaf:%s\n",
            (req->u.tree_get_file_size.retry_msgpair_at_leaf ? "YES" : "NO"));
 
     /* AGAIN, cannot do this - switch from one op to another */
@@ -1580,11 +1580,11 @@ static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb,
             req->u.tree_get_file_size.caller_handle_index;
     resp->u.tree_get_file_size.handle_count =
             req->u.tree_get_file_size.num_data_files;
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "%s: frame:%p \ttree.caller_handle_index:%u\n"
-                 "\t\ttree.handle_count:%d \ttree.op:%d\n", __func__,
-                 s_op, resp->u.tree_get_file_size.caller_handle_index,
-                 resp->u.tree_get_file_size.handle_count, resp->op);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                   "frame:%p tree.caller_handle_index %u "
+                   "tree.handle_count %d tree.op %d\n",
+                   s_op, resp->u.tree_get_file_size.caller_handle_index,
+                   resp->u.tree_get_file_size.handle_count, resp->op);
 
     /* allocate response arrays */
     resp->u.tree_get_file_size.error = (PVFS_error *)
@@ -1685,22 +1685,21 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
 {
     /* get frame from bottom of stack */
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PVFS_servresp_tree_get_file_size *s_tree =
-                                  &(s_op->resp.u.tree_get_file_size);
     int i, j, k, task_id, error_code;
     uint32_t size_array_index = 0, error_array_index = 0;
     PINT_server_op *old_frame;
     struct PVFS_servreq_tree_get_file_size *tree_req = NULL;
     PINT_sm_msgpair_state *tree_msgarray = NULL;
     PINT_sm_msgarray_op *tree_msgop = NULL;
+    struct PVFS_servresp_tree_get_file_size *s_tree =
+                                  &(s_op->resp.u.tree_get_file_size);
     struct PINT_server_tree_communicate_op *s_tree_comm =
                                   &(s_op->u.tree_communicate); 
 
 
-    assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);
-    gossip_ldebug(GOSSIP_SERVER_DEBUG,
-                 "num_pjmp_frames = %d\n"
-                 ,s_op->u.tree_communicate.num_pjmp_frames);
+    /*assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);*/
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "num_pjmp_frames = %d\n",
+                   s_op->u.tree_communicate.num_pjmp_frames);
 
     /* for each state machine spawned, pop a frame */
     for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
@@ -1715,16 +1714,10 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
            tree_msgop = &(old_frame->msgarray_op);
         }
 
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: Value of task_id is %d\n"
-                                        ,__func__,task_id);
-        gossip_debug(GOSSIP_SERVER_DEBUG
-                    ,"%s: Value of handle_count is %d\n"
-                    ,__func__
-                    ,old_frame->resp.u.tree_get_file_size.handle_count);
-        gossip_debug(GOSSIP_SERVER_DEBUG
-                     ,"%s: Value of error_code is %d\n"
-                     ,__func__
-                     ,error_code);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,"Value of task_id is %d\n", task_id);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,"Value of handle_count is %d\n",
+                              old_frame->resp.u.tree_get_file_size.handle_count);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Value of error_code is %d\n", error_code);
 
         if (task_id == PJMP_REMOTE) 
         {
@@ -1733,10 +1726,9 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                 /*sub-tree request failed; all handles identified in each msgpair 
                  *must be retried.  response structure is invalid; use request.
                  */
-                gossip_debug(GOSSIP_SERVER_DEBUG
-                            ,"%s: REMOTE OPERATION encountered error:%d\n"
-                            ,__func__
-                            ,error_code);
+                gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                               "REMOTE OPERATION encountered error:%d\n",
+                               error_code);
                 for (j = 0; j < tree_msgop->count; j++)
                 {
                     tree_req = &(tree_msgarray[j].req.u.tree_get_file_size);
@@ -1749,11 +1741,8 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
                         s_op->resp.u.tree_get_file_size.size[index]  = 0;
                         s_op->resp.u.tree_get_file_size.error[index] = error_code;
 
-                        gossip_err("%s:index:%d \terror[%d]:%d\n"
-                                  ,__func__
-                                  ,index
-                                  ,index
-                                 ,s_op->resp.u.tree_get_file_size.error[index]);
+                        gossip_lerr("index:%d \terror[%d]:%d\n", index, index,
+                                    s_op->resp.u.tree_get_file_size.error[index]);
 
                     }/*end for*/
                 }/*end for*/
@@ -1764,14 +1753,12 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
         else
         {
             /* LOCAL OPERATION */
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "%s: size of local datafile is %lld\n"
-                         ,__func__
-                         ,lld(old_frame->resp.u.getattr.attr.u.data.size));
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                           "size of local datafile is %lld\n",
+                           lld(old_frame->resp.u.getattr.attr.u.data.size));
 
-            gossip_debug(GOSSIP_SERVER_DEBUG,"%s:handle_index:%d\n"
-                                            ,__func__
-                                            ,old_frame->local_index);
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "handle_index:%d\n",
+                                                old_frame->local_index);
 
             size_array_index = s_op->u.tree_communicate.local_join_size[
                                      old_frame->local_index];
@@ -1788,29 +1775,21 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
 
     for (i = 0; i < s_tree->handle_count; i++)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: resp->size[%d]:%u "
-                                         "\tresp->error[%d]:%d\n"
-                                        ,__func__
-                                        ,i
-                                        ,(unsigned int)s_tree->size[i]
-                                        ,i
-                                        ,s_tree->error[i]);
+        gossip_debug(GOSSIP_SERVER_DEBUG,"resp->size[%d]:%u \tresp->error[%d]:%d\n",
+                                         i, (unsigned int)s_tree->size[i], i,
+                                         s_tree->error[i]);
     }
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: Resp op:%d \tResp status:%d\n"
-                                    ,__func__
-                                    ,s_op->resp.op
-                                    ,s_op->resp.status);
+    gossip_debug(GOSSIP_SERVER_DEBUG,"Resp op:%d \tResp status:%d\n",
+                                     s_op->resp.op, s_op->resp.status);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: s_op->addr:%d\n"
-                                    ,__func__
-                                    ,(int)s_op->addr);
+    gossip_debug(GOSSIP_SERVER_DEBUG,"s_op->addr:%d\n",
+                                     (int)s_op->addr);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG,"%s: resp->caller_handle_index:%u "
-                                     "\tresp->handle_count:%d\n"
-                                    ,__func__
-                                    ,s_tree->caller_handle_index
-                                    ,s_tree->handle_count);
+    gossip_debug(GOSSIP_SERVER_DEBUG,"resp->caller_handle_index:%u "
+                                     "\tresp->handle_count:%d\n",
+                                     s_tree->caller_handle_index,
+                                     s_tree->handle_count);
 
     /*cleanup tree-communicate structure*/
     if (s_tree_comm->handle_array_local)
