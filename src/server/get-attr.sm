@@ -322,6 +322,8 @@ static PINT_sm_action getattr_debug(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_debug_servreq_getattr(GOSSIP_GETATTR_DEBUG, s_op->req);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "issuer: (%p)\n",
+                   s_op->req->u.getattr.credential.issuer);
     return SM_ACTION_COMPLETE;
 }
 
@@ -1213,7 +1215,7 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
     //gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "getattr_p\n");
     //PVFS_debug_getattr_op_s(GOSSIP_SERVER_DEBUG, s_op);
 
-   /* Note: permission not required for tree_get_file_size op */
+    /* Note: permission not required for tree_get_file_size op */
     PINT_null_capability(&capability);
 
     PINT_msgpair_init(&s_op->msgarray_op);
@@ -1226,18 +1228,16 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_COMMON_DEBUG, "getattr->size_array (%p)\n",
                    (void *) getattr_p->size_array);
 
-    //PINT_debug_capability(&(capability), "get file size cap");
-
     PINT_SERVREQ_TREE_GET_FILE_SIZE_FILL(msg_p->req,
                                          capability,
                                          getattr_p->credential,
                                          getattr_p->fs_id,
-                                         0,
+                                         0, /* caller handle index */
                                          attr_p->u.meta.dfile_count,
                                          attr_p->u.meta.dfile_array,
                                          attr_p->u.meta.sid_count,
                                          attr_p->u.meta.sid_array,
-                                         0,
+                                         0, /* retry at leaf */
                                          s_op->req->hints);
 
     gossip_lsdebug(GOSSIP_COMMON_DEBUG, "Done with FILL macro\n");

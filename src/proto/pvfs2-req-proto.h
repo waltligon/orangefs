@@ -985,25 +985,28 @@ endecode_fields_3a1a_struct(
     int32_t, sid_count,
     PVFS_SID, sid_array);
 
-#define PVFS_debug_servreq_tree_get_file_size(mask, req)    \
-do {                                                        \
-    struct PVFS_servreq_tree_get_file_size *treq =          \
-                             &((req)->u.tree_get_file_size);\
-    gossip_if (mask)                                        \
-    {                                                       \
-        gossip_lsadebug("Tree Get File Size Request:\n");   \
-        gossip_lsadebug("req = (%p)\n", (req));             \
-        PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
-        PVFS_debug_afield(treq->caller_handle_index, uint32_t);\
-        PVFS_debug_afield(treq->retry_msgpair_at_leaf, uint32_t);\
-        PVFS_debug_afield(treq->num_data_files, uint32_t);  \
-        PVFS_debug_afield(treq->handle_array, PVFS_handle); \
-        PVFS_debug_afield(treq->sid_count, int32_t);        \
-        PVFS_debug_afield(treq->sid_array, PVFS_SID);       \
-        PVFS_debug_afield(&(treq->credential), PVFS_credential);\
-        gossip_lsadebug("Tree Get File Size End:\n");       \
-    }                                                       \
-    gossip_end;                                             \
+#define PVFS_debug_servreq_tree_get_file_size(_mask, _req)           \
+do {                                                                 \
+    struct PVFS_servreq_tree_get_file_size *treq =                   \
+                             &((_req)->u.tree_get_file_size);        \
+    if ((_req)->op == PVFS_SERV_TREE_GET_FILE_SIZE)                  \
+    {                                                                \
+        gossip_if (_mask)                                            \
+        {                                                            \
+            gossip_lsadebug("Tree Get File Size Request:\n");        \
+            gossip_lsadebug("req = (%p)\n", (_req));                 \
+            PVFS_debug_afield(treq->fs_id, PVFS_fs_id);              \
+            PVFS_debug_afield(treq->caller_handle_index, uint32_t);  \
+            PVFS_debug_afield(treq->retry_msgpair_at_leaf, uint32_t);\
+            PVFS_debug_afield(treq->num_data_files, uint32_t);       \
+            PVFS_debug_afield(treq->handle_array, PVFS_handle);      \
+            PVFS_debug_afield(treq->sid_count, int32_t);             \
+            PVFS_debug_afield(treq->sid_array, PVFS_SID);            \
+            PVFS_debug_afield(&(treq->credential), PVFS_credential); \
+            gossip_lsadebug("Tree Get File Size End:\n");            \
+        }                                                            \
+        gossip_end;                                                  \
+    }                                                                \
 } while (0)
 
 #define extra_size_PVFS_servreq_tree_get_file_size          \

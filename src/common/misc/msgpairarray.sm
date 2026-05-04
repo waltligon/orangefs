@@ -489,10 +489,15 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
                        &(msg_p->req), &(msg_p->encoded_req), msg_p->svr_addr, msg_p->enc_type);
 
         //PVFS_debug_servreq_tree_get_file_size(GOSSIP_MSGPAIR_DEBUG, &(msg_p->req));
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "userid: %d\n", msg_p->req.u.tree_get_file_size.credential.userid);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "num_groups: %d\n", msg_p->req.u.tree_get_file_size.credential.num_groups);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "group_array: (%p)\n", msg_p->req.u.tree_get_file_size.credential.group_array);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "issuer: (%p)\n", msg_p->req.u.tree_get_file_size.credential.issuer);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "sig_size: %d\n", msg_p->req.u.tree_get_file_size.credential.sig_size);
 
-        ret = PINT_encode(&msg_p->req,
+        ret = PINT_encode(&(msg_p->req),
                           PINT_ENCODE_REQ,
-                          &msg_p->encoded_req,
+                          &(msg_p->encoded_req),
                           msg_p->svr_addr,
                           msg_p->enc_type);
         if (ret != 0)

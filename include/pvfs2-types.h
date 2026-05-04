@@ -1697,13 +1697,13 @@ endecode_fields_3a2a1_struct (
 
 typedef PVFS_credential PVFS_credentials;
 
-#define PVFS_debug_PVFS_credential(mask, cred) \
-do { \
-    gossip_if(mask) \
-    { \
-        PVFS_debug_PVFS_credential_nomask(cred); \
-    } \
-    gossip_end; \
+#define PVFS_debug_PVFS_credential(_mask, _cred)  \
+do {                                              \
+    gossip_if(_mask)                              \
+    {                                             \
+        PVFS_debug_PVFS_credential_nomask(_cred); \
+    }                                             \
+    gossip_end;                                   \
 } while (0)
 
 #define PVFS_debug_PVFS_credential_nomask(_cred) \
