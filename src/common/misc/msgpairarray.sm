@@ -485,15 +485,31 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
             PVFS_debug_servreq_tree_get_dirent_count(GOSSIP_MSGPAIR_DEBUG, &(msg_p->req));
         }
 
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "&msg_p->req (%p) &msg_p->encoded_req (%p) msg_p->svr_addr %ld msg_p->enc_type %d\n",
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG,
+                       "&msg_p->req (%p) &msg_p->encoded_req (%p)"
+                       " msg_p->svr_addr %ld msg_p->enc_type %d\n",
                        &(msg_p->req), &(msg_p->encoded_req), msg_p->svr_addr, msg_p->enc_type);
 
+        {
+            const char *server_string;
+            server_string = BMI_addr_rev_lookup(msg_p->svr_addr);
+            gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "addr: %ld server: %s\n",
+                           msg_p->svr_addr, server_string);
+        }
+
         //PVFS_debug_servreq_tree_get_file_size(GOSSIP_MSGPAIR_DEBUG, &(msg_p->req));
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "userid: %d\n", msg_p->req.u.tree_get_file_size.credential.userid);
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "num_groups: %d\n", msg_p->req.u.tree_get_file_size.credential.num_groups);
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "group_array: (%p)\n", msg_p->req.u.tree_get_file_size.credential.group_array);
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "issuer: (%p)\n", msg_p->req.u.tree_get_file_size.credential.issuer);
-        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "sig_size: %d\n", msg_p->req.u.tree_get_file_size.credential.sig_size);
+#if 0
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "userid: %d\n",
+                       msg_p->req.u.tree_get_file_size.credential.userid);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "num_groups: %d\n",
+                       msg_p->req.u.tree_get_file_size.credential.num_groups);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "group_array: (%p)\n",
+                       msg_p->req.u.tree_get_file_size.credential.group_array);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "issuer: (%p)\n",
+                       msg_p->req.u.tree_get_file_size.credential.issuer);
+        gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "sig_size: %d\n",
+                       msg_p->req.u.tree_get_file_size.credential.sig_size);
+#endif
 
         ret = PINT_encode(&(msg_p->req),
                           PINT_ENCODE_REQ,
@@ -1194,6 +1210,9 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
                                 &msg_p->svr_addr,
                                 msg_p->recv_status.actual_size,
                                 &resp_p);
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "resp_p->op %d ########################\n", resp_p->op);
+    PVFS_debug_servresp(GOSSIP_SERVER_DEBUG, resp_p);
 
     gossip_if(GOSSIP_MSGPAIR_DEBUG)
     {

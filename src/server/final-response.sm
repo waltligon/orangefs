@@ -205,10 +205,7 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
                    "calling PINT_encode, s_op->decoded.enc_type %d\n",
                    s_op->decoded.enc_type);
 
-    if (smcb->op == PVFS_SERV_GETATTR)
-    {
-        PVFS_debug_servresp_getattr(GOSSIP_GETATTR_DEBUG, &s_op->resp);
-    }
+    PVFS_debug_servresp_getattr(GOSSIP_GETATTR_DEBUG, &s_op->resp);
 
     ret = PINT_encode(&s_op->resp,
                       PINT_ENCODE_RESP,

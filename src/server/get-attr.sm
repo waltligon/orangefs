@@ -375,10 +375,13 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
      * have the original client request attr mask
      * (s_op->u.getattr.attrmask).
      */
+
+    PVFS_debug_PVFS_attr(GOSSIP_GETATTR_DEBUG, respattr);
+
     switch(respattr->objtype)
     {
         case PVFS_TYPE_METAFILE:
-            PINT_ACCESS_DEBUG(s_op, GOSSIP_GETATTR_DEBUG, "type: metafile\n");
+            gossip_lsdebug( GOSSIP_GETATTR_DEBUG, "type: metafile\n");
             gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                            "handle %s refers to a metafile\n",
                            PVFS_OID_str(&s_op->u.getattr.handle));
@@ -453,7 +456,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             break;
 
         case PVFS_TYPE_DATAFILE:
-            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: datafile\n");
+            gossip_lsdebug( GOSSIP_ACCESS_DEBUG, "type: datafile\n");
             /*
              * note: the prelude already retrieved the size for us, so
              * there's no special action that needs to be taken if we have
@@ -475,13 +478,12 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
 
 
         case PVFS_TYPE_DIRECTORY:
-            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: directory\n");
+            gossip_lsdebug( GOSSIP_ACCESS_DEBUG, "type: directory\n");
 
             gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                            "handle %s refers to a directory\n",
                            PVFS_OID_str(&s_op->target_handle));
 
-            PVFS_debug_PVFS_directory_attr(GOSSIP_GETATTR_DEBUG, respattr);
 
             /* We need some of this error checking back, but the bit
              * flipping going on does not seem right.  Need a careful
@@ -540,8 +542,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             break;
 
         case PVFS_TYPE_DIRDATA:
-            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
-            PVFS_debug_PVFS_dirdata_attr(GOSSIP_GETATTR_DEBUG, respattr);
+            gossip_lsdebug( GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
 
             gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                            "handle %s refers to a dirdata\n",
@@ -586,8 +587,6 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             assert(respattr->mask & PVFS_ATTR_COMMON_ALL);
 */
 #endif
-            PVFS_debug_PVFS_dist_dir_attr(GOSSIP_GETATTR_DEBUG,
-                      &(respattr->u.dirdata.dist_dir_attr));
 #if 0
             gossip_debug(
                 GOSSIP_GETATTR_DEBUG,
@@ -617,7 +616,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             break;
 
         case PVFS_TYPE_SYMLINK:
-            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
+            gossip_lsdebug( GOSSIP_ACCESS_DEBUG, "type: symlink\n");
             gossip_lsdebug(
                 GOSSIP_GETATTR_DEBUG, "handle %s refers to a symlink.\n",
                 PVFS_OID_str(&s_op->u.getattr.handle));
@@ -632,7 +631,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
             break;
 
         case PVFS_TYPE_INTERNAL:
-            PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: internal\n");
+            gossip_lsdebug( GOSSIP_ACCESS_DEBUG, "type: internal\n");
             /* nothing interesting to add; this is meaningless to a client */
             break;
 
@@ -1109,8 +1108,6 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
                                                   respattr->u.meta.dfile_count;
     }
 
-    //PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
-
     if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DIST)
     {
         /* successfully read dist key; make sure we got something valid */
@@ -1136,8 +1133,6 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         //PINT_dist_decode(&s_op->resp.u.getattr.attr.u.meta.dist, s_op->val_a[1].buffer);
         PINT_dist_copy(&s_op->resp.u.getattr.attr.u.meta.dist, s_op->val_a[1].buffer);
 
-        //PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->resp.u.getattr.attr.u.meta.dist);
-
         if(s_op->resp.u.getattr.attr.u.meta.dist == NULL)
         {
             gossip_err("Found dist of 0 for handle %s,%d\n",
@@ -1153,7 +1148,6 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Clearing Dist won't be returned\n");
         memset(s_op->val_a[1].buffer, 0, sizeof(struct PINT_dist_s));
         memset(s_op->resp.u.getattr.attr.u.meta.dist, 0, s_op->val_a[1].buffer_sz);
-        //PVFS_debug_PINT_dist(GOSSIP_GETATTR_DEBUG, s_op->val_a[1].buffer);
     }
 
     if (s_op->u.getattr.attrmask & PVFS_ATTR_COMMON_PARENT)
@@ -1209,17 +1203,11 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
     attr_p = &s_op->attr; /* should point to parent attr */
     assert(attr_p);
 
-    //gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "attr_p\n");
-    //PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, attr_p);
-
-    //gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "getattr_p\n");
-    //PVFS_debug_getattr_op_s(GOSSIP_SERVER_DEBUG, s_op);
-
     /* Note: permission not required for tree_get_file_size op */
     PINT_null_capability(&capability);
 
-    PINT_msgpair_init(&s_op->msgarray_op);
-    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_msgpair_init(&(s_op->msgarray_op));
+    msg_p = &(s_op->msgarray_op.msgpair);
 
     /*initialize the size_array, which will hold the size of each datahandle*/
     getattr_p->size_array =
@@ -1240,13 +1228,14 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
                                          0, /* retry at leaf */
                                          s_op->req->hints);
 
+    gossip_lsdebug(GOSSIP_COMMON_DEBUG, "msg_p->req.op %d\n", msg_p->req.op);
     gossip_lsdebug(GOSSIP_COMMON_DEBUG, "Done with FILL macro\n");
 
     PINT_cleanup_capability(&capability);
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_READ;
     msg_p->fs_id = s_op->u.getattr.fs_id;
-    memcpy(&msg_p->handle, attr_p->u.meta.dfile_array, sizeof(msg_p->handle));;
+    memcpy(&(msg_p->handle), attr_p->u.meta.dfile_array, sizeof(msg_p->handle));;
     msg_p->sid_count = attr_p->u.meta.sid_count;
     msg_p->sid_index = 0;
     msg_p->sid_array = attr_p->u.meta.sid_array;
@@ -1259,7 +1248,7 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
     {
         gossip_lerr("Unable to map server address for this handle(%s) and "
                     "filesystem(%d)\n",
-                    PVFS_OID_str(&msg_p->handle),
+                    PVFS_OID_str(&(msg_p->handle)),
                     msg_p->fs_id);
         js_p->error_code = ret;
         return SM_ACTION_COMPLETE;
@@ -2048,8 +2037,6 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                  respattr_p->u.dir.dist_dir_bitmap,
                  PVFS_OID_str(respattr_p->parent));
 
-    //PINT_server_req_get_credential(s_op->req, &cred);
-    //PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     return SM_ACTION_COMPLETE;
 }
 
@@ -2262,6 +2249,8 @@ static PINT_sm_action getattr_read_acl(struct PINT_smcb *smcb,
     job_id_t tmp_id;
     int ret;
 
+    PVFS_debug_servresp_getattr(GOSSIP_GETATTR_DEBUG, &(s_op->resp));
+
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                  "frame (%p) op %s (getattr sm)\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
@@ -2355,6 +2344,7 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     int insert_flag = 1;
 #endif
 
+    PVFS_debug_servresp_getattr(GOSSIP_GETATTR_DEBUG, &(s_op->resp));
     /* DEBUG_attr_mask(respattr->mask); makes a lot of output */
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p)\n", s_op);
@@ -2562,9 +2552,9 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "frame (%p) resp (%p)\n",
                    s_op, &s_op->resp);
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                   "previous state error_code = %d\n",
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "previous state error_code = %d\n",
                    js_p->error_code);
+
     if (js_p->error_code > 0)
     {
         /* if we reach this state with a positive error code it means that
@@ -2608,6 +2598,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
     switch (respattr->objtype)
     {
     case PVFS_TYPE_METAFILE :
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "METAFILE \n");
         if (respattr->u.meta.dfile_count)
         {
             assert(respattr->u.meta.dfile_array);
@@ -2621,6 +2612,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                        respattr->u.meta.dist_size);
         break;
     case PVFS_TYPE_DIRDATA :
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "DIRDATA \n");
         /* why do we zero these fields? */
         respattr->u.dirdata.dist_dir_attr.bitmap_size = 0;
         respattr->u.dirdata.dist_dir_attr.dirdata_count = 0;
@@ -2630,11 +2622,13 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
                      lld(respattr->u.dirdata.dirent_count));
         break;
     case PVFS_TYPE_DATAFILE :
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "DATAFILE \n");
         gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                        "also returning data size of %lld\n",
                        lld(respattr->u.data.size));
         break;
     case PVFS_TYPE_SYMLINK :
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "SYMLINK \n");
         if (js_p->error_code == 0)
         {
             assert(respattr->u.sym.target_path);
@@ -2664,6 +2658,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
         }
         break;
     case PVFS_TYPE_DIRECTORY :
+        gossip_debug(GOSSIP_GETATTR_DEBUG, "DIRECTORY \n");
     {
         /* !!! may change later */
 #if 0
@@ -2775,10 +2770,10 @@ static PINT_sm_action getattr_setup_op(struct PINT_smcb *smcb,
     memset(&s_op->resp.u.getattr.attr, 0, sizeof(PVFS_object_attr)); /* repeated in verify */
     s_op->resp.op = s_op->req->op;
 
-    s_op->u.getattr.handle                    = s_op->req->u.getattr.handle;
-    s_op->u.getattr.fs_id                     = s_op->req->u.getattr.fs_id;
-    s_op->u.getattr.attrmask                  = s_op->req->u.getattr.attrmask;
-    s_op->u.getattr.credential                = s_op->req->u.getattr.credential;
+    s_op->u.getattr.handle     = s_op->req->u.getattr.handle;
+    s_op->u.getattr.fs_id      = s_op->req->u.getattr.fs_id;
+    s_op->u.getattr.attrmask   = s_op->req->u.getattr.attrmask;
+    s_op->u.getattr.credential = s_op->req->u.getattr.credential;
 #if 0
     s_op->u.getattr.mirror_dfile_status_array = NULL;
 #endif

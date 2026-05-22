@@ -179,7 +179,6 @@ typedef struct PINT_smcb
     struct qlist_head frames;  /* circular list of frames */
     int base_frame;            /* index of current base frame */
     int frame_count;           /* number of frames in list */
-    int pjmp_frame_count;      /* number of PJMP frames on the stack */
     int children_running;      /* the number of child SMs running */
                                /* different from pjmp_frame_count because */
                                /* this decrements as tasks finish */
@@ -197,6 +196,7 @@ typedef struct PINT_smcb
     int op_cancelled; /* indicates SM operation was cancelled */
     int op_completed;  /* indicates SM operation was added to completion Q */
     /* add a lock here */
+    int num_pjmp_frames; /* counts frames used to pjmp child tasks */
     job_context_id context; /* job context when waiting for children */
     int (*terminate_fn)(struct PINT_smcb *, job_status_s *);
     void *user_ptr; /* external user pointer */

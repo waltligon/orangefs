@@ -379,7 +379,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
                    local_op_frame, local_op_frame->req, smcb->op, local_op_frame->op, local_op_frame->req->op);
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Pushing local op frame\n");
-    s_op->num_pjmp_frames = 1;
+    smcb->num_pjmp_frames = 1;
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Client addr %ld tag %d (from local_op_frame %p)\n",
                    local_op_frame->addr, local_op_frame->tag, local_op_frame);
@@ -517,7 +517,7 @@ static PINT_sm_action unexpected_pjmp_setup(struct PINT_smcb *smcb,
         /* now push remote ops frame */
         ret = PINT_sm_push_frame(smcb, PJMP_REMOTE, remote_op_frame, S_OP);
         gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Pushing remote op frame\n");
-        s_op->num_pjmp_frames += 1;
+        smcb->num_pjmp_frames += 1;
         if(ret < 0)
         {
             gossip_lerr("unexpected_pjmp_setup failed to push frame for "
@@ -549,19 +549,19 @@ noremote:
 static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
                                               job_status_s *js_p)
 {
-    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *s_op GCC_UNUSED = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *local_op = NULL;
     struct PINT_server_op *remote_op = NULL;
     int task_id;
     PVFS_error tmp_err = 0;
     int remaining = 0;
 
-    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "s_op->num_pjmp_frames = %d\n",
-                  s_op->num_pjmp_frames);
+    gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "smcb->num_pjmp_frames = %d\n",
+                  smcb->num_pjmp_frames);
 
-    assert(s_op->num_pjmp_frames > 0);
+    assert(smcb->num_pjmp_frames > 0);
 
-    for (; s_op->num_pjmp_frames > 1; s_op->num_pjmp_frames--)
+    for (; smcb->num_pjmp_frames > 1; smcb->num_pjmp_frames--)
     {
         gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Poping a remote frame\n");
 
@@ -582,7 +582,7 @@ static PINT_sm_action unexpected_pjmp_cleanup(struct PINT_smcb *smcb,
         free(remote_op);
     }
     
-    assert(s_op->num_pjmp_frames == 1);
+    assert(smcb->num_pjmp_frames == 1);
 
     gossip_lsdebug(GOSSIP_UNEXP_DEBUG, "Poping a local frame\n");
     local_op = PINT_sm_pop_frame(smcb, &task_id, &tmp_err, &remaining, NULL);
@@ -705,6 +705,11 @@ static PINT_sm_action unexp_local_pre(struct PINT_smcb *smcb,
             s_op->op = s_op->req->op;
         }
         s_op->resp.op = s_op->req->op;
+
+        if (s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE)
+        {
+            PVFS_debug_servreq_tree_get_file_size(GOSSIP_SERVER_DEBUG, s_op->req);
+        }
     }
 
     s_op->addr = s_op->unexp_bmi_buff.addr;

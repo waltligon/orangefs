@@ -1096,7 +1096,6 @@ struct PINT_server_unstuff_op
 
 struct PINT_server_tree_communicate_op
 {
-    int num_pjmp_frames;
     int num_partitions;
     PVFS_OID* handle_array_local; 
     PVFS_OID* handle_array_remote; 
@@ -1178,7 +1177,6 @@ do { \
         PVFS_debug_afield(access_type, int /* enum PINT_server_req_access_type */); \
         PVFS_debug_afield(sched_policy, int /* enum PINT_server_sched_policy */); \
         PVFS_debug_afield(orig_cred, PVFS_credential); \
-        PVFS_debug_afield(num_pjmp_frames, int); \
         PVFS_debug_afield(join, struct PINT_mpa_join); /* ptr */ \
         PVFS_debug_afield(metasidcnt, int32_t); \
         gossip_lsadebug("S_OP common END"); \
@@ -1260,10 +1258,6 @@ typedef struct PINT_server_op
 
     struct PVFS_credential     orig_cred;
     
-    /* used in a pjmp to remember how many frames we pushed but be
-     * careful about nesting
-     */
-    int                        num_pjmp_frames;
     struct PINT_mpa_join      *join;
 
     /* Used just about everywhere so this is a std place to keep it */

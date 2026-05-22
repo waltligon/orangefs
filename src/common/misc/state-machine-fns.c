@@ -246,15 +246,15 @@ PINT_sm_action PINT_state_machine_invoke(struct PINT_smcb *smcb,
                        "Executing PJMP %d children starting\n",
                        (smcb->frame_count - 1) - smcb->base_frame);
         /* start child SMs */
-        PINT_sm_start_child_frames(smcb, &smcb->pjmp_frame_count);
+        PINT_sm_start_child_frames(smcb, &smcb->num_pjmp_frames);
 
         /* if any children were started, then we return DEFERRED (even
          * though they may have all completed immediately).  The last child
          * issues a job_null that will drive progress from here and we don't
          * want to cause a double transition.
          */
-        gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, "pjmp_frame_count %d\n", smcb->pjmp_frame_count);
-        if (smcb->pjmp_frame_count > 0)
+        gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, "num_pjmp_frames %d\n", smcb->num_pjmp_frames);
+        if (smcb->num_pjmp_frames > 0)
         {
             gossip_ldebug(GOSSIP_STATE_MACHINE_DEBUG, "Returning DEFERRED\n");
             retval = SM_ACTION_DEFERRED;
@@ -1033,8 +1033,8 @@ struct PINT_frame_info_s *PINT_sm_frame_info(struct PINT_smcb *smcb, int index)
         /* target should be 0 .. frame_count-1 now */
         if (target < 0 || target >= smcb->frame_count)
         {
-            gossip_err("FRAME GET ERROR: (%p) index %d target %d -> Out of range\n",
-                       smcb, index, target);
+            gossip_err("FRAME GET ERROR: (%p) index %d target %d frame-count %d -> Out of range\n",
+                       smcb, index, target, smcb->frame_count);
             return NULL;
         }
 
@@ -1714,7 +1714,7 @@ PINT_sm_action PINT_sm_pop_old_pjmp_frames(struct PINT_smcb *smcb, int numpframe
             /* finished - bail out */
             gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG,
                            "Original Frame\n");
-            smcb->pjmp_frame_count = 0;
+            smcb->num_pjmp_frames = 0;
             smcb->children_running = 0;
             return SM_ACTION_COMPLETE;
         }

@@ -995,6 +995,7 @@ do {                                                                 \
         {                                                            \
             gossip_lsadebug("Tree Get File Size Request:\n");        \
             gossip_lsadebug("req = (%p)\n", (_req));                 \
+            PVFS_debug_afield((_req)->op, int);                         \
             PVFS_debug_afield(treq->fs_id, PVFS_fs_id);              \
             PVFS_debug_afield(treq->caller_handle_index, uint32_t);  \
             PVFS_debug_afield(treq->retry_msgpair_at_leaf, uint32_t);\
@@ -1171,21 +1172,21 @@ endecode_fields_1aa_struct(
     PVFS_size, dentcnt,
     PVFS_error, error);
 
-#define PVFS_debug_servresp_tree_get_dirent_count(mask, resp)                \
-do {                                                        \
-    struct PVFS_servresp_tree_get_dirent_count *tresp =                      \
-                                  &((resp)->u.tree_get_dirent_count);       \
-    gossip_if (mask)                                        \
-    {                                                       \
-        gossip_lsadebug("Tree Get Dirent Count Response:\n");               \
-        gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->caller_handle_index, uint32_t);\
-        PVFS_debug_afield(tresp->handle_count, uint32_t);    \
-        PVFS_debug_afield(tresp->dentcnt, PVFS_size);    \
-        PVFS_debug_afield(tresp->error, PVFS_error);    \
-        gossip_lsadebug("Tree Get Dirent Count End:\n");                   \
-    }                                                       \
-    gossip_end;                                             \
+#define PVFS_debug_servresp_tree_get_dirent_count(mask, resp)       \
+do {                                                                \
+    struct PVFS_servresp_tree_get_dirent_count *tresp =             \
+                                  &((resp)->u.tree_get_dirent_count); \
+    gossip_if (mask)                                                \
+    {                                                               \
+        gossip_lsadebug("Tree Get Dirent Count Response:\n");       \
+        gossip_lsadebug("resp = (%p)\n", (resp));                   \
+        PVFS_debug_afield(tresp->caller_handle_index, uint32_t);    \
+        PVFS_debug_afield(tresp->handle_count, uint32_t);           \
+        PVFS_debug_afield(tresp->dentcnt, pointer);                 \
+        PVFS_debug_afield(tresp->error, pointer);                   \
+        gossip_lsadebug("Tree Get Dirent Count End:\n");            \
+    }                                                               \
+    gossip_end;                                                     \
 } while (0)
     
 #define extra_size_PVFS_servreq_tree_get_dirent_count       \
@@ -2457,7 +2458,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Readdir Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->token, PVFS_ds_position);\
+        PVFS_debug_afield(tresp->token, uint64_t);\
         PVFS_debug_afield(tresp->dirent_array, PVFS_dirent);    \
         PVFS_debug_afield(tresp->dirent_count, uint32_t);    \
         PVFS_debug_afield(tresp->sid_array, PVFS_SID);    \
@@ -2779,15 +2780,26 @@ endecode_fields_1_struct(
     PVFS_servresp_statfs,
     PVFS_statfs, stat);
 
-#define PVFS_debug_servresp_statfs(mask, resp)                \
+#define PVFS_debug_servresp_statfs(_mask, _resp)                \
 do {                                                        \
     struct PVFS_servresp_statfs *tresp =                      \
-                                  &((resp)->u.statfs);       \
-    gossip_if (mask)                                        \
+                                  &((_resp)->u.statfs);       \
+    gossip_if (_mask)                                        \
     {                                                       \
         gossip_lsadebug("Statfs Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->stat, PPVFS_statfs);\
+        PVFS_debug_afield(tresp->stat, PVFS_statfs);          \
+        PVFS_debug_afield(tresp->stat.fs_id, PVFS_fs_id);           \
+        PVFS_debug_afield(tresp->stat.bytes_available, PVFS_size);  \
+        PVFS_debug_afield(tresp->stat.bytes_total, PVFS_size);        \
+        PVFS_debug_afield(tresp->stat.ram_total_bytes, unint64_t);    \
+        PVFS_debug_afield(tresp->stat.ram_free_bytes, unint64_t);           \
+        PVFS_debug_afield(tresp->stat.load_1, unint64_t);           \
+        PVFS_debug_afield(tresp->stat.load_5, unint64_t);           \
+        PVFS_debug_afield(tresp->stat.load_15, unint64_t);           \
+        PVFS_debug_afield(tresp->stat.uptime_seconds, unint64_t);           \
+        PVFS_debug_afield(tresp->stat.handles_available_count, unint64_t);           \
+        PVFS_debug_afield(tresp->stat.handles_total_count, unint64_t);           \
         gossip_lsadebug("Statfs End:\n");                   \
     }                                                       \
     gossip_end;                                             \
@@ -3543,14 +3555,14 @@ endecode_fields_1a_struct(
     int32_t, handle_count,
     PVFS_handle, handle_array);
 
-#define PVFS_debug_servreq_mgmt_dspace_info_list(mask, req) \
+#define PVFS_debug_servreq_mgmt_dspace_info_list(mask, _req) \
 do {                                                        \
     struct PVFS_servreq_mgmt_dspace_info_list *treq =       \
-                                  &((req)->u.mgmt_dspace_info_list);\
-    gossip_if (mask)                                        \
+                                  &((_req)->u.mgmt_dspace_info_list);\
+    gossip_if (_mask)                                        \
     {                                                       \
         gossip_lsadebug("Management Dspace Info List Request:\n");\
-        gossip_lsadebug("req = (%p)\n", (req));             \
+        gossip_lsadebug("req = (%p)\n", (_req));             \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->handle_array, PVFS_handle); \
         PVFS_debug_afield(treq->handle_count, int32_t);     \
@@ -4795,6 +4807,131 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_get_user_cert_keyreq mgmt_get_user_cert_keyreq;
     } u;
 };
+
+#define PVFS_debug_servresp(_mask, _resp_p) \
+do {                                       \
+    gossip_if(_mask)                       \
+    {                                      \
+        gossip_ldebug((_mask), "SERVER RESPONSE\n");         \
+        switch ((_resp_p)->op)                       \
+        {                       \
+        case PVFS_SERV_CREATE:                       \
+            PVFS_debug_servresp_create(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_IO:        \
+            PVFS_debug_servresp_io(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_GETATTR:        \
+            PVFS_debug_servresp_getattr(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_LOOKUP_PATH:        \
+            PVFS_debug_servresp_lookup_path(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_RMDIRENT:        \
+            PVFS_debug_servresp_rmdirent(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_CHDIRENT:        \
+            PVFS_debug_servresp_chdirent(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_MKDIR:        \
+            PVFS_debug_servresp_mkdir(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_TREE_GET_FILE_SIZE:        \
+            PVFS_debug_servresp_tree_get_file_size(_mask,  (_resp_p));        \
+            break;        \
+        default:        \
+            break;        \
+        }               \
+    }                    \
+    gossip_end;                    \
+    gossip_ldebug((_mask), "SERVER RESPONSE END\n");         \
+} while (0)
+
+#if 0
+        /*case PVFS_SERV_READDIR:   */     \
+         /*   PVFS_debug_servresp_readdir(_mask,  (_resp_p));   */     \
+          /*  break;    */    \
+        case PVFS_SERV_WRITE_COMPLETION:        \
+            PVFS_debug_servresp_write_completion(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_STATFS:        \
+            PVFS_debug_servresp_statfs(_mask,  (_resp_p));        \
+            break;        \
+       /* case PVFS_SERV_MGMT_PERF_MON:  */      \
+        /*    PVFS_debug_servresp_mgmt_perf_mon(_mask,  (_resp_p));  */      \
+         /*   break;    */    \
+      /*  case PVFS_SERV_MGMT_ITERATE_HANDLES:    */    \
+       /*     PVFS_debug_servresp_mgmt_iterate_handles(_mask,  (_resp_p));  */      \
+        /*    break;  */      \
+     /*   case PVFS_SERV_MGMT_DSPACE_INFO_LIST:   */     \
+      /*      PVFS_debug_servresp_mgmt_dspace_info_list(_mask,  (_resp_p));   */     \
+       /*     break;    */    \
+    /*    case PVFS_SERV_MGMT_EVENT_MON:  */      \
+     /*       PVFS_debug_servresp_mgmt_event_mon(_mask,  (_resp_p));   */     \
+      /*      break;    */    \
+        case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:        \
+            PVFS_debug_servresp_mgmt_get_dirdata_handle(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_GETEATTR:        \
+            PVFS_debug_servresp_geteattr(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_SMALL_IO:        \
+            PVFS_debug_servresp_small_io(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_LISTATTR:        \
+            PVFS_debug_servresp_listattr(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_BATCH_CREATE:        \
+            PVFS_debug_servresp_batch_create(_mask,  (_resp_p));        \
+            break;        \
+       /* case PVFS_SERV_UNSTUFF:     */   \
+        /*    PVFS_debug_servresp_unstuff(_mask,  (_resp_p)); */       \
+         /*   break;     */   \
+      /*  case PVFS_SERV_MIRROR:     */   \
+       /*     PVFS_debug_servresp_mirror (_mask,  (_resp_p));   */     \
+        /*    break;    */    \
+        case PVFS_SERV_TREE_REMOVE:        \
+            PVFS_debug_servresp_tree_remove(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_TREE_GET_FILE_SIZE:        \
+            PVFS_debug_servresp_tree_get_file_size(_mask,  (_resp_p));        \
+            break;        \
+      /*  case PVFS_SERV_MGMT_GET_UID:   */     \
+       /*     PVFS_debug_servresp_mgmt_get_uid(_mask,  (_resp_p));    */     \
+        /*    break;    */    \
+        case PVFS_SERV_TREE_SETATTR:        \
+            PVFS_debug_servresp_tree_setattr(_mask,  (_resp_p));        \
+            break;        \
+       /* case PVFS_SERV_MGMT_GET_DIRENT:  */      \
+        /*    PVFS_debug_servresp_mgmt_get_dirent(_mask,  (_resp_p));  */      \
+         /*   break;    */    \
+       /* case PVFS_SERV_ATOMICEATTR:   */     \
+        /*    PVFS_debug_servresp_atomiceattr(_mask,  (_resp_p));  */      \
+         /*   break;    */    \
+        case PVFS_SERV_GET_CONFIG:        \
+            PVFS_debug_servresp_getconfig(_mask,  (_resp_p));        \
+            break;        \
+        case PVFS_SERV_TREE_GETATTR:        \
+            PVFS_debug_servresp_tree_getattr(_mask,  (_resp_p));        \
+            break;        \
+      /*  case PVFS_SERV_MGMT_GET_USER_CERT:   */     \
+       /*     PVFS_debug_servresp_mgmt_get_user_cert(_mask,  (_resp_p));  */      \
+        /*    break;    */    \
+     /*   case PVFS_SERV_MGMT_GET_USER_CERT_KEYREQ:  */      \
+      /*      PVFS_debug_servresp_mgmt_get_user_cert_keyreq(_mask,  (_resp_p));   */     \
+       /*     break;  */      \
+        case PVFS_SERV_TREE_GET_DIRENT_COUNT:        \
+            PVFS_debug_servresp_tree_get_dirent_count(_mask,  (_resp_p));        \        \
+            break;        \
+        default:        \
+            break;        \
+        }               \
+        gossip_ldebug((_mask), "END SERVER RESPONSE\n");         \
+    }                  \
+    gossip_end;        \
+} while (0)
+#endif
+
 endecode_fields_2_struct(
     PVFS_server_resp,
     enum, op,
@@ -4810,3 +4947,4 @@ endecode_fields_2_struct(
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
+

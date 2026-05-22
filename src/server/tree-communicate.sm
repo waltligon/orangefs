@@ -147,6 +147,12 @@ nested machine pvfs2_tree_remove_work_sm
 
 machine pvfs2_tree_get_file_size_sm
 {
+    state TGFS_debug
+    {
+        run TGFS_debug;
+        default => tree_get_file_size_do_work;
+    }
+
     state tree_get_file_size_do_work
     {
         jump pvfs2_tree_get_file_size_work_sm;
@@ -168,6 +174,12 @@ machine pvfs2_tree_get_file_size_sm
 
 nested machine pvfs2_tree_get_file_size_work_sm
 {
+    state TGFSW_debug
+    {
+        run TGFSW_debug;
+        default => tree_get_file_size_work_do_work;
+    }
+
     state tree_get_file_size_work_do_work
     {
         pjmp tree_get_file_size_setup
@@ -294,6 +306,27 @@ nested machine pvfs2_tree_getattr_work_sm
 %%
 
 /******************** ACTION FUNCTIONS *********************/
+static PINT_sm_action TGFS_debug(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE)
+    {   
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "TGFS Debug\n");
+        PVFS_debug_servreq_tree_get_file_size(GOSSIP_SERVER_DEBUG, s_op->req);
+    }
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action TGFSW_debug(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    if (s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE)
+    {   
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "TGFSW Debug\n");
+        PVFS_debug_servreq_tree_get_file_size(GOSSIP_SERVER_DEBUG, s_op->req);
+    }
+    return SM_ACTION_COMPLETE;
+}
 
 static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                                                          job_status_s *js_p, 
@@ -324,8 +357,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                    smcb->op, s_op->op, operation);
     if (s_op->req)
     {
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->req->op %d\n",
-                                            s_op->req->op);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->req->op %d\n", s_op->req->op);
     }
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "issuer (%p)\n",
@@ -457,9 +489,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         for (i = 0; i < tc->handle_array_local_count; i++)
         {
             /* Create a stack frame for the local operation. */
-            tc->num_pjmp_frames++;
-            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "tc->num_pjmp_frames %d\n",
-                           tc->num_pjmp_frames);
+            smcb->num_pjmp_frames++;
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "smcb->num_pjmp_frames %d\n",
+                           smcb->num_pjmp_frames);
             js_p->error_code = NEXT_STATE_LOCAL;
 
             /* this creates a new and empty frame and pushes it for
@@ -734,9 +766,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
 
         /* We need to send tree-based messages to other servers */
         js_p->error_code = NEXT_STATE_REMOTE;
-        tc->num_pjmp_frames++;
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "tc->num_pjmp_frames %d\n",
-                       tc->num_pjmp_frames);
+        smcb->num_pjmp_frames++;
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "smcb->num_pjmp_frames %d\n",
+                       smcb->num_pjmp_frames);
 
         /* Prepare the stack for pjmp. This frame will be used in MPA */
         PINT_CREATE_SUBORDINATE_SERVER_FRAME( /* pushes a frame */
@@ -1187,11 +1219,11 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *tree_msgop = NULL;
 
     assert(s_op->req->op == PVFS_SERV_TREE_SETATTR);
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->tc->num_pjmp_frames = %d\n",
-                   s_op->num_pjmp_frames);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "smcb->num_pjmp_frames = %d\n",
+                   smcb->num_pjmp_frames);
 
     /* for each state machine spawned, pop a frame */
-    for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
+    for (i = 0; i < smcb->num_pjmp_frames; i++)
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
         if (old_frame)
@@ -1203,14 +1235,11 @@ static int tree_setattr_work_cleanup(struct PINT_smcb *smcb,
            tree_msgop = &(old_frame->msgarray_op);
         }
 
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: Value of task_id is %d\n"
-                                        ,__func__,task_id);
-        gossip_debug(GOSSIP_SERVER_DEBUG
-                    , "%s: Value of handle_count is %d\n"
-                    , __func__, old_frame->resp.u.tree_setattr.handle_count);
-        gossip_debug(GOSSIP_SERVER_DEBUG
-                     , "%s: Value of error_code is %d\n"
-                     , __func__, error_code);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,"Value of task_id is %d\n",task_id);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Value of handle_count is %d\n",
+                       old_frame->resp.u.tree_setattr.handle_count);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Value of error_code is %d\n",
+                       error_code);
 
         if (task_id == PJMP_REMOTE)
         {
@@ -1447,11 +1476,11 @@ static int tree_remove_work_cleanup(struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *tree_msgop = NULL;
 
     assert(s_op->req->op == PVFS_SERV_TREE_REMOVE);
-    gossip_debug(GOSSIP_SERVER_DEBUG, "s_op->tc->num_pjmp_frames = %d\n",
-                 s_op->u.tree_communicate.num_pjmp_frames);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "smcb->num_pjmp_frames = %d\n",
+                 smcb->num_pjmp_frames);
 
     /* for each state machine spawned, pop a frame */
-    for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
+    for (i = 0; i < smcb->num_pjmp_frames; i++)
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
         if (old_frame)
@@ -1463,16 +1492,14 @@ static int tree_remove_work_cleanup(struct PINT_smcb *smcb,
             tree_msgop = &(old_frame->msgarray_op);
         }
 
-        gossip_debug(GOSSIP_SERVER_DEBUG,"%s: Value of task_id is %d\n"
-                                        ,__func__,task_id);
-        gossip_debug(GOSSIP_SERVER_DEBUG
-                    ,"%s: Value of handle_count is %d\n"
-                    ,__func__
-                    ,old_frame->resp.u.tree_remove.handle_count);
-        gossip_debug(GOSSIP_SERVER_DEBUG
-                     ,"%s: Value of error_code is %d\n"
-                     ,__func__
-                     ,error_code);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,"Value of task_id is %d\n"
+                                        ,task_id);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG
+                      ,"Value of handle_count is %d\n"
+                      ,old_frame->resp.u.tree_remove.handle_count);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG
+                       ,"Value of error_code is %d\n"
+                       ,error_code);
 
         if (task_id == PJMP_REMOTE)
         {
@@ -1590,34 +1617,59 @@ static int tree_remove_cleanup(
 }
 
 /*--------------------------------------------------------------------------*/
+/* sets up PJMP for a tree_get_file_size oeration
+ * Initially the code runs getattr_get_file_size which sets up the request.
+ * When that request arrives at a participating server it runs directly here
+ * so we need to be prepared for each situation.
+ */
 static PINT_sm_action tree_get_file_size_setup(struct PINT_smcb *smcb,
                                                job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PVFS_server_resp *resp = &s_op->resp;
-    PINT_sm_msgpair_state *msg_p = NULL;
-    msg_p = &s_op->msgarray_op.msgpair;
-    struct PVFS_server_req *req = &msg_p->req;
+    struct PVFS_server_resp *resp = &(s_op->resp);
+    PINT_sm_msgpair_state *msg_p = &(s_op->msgarray_op.msgpair);
+    struct PVFS_server_req *req = &(msg_p->req);
+#if 0
+    if (s_op->msgarray_op.msgpair.req.op == PVFS_SERV_TREE_GET_FILE_SIZE)
+    {
+        PINT_sm_msgpair_state *msg_p = &(s_op->msgarray_op.msgpair);
+    }
+    else
+    {
+        PINT_sm_msgpair_state *msg_p = &(s_op->msgarray_op.msgpair);
+    }
+#endif
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "issuer (%p)\n",
-                   msg_p->req.u.tree_get_file_size.credential.issuer);
+    if (msg_p->req.op == 0)
+    {
+        /* This is part of a tree get file size op - the request is 
+         * in s_op->req as opposed to msg_p->req */
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Setting request to s_op\n");
+        req = s_op->req;
+    }
+        
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "issuer (%p) %s\n",
+                   req->u.tree_get_file_size.credential.issuer,
+                   req->u.tree_get_file_size.credential.issuer);
 
     /* the request was built in msg_p->req */
     /* There is no resp in msg_p so this would go in the s_op */
 
-    assert(msg_p->req.op == PVFS_SERV_TREE_GET_FILE_SIZE);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->req.op %d\n", s_op->req->op);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "msg_p->req.op %d\n", msg_p->req.op);
+    assert(PVFS_SERV_TREE_GET_FILE_SIZE == req->op);
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG,"req->retry_msgpair_at_leaf:%s\n",
+    //assert(smcb->op == PVFS_SERV_TREE_GET_FILE_SIZE);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "req->retry_msgpair_at_leaf:%s\n",
            (req->u.tree_get_file_size.retry_msgpair_at_leaf ? "YES" : "NO"));
-
-    /* AGAIN, cannot do this - switch from one op to another */
 
     resp->u.tree_get_file_size.caller_handle_index =
             req->u.tree_get_file_size.caller_handle_index;
     resp->u.tree_get_file_size.handle_count =
             req->u.tree_get_file_size.num_data_files;
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                   "frame:%p tree.caller_handle_index %u "
+                   "frame (%p) tree.caller_handle_index %u "
                    "tree.handle_count %d tree.op %d\n",
                    s_op, resp->u.tree_get_file_size.caller_handle_index,
                    resp->u.tree_get_file_size.handle_count, resp->op);
@@ -1736,11 +1788,11 @@ static int tree_get_file_size_work_cleanup(struct PINT_smcb *smcb,
 
 
     /*assert(s_op->req->op == PVFS_SERV_TREE_GET_FILE_SIZE);*/
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->tc->num_pjmp_frames = %d\n",
-                   s_op->u.tree_communicate.num_pjmp_frames);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "smcb->num_pjmp_frames = %d\n",
+                   smcb->num_pjmp_frames);
 
     /* for each state machine spawned, pop a frame */
-    for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
+    for (i = 0; i < smcb->num_pjmp_frames; i++)
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
         if (old_frame)
@@ -1903,11 +1955,12 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     /* struct PVFS_server_req *req = &s_op->msgarray_op.msgpair.req; */
     struct PVFS_server_req *req = s_op->req;
-    struct PVFS_server_resp *resp = &s_op->resp;
-    PINT_sm_msgpair_state *msg_p GCC_UNUSED = &s_op->msgarray_op.msgpair;
+    struct PVFS_server_resp *resp = &(s_op->resp);
+    PINT_sm_msgpair_state *msg_p GCC_UNUSED = &(s_op->msgarray_op.msgpair);
 
     /* DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &(req->u.tree_get_dirent_count.credential)); */
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "frame (%p) req->op %d smcb->op %d\n", s_op, req->op, smcb->op);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "frame (%p) req->op %d smcb->op %d\n",
+                                        s_op, req->op, smcb->op);
 
 
     /* assert(s_op->req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT); */
@@ -1969,6 +2022,12 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
         free(resp->u.tree_get_dirent_count.dentcnt);
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
+    }
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->req->op %d\n", s_op->req->op);
+    if (s_op->req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT)
+    {
+        PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, resp);
     }
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling partition_handles\n");
@@ -2109,7 +2168,7 @@ static PINT_sm_action tree_get_dirent_count_work_cleanup(struct PINT_smcb *smcb,
     p_op->resp.u.getattr.attr.u.dir.dirent_count +=
                    s_op->resp.u.getattr.attr.u.dir.dirent_count;
 
-    ret = PINT_sm_pop_old_pjmp_frames(smcb, smcb->pjmp_frame_count);
+    ret = PINT_sm_pop_old_pjmp_frames(smcb, smcb->num_pjmp_frames);
 
     return ret;
 }
@@ -2275,11 +2334,11 @@ static int tree_getattr_work_cleanup(struct PINT_smcb *smcb,
     struct PINT_server_tree_communicate_op *s_tree_comm = &(s_op->u.tree_communicate);
 
     assert(s_op->req->op == PVFS_SERV_TREE_GETATTR);
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op->tc->num_pjmp_frames = %d\n",
-                   s_op->u.tree_communicate.num_pjmp_frames);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "smcb->num_pjmp_frames = %d\n",
+                   smcb->num_pjmp_frames);
 
     /* for each state machine spawned, pop a frame */
-    for (i = 0; i < s_op->u.tree_communicate.num_pjmp_frames; i++)
+    for (i = 0; i < smcb->num_pjmp_frames; i++)
     {
         old_frame = PINT_sm_pop_frame(smcb, &task_id, &error_code, NULL, NULL);
         if (old_frame)

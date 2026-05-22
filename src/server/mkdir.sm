@@ -38,7 +38,7 @@ nested machine pvfs2_mkdir_work_sm
 {
     state prep_sm
     {
-        run mkdir_prep_sm;
+        run mkdir_prep;
         default => create;
     }
 
@@ -183,7 +183,7 @@ static PINT_sm_action mkdir_debug(struct PINT_smcb *smcb, job_status_s *js_p)
 }
 
 /*
- * Function: mkdir_prep_sm
+ * Function: mkdir_prep
  *
  * Params:   server_op *s_op, 
  *           job_status_s *js_p
@@ -194,7 +194,7 @@ static PINT_sm_action mkdir_debug(struct PINT_smcb *smcb, job_status_s *js_p)
  *
  */
 
-static PINT_sm_action mkdir_prep_sm(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action mkdir_prep(struct PINT_smcb *smcb, job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PVFS_object_attr *dir_attr = NULL;

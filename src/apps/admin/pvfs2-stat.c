@@ -223,6 +223,7 @@ static int do_stat(const char             * pszFile,
    /* Do we want to follow if the file is a symbolic link */
    if(opts->nFollowLink)
    {
+      fprintf(stderr, "SYS-LOOKUP\n");
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
                             credentials, 
@@ -252,6 +253,7 @@ next_target:
         memset(&lk_response.ref,0,sizeof(lk_response.ref));
         memset(lk_response.error_path,0,PVFS_NAME_MAX);
 
+        fprintf(stderr, "SYS-LOOKUP2\n");
         ret = PVFS_sys_lookup(symlink_target_fs_id,
                               symlink_target_path,
                               (PVFS_credential *)credentials,
@@ -273,6 +275,7 @@ next_target:
    }
    else
    {
+      fprintf(stderr, "SYS-LOOKUP3\n");
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
                             credentials, 
@@ -298,6 +301,7 @@ next_target:
 
    ref = lk_response.ref;
 
+   fprintf(stderr, "SYS-GETATTR\n");
    ret = PVFS_sys_getattr(ref, 
                           PVFS_ATTR_SYS_ALL_NOHINT,
                           credentials, 
@@ -310,6 +314,7 @@ next_target:
       return -1;
    }
 
+   fprintf(stderr, "DONE\n");
 
    /* Display the attributes for the file */
    print_stats(&ref,

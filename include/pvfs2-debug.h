@@ -379,29 +379,29 @@ do { \
 } while (0)
 
 #define PVFS_to_string_PVFS_credential(_cred, _string, _print) \
-do { \
-    if (_cred == NULL)                   \
-    {                                    \
-        sprintf(_string, "(nil)");       \
-    }                                    \
-    else                                 \
-    {                                    \
+do {                                              \
+    if (_cred == NULL)                            \
+    {                                             \
+        sprintf(_string, "(nil)");                \
+    }                                             \
+    else                                          \
+    {                                             \
         PVFS_debug_PVFS_credential_nomask(_cred); \
-        _print = 'N';                    \
-    }                                    \
+        _print = 'N';                             \
+    }                                             \
 } while (0)
 
 #define PVFS_to_string_PVFS_capability(_cap, _string, _print) \
-do {                                     \
-    if (_cap == NULL)                    \
-    {                                    \
-        sprintf(_string, "(nil)");       \
-    }                                    \
-    else                                 \
-    {                                    \
-        PVFS_debug_PVFS_capability_nomask(_cap); \
-        _print = 'N';                    \
-    }                                    \
+do {                                              \
+    if (_cap == NULL)                             \
+    {                                             \
+        sprintf(_string, "(nil)");                \
+    }                                             \
+    else                                          \
+    {                                             \
+        PVFS_debug_PVFS_capability_nomask(_cap);  \
+        _print = 'N';                             \
+    }                                             \
 } while (0)
 
 #define PVFS_to_string_pointer(_ptr, _string, _print) \
