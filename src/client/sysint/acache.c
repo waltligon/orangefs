@@ -350,6 +350,7 @@ int PINT_acache_get_cached_entry(
 
     /* At this point should have all pertinent static attributes and
      * potentially some dynamic attributes. */
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Copy attr to tmp_payload\n");
     ret = PINT_copy_object_attr(attr, &(tmp_payload->attr));
     if(ret < 0)
     {
@@ -464,7 +465,7 @@ void PINT_acache_invalidate_size(PVFS_object_ref refn)
 int PINT_acache_update(
     PVFS_object_ref refn,   /**< object to update */
     PVFS_object_attr *attr, /**< attributes to copy into cache */
-    PVFS_size* size)        /**< logical file size (NULL if not available) */
+    PVFS_size *size)        /**< logical file size (NULL if not available) */
 {
     struct acache_payload *tmp_payload = NULL;
     uint64_t save_mask;
@@ -497,8 +498,8 @@ int PINT_acache_update(
     save_mask = attr->mask;
     /* Don't cache size_array (indicated by PVFS_ATTR_DIR_DIRENT_COUNT). */
     /* this does not indicate a size array, its in the dir's copy of
-     * the number of dirents - which works like the fiel size but needs
-     * its own fields and flags.  I'm not sure where the "sise array" is
+     * the number of dirents - which works like the file size but needs
+     * its own fields and flags.  I'm not sure where the "size array" is
      */
     attr->mask &= ~(PVFS_ATTR_CAPABILITY | PVFS_ATTR_DIR_DIRENT_COUNT);
     ret = PINT_copy_object_attr(&tmp_payload->attr, attr);

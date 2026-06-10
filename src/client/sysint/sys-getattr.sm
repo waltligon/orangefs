@@ -654,6 +654,19 @@ static int getattr_dirdata_getattr_comp_fn(void *v_p,
  * unless an error occurred within the internals of the state
  * machine.
  */
+
+/* we are getting away from attribute masks.  The attribute mask is
+ * still relevant to a setattr so we can set a few attributes potentially
+ * without an attribute read first.  This the only things that matter
+ * to a getattr are as follows:
+ * - PVFS_ATTR_DIR_DIRENT_COUNT total number of dirent in dir
+ * - PVFS_ATTR_META_SIZE        total size of file
+ * - PVFS_ATTR_LATEST           get the exact counts from data/dirdata
+ * - PVFS_ATTR_FASTEST          get recently calculated counts from meta/dir
+ * - PVFS_ATTR_CAPABILITY       create a capability
+ * Otherwise all fields in dspace and keyval are read and returned.  All are
+ * cached and a cache hit on the OID is sufficient.
+ */
 static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                                             job_status_s *js_p)
 {
@@ -671,22 +684,10 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
 
     object_ref = sm_p->getattr.object_ref;
 
-    gossip_if(GOSSIP_GETATTR_DEBUG)
-    {
-        gossip_lsadebug("OIDS:\n");
-        gossip_lsadebug("obj_ref: %s\n", PVFS_OID_str(&object_ref.handle));
-        gossip_lsadebug("nil: %s\n", PVFS_OID_str(&PVFS_HANDLE_NULL));
-    }
-    gossip_end;
-
     assert(PVFS_OID_NE(&object_ref.handle, &PVFS_HANDLE_NULL));
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
-    assert(object_ref.sid_count > 0);
-
-    assert(PVFS_OID_NE(&object_ref.handle, &PVFS_HANDLE_NULL));
-    assert(object_ref.fs_id != PVFS_FS_ID_NULL);
-    assert(object_ref.sid_count > 0);
-    assert(object_ref.sid_array != NULL);
+    //assert(object_ref.sid_count > 0);
+    //assert(object_ref.sid_array != NULL);
 
     /* Useful for debugging acache access. */
     /* This dumps the whole mask for debugging */
@@ -768,6 +769,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
      * This call makes sure it is
      */
     PINT_free_object_attr(&sm_p->getattr.attr);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "looking in acache for entry\n");
     ret = PINT_acache_get_cached_entry(object_ref,
                                        &sm_p->getattr.attr,
                                        &attr_status,
@@ -776,8 +778,8 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     if(ret < 0 || attr_status < 0)
     {
         gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                     "acache: clean acache miss: [%s]\n",
-                      PVFS_OID_str(&object_ref.handle));
+                       "acache: clean acache miss: [%s]\n",
+                       PVFS_OID_str(&object_ref.handle));
   
         js_p->error_code = GETATTR_CACHE_MISS;
         return SM_ACTION_COMPLETE;
@@ -792,31 +794,59 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
      * this code may not be needed when more sophisticated caches
      * are added.  We DO care about the capability flag.
      */
-    /* V3 note a chunck of code that checked for timed out capabilities
+    /* V3 note a chunk of code that checked for timed out capabilities
      * was removed here - pretty sure that was right, but this is here
      * as a marker just in case
      */
 
     /* acache hit, check results */
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                   "acache: clean acache hit: [%s]\n",
+                   PVFS_OID_str(&object_ref.handle));
 
     /* The sys attr mask request is converted to object
      * attr mask values for comparison with the cached
      * entry
      */
-    trimmed_mask = sm_p->getattr.req_attrmask;
+    trimmed_mask = sm_p->getattr.req_attrmask & PVFS_ATTR_GETATTR_VALID;
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "request attrmask:\n");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.req_attrmask);
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "returned attrmask:\n");
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "trimmed attrmask:\n");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, trimmed_mask);
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "returned cached attrmask: type %d\n",
+                   sm_p->getattr.attr.objtype);
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.attr.mask);
 
     /* the trimmed mask is used for making sure that we're only
      * checking attr bits that make sense for the object type
      * since the caller may have requested all attributes in
      * the case where it doesn't know what type of object we're
-     * doing the getattr against.
+     * doing the getattr against.  This starts with the request
+     * attributes
      */
+
+    if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE)
+    {
+        if (trimmed_mask & (PVFS_ATTR_LATEST | PVFS_ATTR_DATA_SIZE)) 
+        {
+            /* must run getattr to get the latest file size */
+        }
+    }
+
+    if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY)
+    {
+        if (trimmed_mask & (PVFS_ATTR_LATEST | PVFS_ATTR_DIR_DIRENT_COUNT))
+        {
+            /* must run getattr to get the latest dirent count */
+        }
+    }
+
+    /* else the acache record will do */
+
+#if 0
     if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE)
     {
         trimmed_mask &= (PVFS_ATTR_META_ALL |
@@ -825,15 +855,21 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     }
     else if (sm_p->getattr.attr.objtype == PVFS_TYPE_SYMLINK)
     {
-        trimmed_mask &= (PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_COMMON_ALL);
+        trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYMLNK_ALL);
     }
     else if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY)
     {
         trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_ALL);
     }
-
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "trimmed attrmask:\n");
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, trimmed_mask);
+    else if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRDATA)
+    {
+        trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIRDATA_ALL);
+    }
+    else if (sm_p->getattr.attr.objtype == PVFS_TYPE_DATAFILE)
+    {
+        trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DATA_ALL);
+    }
+#endif
 
     /* trimmed_mask contains the list of attributes
      * requested for a particular object, 
@@ -850,6 +886,9 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
      */
     missing_attrs = ((trimmed_mask ^ sm_p->getattr.attr.mask) &
                      trimmed_mask);
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "missing requested attrmask:\n");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, missing_attrs);
 
     if (missing_attrs == 0)
     {
@@ -896,9 +935,9 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
         }
         gossip_end;
 
-        js_p->error_code = 0;
+        js_p->error_code = 0; /* hit */
         return SM_ACTION_COMPLETE;
-    }
+    } /* missing_attrs == 0 */
   
     /* check if the only thing missing is the file size, then
      * we don't need to do the object getattr operation, we only

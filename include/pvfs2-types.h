@@ -807,17 +807,19 @@ do { \
 } while (0)
 
 /* This is meant to be called from another debug macro that checks the mask
+ * oref must be a pointer
  */
-#define PVFS_debug_object_ref(oref) \
-do { \
-        gossip_ladebug("Object ref Debug (" #oref "):\n"); \
+#define PVFS_debug_object_ref(oref)                                       \
+do {                                                                      \
+        gossip_ladebug("Object ref Debug (" #oref "):\n");                \
         gossip_ladebug("Handle    %s\n", PVFS_OID_str(&((oref)->handle))); \
-        gossip_ladebug("FS_id     %d\n", (oref)->fs_id); \
-        gossip_ladebug("SID count %d\n", (oref)->sid_count); \
-        if ((oref)->sid_count > 0) \
-        { \
+        gossip_ladebug("FS_id     %d\n", (oref)->fs_id);                \
+        gossip_ladebug("SID count %d\n", (oref)->sid_count);                \
+        if ((oref)->sid_count > 0)                                         \
+        {                                                                  \
            gossip_ladebug("SID %s\n", PVFS_SID_str((oref)->sid_array)); \
-        } \
+        }                                                                  \
+        gossip_ladebug("END Object ref\n");                                 \
 } while (0)     
 
 /* kernel compatibility version of a PVFS_handle */

@@ -356,6 +356,7 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
     struct server_configuration_s *ret_config = NULL;
     server_config_t *config = NULL;
     struct qlist_head *hash_link = NULL;
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Calling Get Config FSID %d\n", fs_id);
 
     if (SC_MGR_INITIALIZED())
     {
@@ -369,7 +370,10 @@ struct server_configuration_s *__PINT_server_config_mgr_get_config(
         }
         else
         {
-            /* grab the first one - we should be on the server */
+            /* grab the first one - we should be on the server 
+             * no we are the client  - might have a race condition 
+             * but the lock should do the trick
+             */
             hash_link = qhash_first(s_fsid_to_config_table);
         }
         if (hash_link)
@@ -401,6 +405,7 @@ void __PINT_server_config_mgr_put_config(struct server_configuration_s *config_s
     struct filesystem_configuration_s *cur_fs = NULL;
     server_config_t *config = NULL;
     struct qlist_head *hash_link = NULL;
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Calling Put Config\n");
 
     if (SC_MGR_INITIALIZED() && config_s)
     {

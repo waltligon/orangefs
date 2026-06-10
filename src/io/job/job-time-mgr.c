@@ -239,7 +239,10 @@ int job_time_mgr_expire(void)
 
     qlist_for_each_safe(iterator, scratch, &bucket_queue)
     {
-	tmp_bucket = qlist_entry(iterator, struct time_bucket, bucket_link);
+	tmp_bucket = qlist_entry(iterator,
+                                 struct time_bucket,
+                                 bucket_link);
+        /* FIX ME - error handling */
         assert(tmp_bucket);
 
 	/* stop when we see the first bucket that has not expired */
@@ -257,7 +260,8 @@ int job_time_mgr_expire(void)
 	    switch(jd->type)
 	    {
 	    case JOB_BMI:
-		gossip_err("%s: job time out: cancelling bmi operation, job_id: %llu.\n", __func__, llu(jd->job_id));
+		gossip_err("%s: job time out: cancelling bmi operation, job_id: %llu.\n",
+                           __func__, llu(jd->job_id));
 		ret = job_bmi_cancel(jd->job_id, jd->context_id);
 	        jd->time_bucket = NULL;
 		break;
@@ -275,15 +279,18 @@ int job_time_mgr_expire(void)
 		else
 		{
 		    /* otherwise kill the flow */
-		    gossip_err("%s: job time out: cancelling flow operation, job_id: %llu.\n", __func__, llu(jd->job_id));
+		    gossip_err("%s: job time out: cancelling flow operation, job_id: %llu.\n",
+                               __func__, llu(jd->job_id));
 		    ret = job_flow_cancel(jd->job_id, jd->context_id);
 	            jd->time_bucket = NULL;
 		}
 		break;
 	    case JOB_TROVE:
-		gossip_err("%s: job time out: cancelling trove operation, job_id: %llu.\n", __func__, llu(jd->job_id));
-		ret = job_trove_dspace_cancel(
-                    jd->u.trove.fsid, jd->job_id, jd->context_id);
+		gossip_err("%s: job time out: cancelling trove operation, job_id: %llu.\n",
+                           __func__, llu(jd->job_id));
+		ret = job_trove_dspace_cancel(jd->u.trove.fsid,
+                                              jd->job_id,
+                                              jd->context_id);
 	        jd->time_bucket = NULL;
                 break;
 	    default:

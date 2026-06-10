@@ -176,7 +176,8 @@ PVFS_error PVFS_isys_create(char *object_name,
     PVFS_size default_strip_size = PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE;
     struct PVFS_sys_mntent mntent;
 
-    gossip_ldebug(GOSSIP_CREATE_DEBUG, "PVFS_isys_create entered\n");
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "--------------------------------------\n"
+                  "PVFS_isys_create entered\n");
     
     if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
@@ -185,6 +186,8 @@ PVFS_error PVFS_isys_create(char *object_name,
         gossip_err("invalid (NULL) required argument\n");
         return ret;
     }
+
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "Check Attributes\n");
 
     /* check to make sure all expected attributes are present */
     if ((attr.mask & PVFS_ATTR_SYS_CREATE_REQUIRED) != PVFS_ATTR_SYS_CREATE_REQUIRED)
@@ -207,8 +210,15 @@ PVFS_error PVFS_isys_create(char *object_name,
 
     if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
     {
+        gossip_err("Error: object name too long ");
         return -PVFS_ENAMETOOLONG;
     }
+
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "Get Config Struct\n");
+
+    /* get config for this filesystem */
+    server_config = PINT_get_server_config_struct(parent_ref.fs_id);
+    fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
 
 #ifndef ENABLE_SECURITY_CERT
     /* if owner/group differ from credential values, and credential is 
@@ -232,6 +242,7 @@ PVFS_error PVFS_isys_create(char *object_name,
 #endif
 
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "create Allocating SMCB\n\n");
+
     PINT_smcb_alloc(&smcb,
                     PVFS_SYS_CREATE,
                     SM_P,
@@ -241,32 +252,75 @@ PVFS_error PVFS_isys_create(char *object_name,
 
     if (smcb == NULL)
     {
+        gossip_err("Error: failed to get SMCB ");
         return -PVFS_ENOMEM;
     }
 
     PINT_state_machine_locate(smcb, 1);
 
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "Get Frame \n");
+
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "Initializing msgarray\n");
 
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.object_name = object_name;
+
     file_attr = &sm_p->u.create.file_attr;
+    /* meta_sid_count is needed for calculating malloc sizes */
+    //file_attr->meta_sid_count = fs_config->metadata_replication_factor;
+
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "File ATTR passed in\n");
+    PVFS_debug_PVFS_object_attr(GOSSIP_CREATE_DEBUG, file_attr);
 
     /* Rather than convert and toss the sys_attrs, save them so we can apply them
      * last in the parent_getattr_inspect function
      */
     //PINT_CONVERT_ATTR(&sm_p->u.create.attr, &attr, PVFS_ATTR_META_ALL);
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "Copying SYS ATTRS\n");
     PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
+
+    gossip_if (GOSSIP_CREATE_DEBUG)
+    {
+        PVFS_debug_object_ref(&parent_ref); /* does not check mask */
+    }
+    gossip_end;
 
     /* save parent reference for later in SM */
     sm_p->parent_ref = parent_ref;
 
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "meta_sid_count %d\n", file_attr->meta_sid_count);
+
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "parent %ld parent_sids %ld\n",
+                  OASZ(1), SASZ(file_attr->meta_sid_count));
+
+    file_attr->parent = malloc(OSASZ(1, file_attr->meta_sid_count));
+    file_attr->parent_sids = (PVFS_SID *)(file_attr->parent + 1);
+
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "parent %p parent_sids %p\n",
+                  file_attr->parent, file_attr->parent_sids);
+
+    
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "Copying parent from file_attr to parent_ref\n");
+    memcpy(&(file_attr->parent),
+           &(parent_ref.handle),
+           OASZ(1));
+
+    memcpy(&(file_attr->parent_sids),
+           &(parent_ref.sid_array),
+           SASZ(file_attr->meta_sid_count));
+
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "parent %s parent_sids %s\n",
+           PVFS_OID_str(file_attr->parent),
+           PVFS_SID_str(file_attr->parent_sids));
+
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
 
-    gossip_ldebug(GOSSIP_CREATE_DEBUG, "create Adding hints\n\n");
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "create Adding hints\n");
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints,
                   PVFS_HINT_HANDLE_NAME,
@@ -289,6 +343,7 @@ PVFS_error PVFS_isys_create(char *object_name,
     /*********************/
 
     /* General attributes */
+    memset (&file_attr->handle, 0, sizeof(PVFS_OID));
     file_attr->objtype = PVFS_TYPE_METAFILE;
     file_attr->mask |= PVFS_ATTR_COMMON_TYPE;
     file_attr->owner = credential->userid;
@@ -299,8 +354,8 @@ PVFS_error PVFS_isys_create(char *object_name,
     file_attr->mask |= PVFS_ATTR_COMMON_PERM;
     file_attr->meta_sid_count = 1;
     file_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT;
-    file_attr->parent = NULL;
-    file_attr->parent_sids = NULL;
+    //file_attr->parent = NULL;
+    //file_attr->parent_sids = NULL;
     /* attributes pertaining to files */
     /* 
      * layout is not an attribute, its is used in this SM to pick servers
@@ -329,9 +384,9 @@ PVFS_error PVFS_isys_create(char *object_name,
     /* Defaults from the config file */
     /*********************************/
 
-    /* get config for this filesystem */
-    server_config = PINT_get_server_config_struct(parent_ref.fs_id);
-    fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
+    /* config information for this FS is already retrieved above
+     * be sore to release it when we are done
+     */
 
     if (fs_config->default_num_dfiles > 0)
     {
@@ -731,8 +786,10 @@ static PINT_sm_action create_init(struct PINT_smcb *smcb, job_status_s *js_p)
          * The retry path comes through here so we'll want to reset it before each
          * retry. 
          */
+        gossip_lsdebug(GOSSIP_CREATE_DEBUG, "Retry. Copying saved file attrs\n");
         if (sm_p->u.create.retry_count > 0)
         {
+/* We have switched from create to getattr so these refs are bad */
             PINT_copy_object_attr(&(sm_p->u.create.file_attr), 
                                   &(sm_p->u.create.store_attr));
         }

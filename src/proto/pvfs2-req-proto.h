@@ -1068,8 +1068,8 @@ do {                                                        \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
         PVFS_debug_afield(tresp->caller_handle_index, uint32_t);\
         PVFS_debug_afield(tresp->handle_count, uint32_t);    \
-        PVFS_debug_afield(tresp->size, PVFS_size);    \
-        PVFS_debug_afield(tresp->error, PVFS_error);    \
+        PVFS_debug_aafield(tresp->size, PVFS_size, tresp->handle_count);    \
+        PVFS_debug_aafield(tresp->error, PVFS_error, tresp->handle_count);    \
         gossip_lsadebug("Tree Get File Size End:\n");                   \
     }                                                       \
     gossip_end;                                             \
@@ -1308,7 +1308,7 @@ do {                                                        \
         gossip_lsadebug("Tree Getattr Response: " #_resp " = (%p)\n", (_resp)); \
         PVFS_debug_afield(tresp->caller_handle_index, uint32_t);\
         PVFS_debug_afield(tresp->handle_count, uint32_t);   \
-        PVFS_debug_afield(tresp->error, PVFS_error);        \
+        PVFS_debug_aafield(tresp->error, PVFS_error, tresp->handle_count);        \
         PVFS_debug_PVFS_attr(_mask, &tresp->attr);           \
         gossip_lsadebug("Tree Getattr End:\n");             \
     }                                                       \
@@ -3278,7 +3278,7 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Listattr Response: " #_resp " = (%p)\n", (_resp)); \
         PVFS_debug_afield(tresp->nhandles, uint32_t);       \
-        PVFS_debug_afield(tresp->error, PVFS_error);        \
+        PVFS_debug_aafield(tresp->error, PVFS_error, tresp->nhandles);        \
         PVFS_debug_PVFS_attr(_mask, &tresp->attr);          \
         gossip_lsadebug("Listattr End:\n");                 \
     }                                                       \
@@ -3722,8 +3722,8 @@ do {                                                        \
         PVFS_debug_afield(&treq->handle, PVFS_handle);       \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->nkey, int32_t);             \
-        PVFS_debug_afield(treq->key, PVFS_ds_keyval);       \
-        PVFS_debug_afield(treq->valsz, PVFS_size);          \
+        PVFS_debug_aafield(treq->key, PVFS_ds_keyval, treq->nkey);       \
+        PVFS_debug_aafield(treq->valsz, PVFS_size, treq->nkey);          \
         gossip_lsadebug("Geteattr End:\n");                 \
     }                                                       \
     gossip_end;                                             \
@@ -3780,7 +3780,7 @@ do {                                                        \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
         PVFS_debug_afield(tresp->nkey, int32_t);\
         PVFS_debug_afield(tresp->val, PVFS_ds_keyval);    \
-        PVFS_debug_afield(tresp->err, PVFS_error);    \
+        PVFS_debug_aafield(tresp->err, PVFS_error, tresp->nkey);    \
         gossip_lsadebug("Geteattr End:\n");                   \
     }                                                       \
     gossip_end;                                             \
@@ -3987,7 +3987,7 @@ do {                                                        \
         gossip_lsadebug("Atomiceattr Response:\n");               \
         gossip_lsadebug("resp = (%p)\n", (resp));             \
         PVFS_debug_afield(tresp->nkey, int32_t);\
-        PVFS_debug_afield(tresp->err, PVFS_error);    \
+        PVFS_debug_afield(tresp->err, PVFS_error, tresp->nkey);    \
         PVFS_debug_afield(tresp->ret_val, PVFS_ds_keyval);    \
         gossip_lsadebug("Atomiceattr End:\n");                   \
     }                                                       \
@@ -4097,7 +4097,7 @@ do {                                                        \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->token, PVFS_ds_position);   \
         PVFS_debug_afield(treq->nkey, uint32_t);            \
-        PVFS_debug_afield(treq->keysz, PVFS_size);          \
+        PVFS_debug_afield(treq->keysz, PVFS_size, treq->nkey);          \
         gossip_lsadebug("Listeattr End:\n");                \
     }                                                       \
     gossip_end;                                             \

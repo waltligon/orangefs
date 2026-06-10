@@ -529,15 +529,31 @@ do { \
     sprintf(_string, "%p", _stat_p); \
 } while (0)
 
-#define PVFS_debug_afield(_field, _type)               \
-do {                                                   \
-    char _string[100];                                 \
-    char _print = 'Y';                                 \
-    PVFS_to_string_##_type((_field), _string, _print); \
-    if (_print == 'Y')                                 \
-    {                                                  \
-        gossip_ladebug("    " #_field ": %s\n", _string); \
-    }                                                  \
+#define PVFS_debug_afield(_field, _type)                   \
+do {                                                       \
+    char _string[100];                                     \
+    char _print = 'Y';                                     \
+    PVFS_to_string_##_type((_field), _string, _print);     \
+    if (_print == 'Y')                                     \
+    {                                                      \
+        gossip_ladebug("    " #_field ": %s\n", _string);  \
+    }                                                      \
+} while (0) 
+
+/* This version takes a pointer to an array */
+#define PVFS_debug_aafield(_field, _type, _count)              \
+do {                                                           \
+    char _string[100];                                         \
+    char _print = 'Y';                                         \
+    int i;                                                     \
+    for (i = 0; i < (_count); i++)                             \
+    {                                                          \
+        PVFS_to_string_##_type((_field)[i], _string, _print);  \
+        if (_print == 'Y')                                     \
+        {                                                      \
+            gossip_ladebug("    " #_field ": %s\n", _string);  \
+        }                                                      \
+    }                                                          \
 } while (0) 
 
 #define PVFS_debug_areqfield(_field, _type) \

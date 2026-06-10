@@ -164,6 +164,13 @@ machine pvfs2_client_lookup_sm
 
 %%
 
+/* Initialize_context
+ * call in PVFS_isys_ref_lookup and lookup_segment_handle_relative_link
+ * This sets up a new context for each segment of a path.
+ * The context hold the path, segment and remaining parts.
+ * This is often tricky when symlinks are involved.
+ */
+
 static int initialize_context(struct PINT_client_lookup_sm *lookup_sm,
                               char *pathname,
                               PVFS_object_ref ctx_starting_refn)
@@ -215,8 +222,10 @@ static int initialize_context(struct PINT_client_lookup_sm *lookup_sm,
             {
                 return -PVFS_ENOMEM;
             }
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "initialize_context: context realloc\n");
         }
     }
+    gossip_debug(GOSSIP_LOOKUP_DEBUG, "total cts: %d\n", lookup_sm->context_count);
 
     if (!pathname)
     {
@@ -422,7 +431,7 @@ static int initialize_context(struct PINT_client_lookup_sm *lookup_sm,
                gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s\n",ctx->segments[i].seg_name);
                continue;
             }
-            gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s",ctx->segments[i].seg_name);
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "/%s\n",ctx->segments[i].seg_name);
         }
     }
 #endif
@@ -493,6 +502,8 @@ static void finalize_context(PINT_client_lookup_sm_ctx *ctx)
     int i = 0;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
+    gossip_ldebug(GOSSIP_LOOKUP_DEBUG, "Running list of %d segments\n",
+                                       MAX_LOOKUP_SEGMENTS);
     for (i = 0; i < MAX_LOOKUP_SEGMENTS; i++)
     {
         cur_seg = &ctx->segments[i];
@@ -500,19 +511,19 @@ static void finalize_context(PINT_client_lookup_sm_ctx *ctx)
 
         if (cur_seg->seg_name)
         {
-            gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                         "Freeing segment %s starting %s resolved %s\n",
-                         cur_seg->seg_name,
-                         PVFS_OID_str(&(cur_seg->seg_starting_refn.handle)),
-                         PVFS_OID_str(&(cur_seg->seg_resolved_refn.handle)));
+            gossip_ldebug(GOSSIP_LOOKUP_DEBUG,
+                          "Freeing segment %s starting %s resolved %s\n",
+                          cur_seg->seg_name,
+                          PVFS_OID_str(&(cur_seg->seg_starting_refn.handle)),
+                          PVFS_OID_str(&(cur_seg->seg_resolved_refn.handle)));
             free(cur_seg->seg_name);
             cur_seg->seg_name = NULL;
         }
 
         if (cur_seg->path_remaining)
         {
-            gossip_debug(GOSSIP_LOOKUP_DEBUG, "Freeing remaining "
-                         "path %s\n", cur_seg->path_remaining);
+            gossip_debug(GOSSIP_LOOKUP_DEBUG, "Freeing remaining path %s\n",
+                         cur_seg->path_remaining);
             free(cur_seg->path_remaining);
             cur_seg->path_remaining = NULL;
         }
@@ -520,6 +531,8 @@ static void finalize_context(PINT_client_lookup_sm_ctx *ctx)
         gossip_ldebug(GOSSIP_LOOKUP_DEBUG,
                       "-----------------------------\n");
     }
+    gossip_ldebug(GOSSIP_LOOKUP_DEBUG,
+                  "================================\n");
 }
 
 /****************************************************************/
@@ -824,12 +837,18 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
          * and store the retrieved attr in the current
          * segment (if one was returned)
          */
+
         if (i < resp_p->u.lookup_path.attr_count)
         {
             /* add update to acache here or when msgpairarray returns 
              * WBL - V3 this is not done in either place currently and
              * we have to re-fetch the attr from the server.  Add this
              * here! */
+            gossip_ldebug(GOSSIP_LOOKUP_DEBUG, "acache update\n");
+
+            PINT_acache_update(last_resolved_refn,
+                               &(cur_seg->seg_attr),
+                               NULL); /* ptr to size */
             PINT_free_object_attr(&(cur_seg->seg_attr));
             PINT_copy_object_attr(&(cur_seg->seg_attr),
                                   &(resp_p->u.lookup_path.attr_array[i]));
@@ -838,9 +857,11 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
         memcpy(oid1,
                PVFS_OID_str(&last_resolved_refn.handle),
                OID_STR_SZ); 
+
         memcpy(oid2,
                PVFS_OID_str(&cur_seg->seg_starting_refn.handle),
                OID_STR_SZ); 
+
         gossip_ldebug(GOSSIP_LOOKUP_DEBUG,
                       "ncache update on %s target (%s|%d) parent (%s|%d)\n",
                       cur_seg->seg_name, oid1,
@@ -1210,13 +1231,13 @@ static PINT_sm_action lookup_segment_handle_relative_link(
     char *relative_symlink_target = NULL;
 
     /*
-      NOTE: if we have a relative link, we need to essentially
-      recurse.  we're basically doing that iteratively by moving to a
-      new context and continuing along our completely linear state
-      machine.  the absolute link case is a simplification of this
-      case.  the reason this is tricker is because the relative link
-      may contain '.' and '..' characters (i.e. foo -> ../oldfoo)
-    */
+     * NOTE: if we have a relative link, we need to essentially
+     * recurse.  we're basically doing that iteratively by moving to a
+     * new context and continuing along our completely linear state
+     * machine.  the absolute link case is a simplification of this
+     * case.  the reason this is tricker is because the relative link
+     * may contain '.' and '..' characters (i.e. foo -> ../oldfoo)
+     */
     gossip_lsdebug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
                    "handle relative link\n");
 
@@ -1230,13 +1251,13 @@ static PINT_sm_action lookup_segment_handle_relative_link(
 
     sm_p->u.lookup.current_context++;
     /*
-      and initialize the new context with the information we have so
-      that it can resolve this absolute link.
-
-      the starting refn is initialized as the starting refn of
-      the segment that resolves to this relative link, since the
-      link must be relative to that starting parent
-    */
+     * and initialize the new context with the information we have so
+     * that it can resolve this absolute link.
+     *
+     * the starting refn is initialized as the starting refn of
+     * the segment that resolves to this relative link, since the
+     * link must be relative to that starting parent
+     */
     ret = initialize_context(&sm_p->u.lookup,
                              relative_symlink_target,
                              cur_seg->seg_starting_refn);
@@ -1463,11 +1484,12 @@ static PINT_sm_action lookup_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     int i = 0;
 
     gossip_lsdebug(DBG_OR(2,GOSSIP_CLIENT_DEBUG,GOSSIP_LOOKUP_DEBUG),
-                   "cleaning up memory and such\n");
+                   "sm-p (%p) cleaning up memory and such\n", sm_p);
 
-    /* clear navigations flags */
+    /* clear navigation flags */
     if (js_p->error_code > 0)
     {
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "nav codes cleared\n");
         js_p->error_code = 0;
     }
 
@@ -1476,6 +1498,9 @@ static PINT_sm_action lookup_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
     sm_p->error_code = js_p->error_code;
 
     /* clean up all used memory for this lookup */
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                   "looping to clear context count %d\n",
+                   sm_p->u.lookup.context_count);
     for (i = 0; i < sm_p->u.lookup.context_count; i++)
     {
         finalize_context(&sm_p->u.lookup.contexts[i]);

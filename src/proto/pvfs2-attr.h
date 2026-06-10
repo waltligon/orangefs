@@ -80,10 +80,18 @@ typedef uint64_t PVFS_object_attrmask;
              PVFS_ATTR_SYMLNK_ALL  | PVFS_ATTR_DIRDATA_ALL)
 
 #define PVFS_ATTR_READ_LATEST \
-            (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_LATEST) \
+            (PVFS_ATTR_COMMON_ALL  | PVFS_ATTR_LATEST)
 
 #define PVFS_ATTR_FASTEST            (1UL << 62)
 #define PVFS_ATTR_LATEST             (1UL << 63)
+
+#define PVFS_ATTR_GETATTR_VALID           \
+            (PVFS_ATTR_DIR_DIRENT_COUNT | \
+             PVFS_ATTR_META_SIZE        | \
+             PVFS_ATTR_LATEST           | \
+             PVFS_ATTR_FASTEST          | \
+             PVFS_ATTR_CAPABILITY)
+
 
 /* latest and fastest refer to atime, mtime, ctime, file size
  * and dirent_count.  Fastest returns the value stored in the
