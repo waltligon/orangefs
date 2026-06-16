@@ -350,9 +350,9 @@ PVFS_error PVFS_isys_io(PVFS_object_ref ref,
         return ret;
     }
 
-    server_config = PINT_get_server_config_struct(ref.fs_id);
+    server_config = PINT_server_config_mgr_get_config(ref.fs_id);
     cur_fs = PINT_config_find_fs_id(server_config, ref.fs_id);
-    PINT_put_server_config_struct(server_config);
+    PINT_server_config_mgr_put_config(server_config);
 
     if (!cur_fs)
     {
@@ -1475,7 +1475,7 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
         cur_ctx->msg_recv_has_been_posted = 0;
         cur_ctx->msg_recv_in_progress = 0;
 
-        server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
+        server_config = PINT_server_config_mgr_get_config(sm_p->object_ref.fs_id);
 
         ret = job_bmi_recv(msg->svr_addr,
                            msg->encoded_resp_p,
@@ -1490,7 +1490,7 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
                            server_config->client_job_bmi_timeout,
                            sm_p->hints);
 
-        PINT_put_server_config_struct(server_config);
+        PINT_server_config_mgr_put_config(server_config);
 
         /* ret -1: problem, do not look at msg recv_status */
         /* ret 1: immediate completion, see status */
@@ -1565,7 +1565,7 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
         gossip_debug(GOSSIP_IO_DEBUG," posting send with "
                      "status_user_tag=%lu\n", status_user_tag);
 
-        server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
+        server_config = PINT_server_config_mgr_get_config(sm_p->object_ref.fs_id);
 
         ret = job_bmi_send_list(msg->encoded_req.dest,
                                 msg->encoded_req.buffer_list,
@@ -1583,7 +1583,7 @@ static PINT_sm_action io_datafile_post_msgpairs(struct PINT_smcb *smcb,
                                 server_config->client_job_bmi_timeout,
                                 sm_p->hints);
 
-        PINT_put_server_config_struct(server_config);
+        PINT_server_config_mgr_put_config(server_config);
 
         if (ret < 0)
         {
@@ -2034,12 +2034,12 @@ static PINT_sm_action io_datafile_complete_operations(struct PINT_smcb *smcb,
 
             assert(sm_p->u.io.write_ack_completion_count);
 
-            server_config = PINT_get_server_config_struct(
+            server_config = PINT_server_config_mgr_get_config(
                                              sm_p->object_ref.fs_id);
             ret = job_reset_timeout(cur_ctx->write_ack.recv_id,
                                     server_config->client_job_bmi_timeout);
 
-            PINT_put_server_config_struct(server_config);
+            PINT_server_config_mgr_put_config(server_config);
 
             /*
               allow -PVFS_EINVAL errors in case the recv has already
@@ -2858,7 +2858,7 @@ static inline int io_post_flow(PINT_smcb *smcb, PINT_client_io_ctx *cur_ctx)
 
     status_user_tag = ((4 * cur_ctx->index) + IO_SM_PHASE_FLOW);
 
-    server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);    
+    server_config = PINT_server_config_mgr_get_config(sm_p->object_ref.fs_id);    
 
     fs_config = PINT_config_find_fs_id(server_config, cur_ctx->msg.fs_id);
     if(fs_config)
@@ -2877,7 +2877,7 @@ static inline int io_post_flow(PINT_smcb *smcb, PINT_client_io_ctx *cur_ctx)
                    server_config->client_job_flow_timeout,
                    sm_p->hints);
 
-    PINT_put_server_config_struct(server_config);
+    PINT_server_config_mgr_put_config(server_config);
 
     /* if the flow fails immediately, then we have to do some special
      * handling.  This function is not equiped to handle the failure
@@ -3484,7 +3484,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
 
 #ifndef PVFS2_SMALL_IO_OFF
             /* we need the encoding type from the server config */
-            server_config = PINT_get_server_config_struct(fs_id);
+            server_config = PINT_server_config_mgr_get_config(fs_id);
             if(!server_config)
             {
                 return -PVFS_EINVAL;
@@ -3505,7 +3505,7 @@ static int io_find_target_datafiles(PVFS_Request mem_req,
                              PVFS_SERV_SMALL_IO, 
                              fs_config->encoding);
 
-            PINT_put_server_config_struct(server_config);
+            PINT_server_config_mgr_put_config(server_config);
 
             if(io_type == PVFS_IO_WRITE)
             {

@@ -27,9 +27,13 @@ int PINT_server_get_config(struct server_configuration_s *config,
                            const PVFS_credential *credential,
                            PVFS_hint hints);
 
+/* DO NOT USE THESE USE PINT_server_config_mgr_get_config */
+#if 0
 struct server_configuration_s *PINT_get_server_config_struct(PVFS_fs_id fs_id);
 
 void PINT_put_server_config_struct(struct server_configuration_s *config);
+
+#endif
 
 int PINT_lookup_parent(char *filename,
                        PVFS_fs_id fs_id,

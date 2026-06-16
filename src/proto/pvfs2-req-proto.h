@@ -1109,17 +1109,17 @@ do {                                                                 \
                                   &((_req)->u.tree_get_dirent_count); \
     gossip_if (_mask)                                                \
     {                                                                \
-        gossip_lsadebug("PVFS_debug_servreq_tree_get_dirent_count:\n" \
-                        #_req " = (%p)\n", (_req));                   \
+        gossip_lsadebug("Debug Req tree_get_dirent_count START\n");  \
+        gossip_ladebug(#_req " = (%p)\n", (_req));                   \
         PVFS_debug_afield(treq->caller_handle_index, uint32_t);      \
         PVFS_debug_afield(treq->retry_msgpair_at_leaf, int32_t);     \
-        PVFS_debug_afield(&((treq)->credential), PVFS_credential);   \
         PVFS_debug_afield(treq->num_dirdata, uint32_t);              \
         PVFS_debug_afield(treq->handle_array, PVFS_handle);          \
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);                  \
         PVFS_debug_afield(treq->sid_count, int32_t);                 \
         PVFS_debug_afield(treq->sid_array, PVFS_SID);                \
-        gossip_lsadebug("PVFS_debug_servreq_tree_get_dirent_count: End\n"); \
+        PVFS_debug_afield(&((treq)->credential), PVFS_credential);   \
+        gossip_ladebug("Debug Req tree_get_dirent_count End\n");    \
     }                                                                \
     gossip_end;                                                      \
 } while (0)

@@ -773,12 +773,12 @@ static int lookup_segment_lookup_comp_fn(void *v_p,
     /*
      * Find metadata replication factor from configuration
      */
-    server_config = PINT_get_server_config_struct(
+    server_config = PINT_server_config_mgr_get_config(
                                     sm_p->u.lookup.starting_refn.fs_id);
     cur_fs = PINT_config_find_fs_id(server_config,
                                     sm_p->u.lookup.starting_refn.fs_id);
     metasidcnt = cur_fs->metadata_replication_factor;
-    PINT_put_server_config_struct(server_config);
+    PINT_server_config_mgr_put_config(server_config);
 
     /*
      * at this point we have 1 or more resolved handles so we're going

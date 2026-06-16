@@ -175,9 +175,11 @@ PVFS_error PVFS_isys_create(char *object_name,
     PVFS_object_attr *file_attr = NULL;
     PVFS_size default_strip_size = PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE;
     struct PVFS_sys_mntent mntent;
+    int32_t meta_sid_count;
 
-    gossip_ldebug(GOSSIP_CREATE_DEBUG, "--------------------------------------\n"
-                  "PVFS_isys_create entered\n");
+    gossip_ldebug(GOSSIP_CREATE_DEBUG,
+                  "--------------------------------------------\n");
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "PVFS_isys_create entered\n");
     
     if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
@@ -215,10 +217,6 @@ PVFS_error PVFS_isys_create(char *object_name,
     }
 
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "Get Config Struct\n");
-
-    /* get config for this filesystem */
-    server_config = PINT_get_server_config_struct(parent_ref.fs_id);
-    fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
 
 #ifndef ENABLE_SECURITY_CERT
     /* if owner/group differ from credential values, and credential is 
@@ -264,6 +262,7 @@ PVFS_error PVFS_isys_create(char *object_name,
 
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "Initializing msgarray\n");
 
+//CALLS GET/PUT CONFIG WITH LOCK
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.create.create_resp = resp;
@@ -289,28 +288,34 @@ PVFS_error PVFS_isys_create(char *object_name,
     }
     gossip_end;
 
+//GET CONFIG STRUCTS
+    /* get config for this filesystem */
+    server_config = PINT_server_config_mgr_get_config(parent_ref.fs_id);
+    fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
+    meta_sid_count =  fs_config->metadata_replication_factor;
+
     /* save parent reference for later in SM */
     sm_p->parent_ref = parent_ref;
+    file_attr->meta_sid_count = meta_sid_count;
 
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "meta_sid_count %d\n", file_attr->meta_sid_count);
 
-    gossip_ldebug(GOSSIP_CREATE_DEBUG, "parent %ld parent_sids %ld\n",
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "in bytes: parent %ld parent_sids %ld\n",
                   OASZ(1), SASZ(file_attr->meta_sid_count));
 
     file_attr->parent = malloc(OSASZ(1, file_attr->meta_sid_count));
     file_attr->parent_sids = (PVFS_SID *)(file_attr->parent + 1);
 
-    gossip_ldebug(GOSSIP_CREATE_DEBUG, "parent %p parent_sids %p\n",
+    gossip_ldebug(GOSSIP_CREATE_DEBUG, "ptrs: parent %p parent_sids %p\n",
                   file_attr->parent, file_attr->parent_sids);
 
-    
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "Copying parent from file_attr to parent_ref\n");
-    memcpy(&(file_attr->parent),
+    memcpy(file_attr->parent,
            &(parent_ref.handle),
            OASZ(1));
 
-    memcpy(&(file_attr->parent_sids),
-           &(parent_ref.sid_array),
+    memcpy(file_attr->parent_sids,
+           parent_ref.sid_array,
            SASZ(file_attr->meta_sid_count));
 
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "parent %s parent_sids %s\n",
@@ -385,8 +390,10 @@ PVFS_error PVFS_isys_create(char *object_name,
     /*********************************/
 
     /* config information for this FS is already retrieved above
-     * be sore to release it when we are done
+     * be sure to release it when we are done
      */
+
+//NEEDS FS CONFIG
 
     if (fs_config->default_num_dfiles > 0)
     {
@@ -407,11 +414,10 @@ PVFS_error PVFS_isys_create(char *object_name,
         file_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT;
     }
 
-    /* return checked out verion of config struct */
-    /* must free before call to get_default_distribution */
-    PINT_put_server_config_struct(server_config);
-
+//NEEDS SERVER CONFIG
     /* Distributions are a little more complicated */
+
+    /* why is this conditional on server_config - doesn't use it! */
     if (server_config && server_config->default_dist_config.name)
     {
         /* free the system default */
@@ -421,6 +427,11 @@ PVFS_error PVFS_isys_create(char *object_name,
         file_attr->mask |= PVFS_ATTR_META_DIST;
         /* dist_size is only used by decode to report the size of the dist */
     }
+
+//RETERN CONFIG
+    /* return checked out verion of config struct */
+    /* must free before call to get_default_distribution */
+    PINT_server_config_mgr_put_config(server_config);
 
     /***********************************/
     /* Defaults from the mount options */
@@ -1366,7 +1377,8 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "dfile_array before = (%p)\n", sm_p->u.create.file_attr.u.meta.dfile_array);
+    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "dfile_array before = (%p)\n",
+                   sm_p->u.create.file_attr.u.meta.dfile_array);
 
     /* object ref will now refer to newly created metadata object */
     sm_p->object_ref.handle =   *sm_p->u.create.metadata_handle;
@@ -1380,21 +1392,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
-    /* resolve and print selected server only if gossip debugging enabled 
-     * should we print more details here - OIDs and SIDs, etc.
-     */
-    gossip_if(GOSSIP_CLIENT_DEBUG)
-    {
-        gossip_lsadebug(
-                     "sys_create: selected meta \n"
-                     "                    OID: %s\n"
-                     "                    SID: %s\n", 
-                     PVFS_OID_str(&sm_p->object_ref.handle),
-                     PVFS_SID_str(&sm_p->object_ref.sid_array[0]));
-        gossip_lsadebug("sys-create: Setting up create request\n");
-    }
-    gossip_end;
-
+    // DEBUG CALL
     PINT_SERVREQ_CREATE_FILL(msg_p->req,
                              sm_p->getattr.attr.capability,
                              *sm_p->cred_p,
@@ -1417,9 +1415,11 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                              sm_p->u.create.datafile_sid_count,
                              sm_p->u.create.datafile_sid_array,
                              */
-    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "dfile_array after = (%p)\n", msg_p->req.u.create.attr.u.meta.dfile_array);
+    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "dfile_array after = (%p)\n",
+                   msg_p->req.u.create.attr.u.meta.dfile_array);
 
-    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "sys-create: Setting up message request\n");
+    gossip_lsdebug(GOSSIP_CREATE_DEBUG,
+                   "sys-create: Setting up message struct\n");
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
 
@@ -1486,7 +1486,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                      PVFS_SID_str(&msg_p->sid_array[0]));
     }
 
-    gossip_debug(GOSSIP_CREATE_DEBUG, "sys-create: Push frame\n");
+    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "sys-create: Push frame\n");
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;
 }
@@ -1741,7 +1741,7 @@ static PINT_sm_action create_cleanup(struct PINT_smcb *smcb, job_status_s *js_p)
                                                          sizeof(*sm_p->object_ref.sid_array));
         if (sm_p->u.create.create_resp->ref.sid_array == NULL)
         {
-           gossip_err("%s: Error allocating memory for sid array.\n",__func__);
+           gossip_lerr("Error allocating memory for sid array.\n");
            js_p->error_code = -PVFS_ENOMEM;
            return SM_ACTION_COMPLETE;
         }
@@ -1899,8 +1899,11 @@ static PINT_dist *get_default_distribution(PVFS_fs_id fs_id)
     server_configuration_t *server_config = NULL;
     PINT_dist *dist = NULL;
 
+    gossip_ldebug(GOSSIP_CREATE_DEBUG,
+                  "will get distribution through server config mgr\n");
+
     /* Retrieve the server configuration (with mutex) */
-    server_config = PINT_get_server_config_struct(fs_id);
+    server_config = PINT_server_config_mgr_get_config(fs_id);
 
     /* If a default dist is specified in the config, use that
        else just create a simple_stripe distribution */
@@ -1917,7 +1920,7 @@ static PINT_dist *get_default_distribution(PVFS_fs_id fs_id)
      * either here or when the default is set up
      */
     
-    /* this allocates a packed memory space with the PINT_dist strucct,
+    /* this allocates a packed memory space with the PINT_dist struct,
      * name string and distribution specific parameters.
      */
     dist = PINT_dist_create(server_config->default_dist_config.name);
@@ -1933,6 +1936,9 @@ static PINT_dist *get_default_distribution(PVFS_fs_id fs_id)
      * array in the PINT_dist struct
      */
     PINT_llist_p iter = server_config->default_dist_config.param_list;
+
+    /* Release the server config mutex */
+    PINT_server_config_mgr_put_config(server_config);
 
     /* Iterate through the supplied distribution parameters */
     while (iter)
@@ -1964,9 +1970,6 @@ static PINT_dist *get_default_distribution(PVFS_fs_id fs_id)
     }                
 
 getdist_exit:
-
-    /* Release the server config mutex */
-    PINT_put_server_config_struct(server_config);
 
     return dist;
 }

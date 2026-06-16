@@ -183,10 +183,10 @@ PVFS_error PVFS_isys_readdir(PVFS_object_ref ref,
     /*
      * Find metadata replication factor from configuration
      */
-    server_config = PINT_get_server_config_struct(ref.fs_id);
+    server_config = PINT_server_config_mgr_get_config(ref.fs_id);
     cur_fs = PINT_config_find_fs_id(server_config, ref.fs_id);
     sm_p->readdir.meta_sid_count = cur_fs->metadata_replication_factor;
-    PINT_put_server_config_struct(server_config);
+    PINT_server_config_mgr_put_config(server_config);
 
     PVFS_hint_copy(hints, &sm_p->hints);
     PVFS_hint_add(&sm_p->hints,

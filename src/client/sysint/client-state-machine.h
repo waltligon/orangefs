@@ -969,7 +969,7 @@ do {                                                          \
 do {                                                                \
     PINT_sm_msgpair_params *mpp = &client_sm_p->msgarray_op.params; \
     struct server_configuration_s *server_config =                  \
-        PINT_get_server_config_struct(__fsid);                      \
+        PINT_server_config_mgr_get_config(__fsid);                  \
     mpp->job_context = pint_client_sm_context;                      \
     mpp->quiet_flag = PVFS2_CLIENT_QUIET_FLAG_DEFAULT;              \
     mpp->fork_flag = PVFS2_CLIENT_FORK_FLAG_DEFAULT;                \
@@ -989,7 +989,7 @@ do {                                                                \
         mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;        \
         mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;     \
     }                                                               \
-    PINT_put_server_config_struct(server_config);                   \
+    PINT_server_config_mgr_put_config(server_config);                   \
 } while(0)
 
 struct PINT_client_op_entry_s

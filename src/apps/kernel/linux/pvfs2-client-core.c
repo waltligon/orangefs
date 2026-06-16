@@ -2227,11 +2227,11 @@ static PVFS_error service_fs_key_request(vfs_request_t *vfs_request)
             "service_fs_key_request called for fsid %d\n",
             vfs_request->in_upcall.req.fs_key.fsid);
     /* get a pointer to the server configuration */
-    sconfig = PINT_get_server_config_struct(
+    sconfig = PINT_server_config_mgr_get_config(
               vfs_request->in_upcall.req.fs_key.fsid);
     if (sconfig == NULL)
     {
-        gossip_err("PINT_get_server_config_struct failed:\n");
+        gossip_err("PINT_server_config_mgr_get_config failed:\n");
         ret = -PVFS_ENOENT;
         goto out;
     }
@@ -2241,7 +2241,7 @@ static PVFS_error service_fs_key_request(vfs_request_t *vfs_request)
                            &key,
                            &key_len);
     /* drop reference to the server configuration */
-    PINT_put_server_config_struct(sconfig);
+    PINT_server_config_mgr_put_config(sconfig);
     if (key_len == 0)
     {
         ret = 0;

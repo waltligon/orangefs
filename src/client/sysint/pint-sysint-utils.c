@@ -76,11 +76,13 @@ static void dyn_destroy_function(struct CRYPTO_dynlock_value*,const char*,int);
 #endif /* HAVE_OPENSSL */
 
 
+/* DO NO USE THIS USE PINT_server_config_mgr_get_config */
 /*
   analogous to 'PINT_get_server_config' in config-utils.c -- only an
   fs_id is required since any client may know about different server
   configurations during run-time
 */
+#if 0
 struct server_configuration_s *PINT_get_server_config_struct(
                                                 PVFS_fs_id fs_id)
 {
@@ -91,6 +93,7 @@ void PINT_put_server_config_struct(struct server_configuration_s *config)
 {
     PINT_server_config_mgr_put_config(config);
 }
+#endif
 
 /* PINT_lookup_parent()
  *

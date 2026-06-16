@@ -72,7 +72,7 @@ int PVFS_mgmt_get_config(const PVFS_fs_id *fsid,
 
     PINT_init_sysint_credential(sm_p->cred_p, credential);
 
-    config = PINT_get_server_config_struct(*fsid);
+    config = PINT_server_config_mgr_get_config(*fsid);
 
     mntent.the_pvfs_config_server = (char *)BMI_addr_rev_lookup(*addr);
     if(!mntent.the_pvfs_config_server)
@@ -81,7 +81,7 @@ int PVFS_mgmt_get_config(const PVFS_fs_id *fsid,
         gossip_err("UNKNOWN CONFIG SERVER\n");
     }
 
-    PINT_put_server_config_struct(config);
+    PINT_server_config_mgr_put_config(config);
 
     cur_fs = PINT_config_find_fs_id(config, *fsid);
 

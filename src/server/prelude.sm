@@ -174,13 +174,6 @@ static PINT_sm_action prelude_setup(struct PINT_smcb *smcb, job_status_s *js_p)
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
     PINT_server_req_get_credential(s_op->req, &cred);
-    if (cred)
-    {
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "cred: (%p)\n", cred);
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "userid: %d\n", cred->userid);
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "num_groups: %d\n", cred->num_groups);
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "issuer: (%p)\n", cred->issuer);
-    }
 
     gossip_if(GOSSIP_SERVER_DEBUG)
     {
@@ -269,8 +262,6 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
     {
         gossip_lsadebug("s_op (%p) %s (prelude sm)\n", s_op,
                         PINT_map_server_op_to_string(s_op->req->op));
-        gossip_lsadebug("\tbase_frame:%d\tframe_count:%d\n",
-                        smcb->base_frame,smcb->frame_count);
         gossip_lsadebug("posting schedule for op type %d, "
                         "fs_id %d handle %s\n", s_op->req->op,
                         s_op->target_fs_id, PVFS_OID_str(&s_op->target_handle));

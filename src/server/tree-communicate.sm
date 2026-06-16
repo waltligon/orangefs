@@ -65,6 +65,8 @@ static int tree_setattr_comp_fn(void *v_p,
 
 %%
 
+/* ===================TREE SETATTR================*/
+
 machine pvfs2_tree_setattr_sm
 {
     state tree_setattr_do_work
@@ -105,6 +107,8 @@ nested machine pvfs2_tree_setattr_work_sm
     }
 }
 
+/* ===================TREE REMOVE================*/
+
 machine pvfs2_tree_remove_sm
 {
     state tree_remove_do_work
@@ -144,6 +148,8 @@ nested machine pvfs2_tree_remove_work_sm
         default => return;
     }
 }
+
+/* ===================GET FILE SIZE================*/
 
 machine pvfs2_tree_get_file_size_sm
 {
@@ -196,6 +202,8 @@ nested machine pvfs2_tree_get_file_size_work_sm
         default => return;
     }
 }
+
+/* ===================GET DIRENT COUNT================*/
 
 machine pvfs2_tree_get_dirent_count_sm
 {
@@ -262,6 +270,8 @@ nested machine pvfs2_tree_get_dirent_count_work_sm
         default => return;
     }
 }
+
+/* ===================TREE GETATTR================*/
 
 machine pvfs2_tree_getattr_sm
 {       
@@ -476,6 +486,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
             tc->handle_array_remote_count++;
         }
     }/*end for each datafile*/
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "local_count %d remote_count %d\n",
+                                        tc->handle_array_local_count,
+                                        tc->handle_array_remote_count);
 
 
     /* For each local handle, setup a state machine frame, 
@@ -720,7 +733,8 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
  
         } /* end for each local handle */
     } /* end if local */
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done with local\n");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done with local %d OIDs\n",
+                                         tc->handle_array_local_count);
 
     /* END OF LOCAL FILES - NOW REMOTE FILES */
 
@@ -1089,8 +1103,9 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
         {
             PINT_null_capability(&capability);
         }
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done with remote\n");
     }/* end if remote */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done with remote %d OIDs\n",
+                                        tc->handle_array_remote_count);
 
     /* target_handle is the DIR, we need the DIRDATA 
      */
@@ -1099,7 +1114,7 @@ static PINT_sm_action tree_communicate_partition_handles(struct PINT_smcb *smcb,
                    PVFS_OID_str(&ts_op->u.tree_communicate.handle_array_local[
                                     ts_op->u.tree_communicate.local_index]));
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Done.\n");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Partition Done.\n");
     js_p->error_code = 0;
     return sm_status;
 }
@@ -1958,27 +1973,30 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
     struct PVFS_server_resp *resp = &(s_op->resp);
     PINT_sm_msgpair_state *msg_p GCC_UNUSED = &(s_op->msgarray_op.msgpair);
 
-    /* DEBUG_PVFS_CREDENTIAL(GOSSIP_GETATTR_DEBUG, &(req->u.tree_get_dirent_count.credential)); */
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "frame (%p) req->op %d smcb->op %d\n",
-                                        s_op, req->op, smcb->op);
-
-
-    /* assert(s_op->req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT); */
     assert(req->op == PVFS_SERV_TREE_GET_DIRENT_COUNT);
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "frame (%p) fs_id %d\n",
-                                        s_op, s_op->target_fs_id);
+    s_op->target_fs_id = req->u.tree_get_dirent_count.fs_id;
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "req->retry_msgpair_at_leaf:%s\n",
-          (req->u.tree_get_dirent_count.retry_msgpair_at_leaf ? "YES" : "NO"));
+    gossip_if(GOSSIP_SERVER_DEBUG)
+    {
+        gossip_lsadebug("frame (%p) req->op %d smcb->op %d\n",
+                        s_op, req->op, smcb->op);
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "dirent_count request:\n"
-                 "\t\t caller_handle_index: %u\n"
-                 "\t\t dirdata_count: %d\n"
-                 "\t\t sid_count: %d\n",
-                 req->u.tree_get_dirent_count.caller_handle_index,
-                 req->u.tree_get_dirent_count.num_dirdata,
-                 req->u.tree_get_dirent_count.sid_count);
+        gossip_lsadebug("frame (%p) fs_id %d\n",
+                        s_op, s_op->target_fs_id);
+
+        gossip_lsadebug("req->retry_msgpair_at_leaf:%s\n",
+                (req->u.tree_get_dirent_count.retry_msgpair_at_leaf ? "YES" : "NO"));
+
+        gossip_lsadebug("dirent_count request:\n"
+                        "\t\t caller_handle_index: %u\n"
+                        "\t\t dirdata_count: %d\n"
+                        "\t\t sid_count: %d\n",
+                        req->u.tree_get_dirent_count.caller_handle_index,
+                        req->u.tree_get_dirent_count.num_dirdata,
+                        req->u.tree_get_dirent_count.sid_count);
+    }
+    gossip_end;
     
     /* Can't do this.   This frame was using getattr, now trying to
      * use tree_get_dirent_count on the same frame!  resp is looking
@@ -2006,6 +2024,8 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
                  resp->u.tree_get_dirent_count.caller_handle_index,
                  resp->u.tree_get_dirent_count.handle_count,
                  resp->op);
+
+    
 
     /* allocate response arrays */
     resp->u.tree_get_dirent_count.error = (PVFS_error *)

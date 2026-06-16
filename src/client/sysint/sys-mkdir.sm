@@ -361,7 +361,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     /*********************************/
 
     /* get config for this filesystem */
-    server_config = PINT_get_server_config_struct(parent_ref.fs_id);
+    server_config = PINT_server_config_mgr_get_config(parent_ref.fs_id);
     fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
 
     if (fs_config->default_distr_dir_servers_initial > 0)
@@ -390,7 +390,7 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     }
 
     /* return checked out verion of config struct */
-    PINT_put_server_config_struct(server_config);
+    PINT_server_config_mgr_put_config(server_config);
 
     /* does this apply to a dir?  if so, shouldn't we have attrs for it? */
     /* TODO: For now, just use round robin layout. */

@@ -204,6 +204,8 @@ static PINT_sm_action msgpairarray_init(struct PINT_smcb *smcb,
     PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "msgpairs %d\n", mop->count);
+    gossip_lsdebug(GOSSIP_MSGPAIR_DEBUG, "mop.msgarray[0].handle %s\n",
+                                         PVFS_OID_str(&(mop->msgarray[0].handle)));
 
     /* PVFS_perror_gossip_verbose(); */
 
@@ -1442,7 +1444,7 @@ static PINT_sm_action msgpairarray_failure (struct PINT_smcb *smcb,
     PINT_sm_msgarray_op *mop = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &mop->msgarray[mop->index];
 
-    gossip_err("%s: Failure in MsgPairArray %d\n", __func__, msg_p->op_status);
+    gossip_lerr("Failure in MsgPairArray op_status %d\n", msg_p->op_status);
     /* something failed - free up anything we can make sure return codes
      * are good and then terminate
      */

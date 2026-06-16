@@ -386,10 +386,10 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     /*
      * Find metadata replication factor from configuration
      */
-    server_config = PINT_get_server_config_struct(sm_p->parent_ref.fs_id);
+    server_config = PINT_server_config_mgr_get_config(sm_p->parent_ref.fs_id);
     cur_fs = PINT_config_find_fs_id(server_config,sm_p->parent_ref.fs_id);
     metasidcnt = cur_fs->metadata_replication_factor;
-    PINT_put_server_config_struct(server_config);
+    PINT_server_config_mgr_put_config(server_config);
 
 
     /* keep a copy of the parent's capability */
