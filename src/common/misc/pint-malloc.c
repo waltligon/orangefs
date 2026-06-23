@@ -353,11 +353,11 @@ int PINT_check_malloc(void *ptr)
     extra = (void *)((ptrint_t)ptr - EXTRA_SIZE);
     if (!PINT_check_address((void *)extra))
     {
-        return 0;
+        return 0; /* failure */
     }
     if (extra->magic == (uint64_t)PVFS_MALLOC_MAGIC_NUM)
     {
-        return 1;
+        return 1; /* success */
     }
     return 0;
 }

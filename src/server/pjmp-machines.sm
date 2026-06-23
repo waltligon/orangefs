@@ -51,15 +51,23 @@ machine pvfs2_pjmp_set_attr_work_sm
 /* tree_get_dirent_count ends at leaves which are local
  * This is all we should need for the local op
  */
-/* Local get dirent count called by pjmp
+/* Local get dirent count called by pjmp in tree_comm
  */
 machine pvfs2_pjmp_get_dirent_count_sm
 {
     state pjmp_get_dirent_count_work_init
     {
         run pjmp_get_dirent_count_work_init;
+        default => pjmp_get_dirent_count_work_finish; /* getattr */
+    }
+
+/*
+    state pjmp_get_dirent_count_work_getattr
+    {
+        jump pvfs2_prelude_sm;
         default => pjmp_get_dirent_count_work_finish;
     }
+*/
 
     state pjmp_get_dirent_count_work_finish
     {
@@ -301,14 +309,23 @@ static PINT_sm_action pjmp_get_dirent_count_work_init(struct PINT_smcb *smcb,
     int i = tc->local_index;
 
     /* the local op needs:*/
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "handle[%d] (%p) fs_id %d\n",
-                   i, &tc->handle_array_local[i], s_op->target_fs_id);
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Reading dspace for %s\n",
-                   PVFS_OID_str(&tc->handle_array_local[i]));
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Parent dirent_count is %ld\n",
+    gossip_if(GOSSIP_SERVER_DEBUG)
+    {
+        gossip_lsadebug("frame (%p)\n", s_op);
+        gossip_lsadebug("Target fs_id %d target_handle %s\n",
+                   s_op->target_fs_id, PVFS_OID_str(&s_op->target_handle));
+        gossip_lsadebug("Reading dspace for local handle [%d] %s\n",
+                   i, PVFS_OID_str(&tc->handle_array_local[i]));
+        gossip_lsadebug("Parent dirent_count is %ld\n",
                    p_op->attr.u.dir.dirent_count);
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "s_op (%p) smcb->op (%d) s_op->op %d\n",
-                   s_op, smcb->op, s_op->op);
+        gossip_lsadebug("Parent objtype is %u\n",
+                   p_op->attr.objtype);
+        gossip_lsadebug("Parent handle is %s\n",
+                   PVFS_OID_str(&p_op->attr.handle));
+        gossip_lsadebug("smcb->op (%d) s_op->op %d\n",
+                   smcb->op, s_op->op);
+    }
+    gossip_end;
 
     /* Trove checks a cache for us first
      */
@@ -325,31 +342,59 @@ static PINT_sm_action pjmp_get_dirent_count_work_init(struct PINT_smcb *smcb,
     return sm_status;
 }
 
+/* get the results into parent frame */
 static PINT_sm_action pjmp_get_dirent_count_work_finish(struct PINT_smcb *smcb,
                                                         job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *p_op = PINT_sm_frame(smcb, PINT_FRAME_PARENT);
     PINT_sm_action sm_status = SM_ACTION_COMPLETE;
+    struct PINT_server_tree_communicate_op *tc = &s_op->u.tree_communicate;
+    int i = tc->local_index;
+
+    //gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Dirent Count Work Finish S_OP\n");
+    //PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &s_op->resp);
 
     /* getattr for a dirdata should have completed */
     if (js_p->error_code == 0)
     {
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "adding dirent_count %ld (%p) to parent frame %ld (%p)\n",
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                       "ADDing dirent_count %ld (%p) to PARENT FRAME %ld (%p)\n",
                        s_op->u.tree_communicate.ds_attr.u.dirdata.dirent_count,
-                       s_op,
-                       p_op->resp.u.getattr.attr.u.dir.dirent_count,
-                       p_op);
-        /* finished correctly - add dirent_count to parent frame */
+                       s_op, p_op->resp.u.getattr.attr.u.dir.dirent_count, p_op);
+
+        /* finished correctly - ADD dirent_count to PARENT FRAME */
         p_op->resp.u.getattr.attr.u.dir.dirent_count +=
                        s_op->u.tree_communicate.ds_attr.u.dirdata.dirent_count;
     }
     else
     {
-        /* error */
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "dspace getattr failed %d\n",
-                       js_p->error_code);
+        /* I don't know why the errno comes back
+         * different but translates to the same code
+         */
+        if (PVFS_ERROR_TO_ERRNO(js_p->error_code) == ENOENT)
+        {
+            /* Handle not found means this hasn't been
+             * created yet BUT if that's the case the
+             * dirent_count is 0, so we can just proceed
+             */
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                           "Dirdata not found, couting zero dirents\n");
+            /* there are no attrs, so set up minimum to fake it */
+            /* is the parent in dirent_count, not getattr */
+            PVFS_OID_cpy(&p_op->resp.u.getattr.attr.handle, &tc->handle_array_local[i]);
+            p_op->resp.u.getattr.attr.objtype = PVFS_TYPE_DIRDATA;
+            js_p->error_code = 0;
+        }
+        else
+        {
+            /* error */
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "dspace getattr failed %d\n",
+                           js_p->error_code);
+        }
     }
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Dirent Count Work Finish P_OP\n");
+    PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &p_op->resp);
     return sm_status;
     /* js_p->error_code passes through */
 }

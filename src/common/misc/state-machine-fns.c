@@ -1684,7 +1684,7 @@ static void PINT_sm_start_child_frames(struct PINT_smcb *smcb,
 }
 
 /* This routine hides the details of messing with the frame stack.
- * After a PJMP completed we need to remove old frames.
+ * After a PJMP completes we need to remove old frames.
  * And reset a few smcb variables.  We assume at this point a
  * pjmp has just ended so the smcb should have no running children
  * and no pjmp frames on the stack after this function
@@ -1694,6 +1694,7 @@ PINT_sm_action PINT_sm_pop_old_pjmp_frames(struct PINT_smcb *smcb, int numpframe
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_frame_s *frame_entry, *tmp;
 
+    gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Popping %d frames\n", numpframes);
 #ifdef WIN32
     qlist_for_each_entry_safe(frame_entry,
                               tmp,
@@ -1737,8 +1738,7 @@ PINT_sm_action PINT_sm_pop_old_pjmp_frames(struct PINT_smcb *smcb, int numpframe
     }
     if (numpframes != 0)
     {
-        gossip_lsdebug(GOSSIP_SM_INT_DEBUG,
-                       "number of pjmp frames appears wrong\n");
+        gossip_lerr("number of pjmp frames appears wrong\n");
     }
 
     return SM_ACTION_COMPLETE;

@@ -71,17 +71,16 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
 
     gossip_if(GOSSIP_SERVER_DEBUG);
     {
-    gossip_lsadebug("s_op (%p) %s (FR sm) s_op->decoded.enc_type %d error_code %d\n",
-                   s_op,
-                   PINT_map_server_op_to_string(s_op->resp.op),
-                   s_op->decoded.enc_type, 
-                   js_p->error_code);
+        gossip_lsadebug("s_op (%p) %s (FR sm) s_op->decoded.enc_type %d error_code %d\n",
+                       s_op,
+                       PINT_map_server_op_to_string(s_op->resp.op),
+                       s_op->decoded.enc_type, 
+                       js_p->error_code);
 
-    gossip_lsadebug( "s_op (%p)\n", s_op);
-    gossip_lsadebug( "s_op->op %d\n", s_op->op);
-    gossip_lsadebug( "s_op->req (%p)\n", s_op->req);
-    gossip_lsadebug( "s_op->req->op %d\n", s_op->req->op);
-    gossip_lsadebug( "s_op->resp (%p)\n", &s_op->resp);
+        gossip_lsadebug( "s_op->op %d\n", s_op->op);
+        gossip_lsadebug( "s_op->req (%p)\n", s_op->req);
+        gossip_lsadebug( "s_op->req->op %d\n", s_op->req->op);
+        gossip_lsadebug( "s_op->resp (%p)\n", &s_op->resp);
     }
     gossip_end;
 
@@ -90,30 +89,28 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
         for (i = 0; i < smcb->frame_count; i++)
         {
             struct PINT_server_op *top = PINT_sm_frame(smcb, PINT_FRAME_CURRENT - i);
-            gossip_lsadebug("frame %d top (%p) op %d resp_op %d req->op %d sched_id %ld\n",
+            gossip_lsadebug("frame# %d top (%p) op %d resp_op %d req->op %d sched_id %ld\n",
                           PINT_FRAME_CURRENT - i, top, top->op, top->resp.op,
                           s_op->req->op, s_op->scheduled_id);
-            if (top->op == 52)
+            if (top->op == PVFS_SERV_TREE_GET_DIRENT_COUNT)
             {
-                gossip_lsadebug("handle count %d ",
+                gossip_lsadebug("handle count %d\n",
                                 top->resp.u.tree_get_dirent_count.handle_count);
                 if (top->resp.u.tree_get_dirent_count.dentcnt)
                 {
-                    gossip_adebug("dirent_count %ld\n",
-                                  *top->resp.u.tree_get_dirent_count.dentcnt);
-                }
-                else
-                {
-                    gossip_adebug("\n");
+                    gossip_lsadebug("BAR----------\n");
+                    gossip_lsadebug("dirent_count %ld\n",
+                                    *top->resp.u.tree_get_dirent_count.dentcnt);
                 }
             }
-            else if (top->op == 4)
+            else if (top->op == PVFS_SERV_GETATTR)
             {
                 gossip_lsadebug("handle count %d dirent_count %ld attr type %d\n",
                        top->resp.u.getattr.attr.u.dir.dist_dir_attr.dirdata_count,
                        top->resp.u.getattr.attr.u.dir.dirent_count, top->resp.u.getattr.attr.objtype);
             }
         }
+        gossip_lsadebug("FOO----------\n");
     }
     gossip_end;
 

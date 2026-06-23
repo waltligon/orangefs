@@ -194,7 +194,7 @@ typedef enum
 typedef enum
 {
     PRELUDE_PERM_CHECK_DONE    = (1<<0),
-    PRELUDE_NO_SCHEDULE        = (1<<1),
+    PRELUDE_NO_SCHEDULE        = (1<<1),  /* bypasses schedule and release */
 } PINT_prelude_flag;
 
 struct PINT_server_create_op
