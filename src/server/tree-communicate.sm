@@ -2044,6 +2044,13 @@ static int tree_get_dirent_count_setup(struct PINT_smcb *smcb,
                              req->u.tree_get_dirent_count.sid_array));
 } /* tree_get_dirent_count_setup */
 
+/* This just returned from a remote dirent_count tree
+ * There may be local returns as well.
+ * This should be called for each remote task, and it
+ * should know its place (index) in the arrays but
+ * we need to make sure its return values get recorded
+ * so the cleanup routine can add them all up.
+ */
 static int tree_get_dirent_count_comp_fn(void *v_p,
                                          struct PVFS_server_resp *resp_p,
                                          int index)
@@ -2107,6 +2114,8 @@ static int tree_get_dirent_count_comp_fn(void *v_p,
         op_tree->error[error_array_index] = m_tree->error[i];
     }
 
+    PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, s_op_resp);
+
     return 0;
 } /* tree_get_dirent_count_comp_fn */
 
@@ -2122,13 +2131,9 @@ static int tree_get_dirent_count_cleanup(struct PINT_smcb *smcb,
                                          job_status_s *js_p)
 {
     PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    PINT_server_op *p_op = PINT_sm_frame(smcb, PINT_FRAME_PARENT);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "TREE Dirent Count Work Cleanup S_OP\n");
     PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &s_op->resp);
-
-    p_op->resp.u.getattr.attr.u.dir.dirent_count =
-            s_op->resp.u.getattr.attr.u.dir.dirent_count;
 
     /*cleanup response structure*/
 #if 0
@@ -2148,7 +2153,14 @@ static int tree_get_dirent_count_cleanup(struct PINT_smcb *smcb,
     return(server_state_machine_complete(smcb));
 }
 
-/* remove frames pushed to start the tasks of the PJMP.
+/* 
+ * This should run once after the PJMP completes.  All of
+ * the tasks involved should have put their values into
+ * the resp arrays.  Not sure where these get added up.
+ * This would seem a good place, and we should copy the
+ * sum into the getattr space.
+ *
+ * Remove frames pushed to start the tasks of the PJMP.
  * check for reference count - should be 1 (this smcb)
  * for all of the frames - leaving the original frame
  * before the PJMP
@@ -2158,6 +2170,8 @@ static PINT_sm_action tree_get_dirent_count_work_cleanup(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     struct PINT_server_op *p_op = PINT_sm_frame(smcb, PINT_FRAME_PARENT);
+    int dirent_count = 0;
+    int i = 0;
     int ret = 0;
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "S_OP RESP\n");
@@ -2177,10 +2191,15 @@ static PINT_sm_action tree_get_dirent_count_work_cleanup(struct PINT_smcb *smcb,
                    p_op);
 
     /* finished correctly - add dirent_count to parent frame */
-    p_op->resp.u.getattr.attr.u.dir.dirent_count +=
-                   s_op->resp.u.getattr.attr.u.dir.dirent_count;
+    for (i = 0; i < s_op->resp.u.tree_get_dirent_count.handle_count; i++)
+    {
+        dirent_count += s_op->resp.u.tree_get_dirent_count.dentcnt[i];
+    }
+    s_op->u.tree_communicate.ds_attr.u.dirdata.dirent_count = dirent_count;
 
     ret = PINT_sm_pop_old_pjmp_frames(smcb, smcb->num_pjmp_frames);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Final Dirent count %d\n", dirent_count);
 
     return ret;
 }

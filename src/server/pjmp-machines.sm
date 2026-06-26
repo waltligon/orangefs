@@ -308,6 +308,13 @@ static PINT_sm_action pjmp_get_dirent_count_work_init(struct PINT_smcb *smcb,
     PINT_sm_action sm_status = SM_ACTION_COMPLETE;
     int i = tc->local_index;
 
+    /* This should not be using "tree_communicate" but "tree_get_dirent_count"?
+     * Need to trace the input back because the handle is comming out of there
+     * Probably should go all the way to tree_communicate and put this in
+     * the right place ... or is this right and we need to deal with it in
+     * the next func.  This IS accessing the s_op not the req or resp.
+     */
+
     /* the local op needs:*/
     gossip_if(GOSSIP_SERVER_DEBUG)
     {
@@ -352,8 +359,16 @@ static PINT_sm_action pjmp_get_dirent_count_work_finish(struct PINT_smcb *smcb,
     struct PINT_server_tree_communicate_op *tc = &s_op->u.tree_communicate;
     int i = tc->local_index;
 
-    //gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Dirent Count Work Finish S_OP\n");
-    //PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &s_op->resp);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Dirent Count Work Finish S_OP\n");
+    PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &s_op->resp);
+    
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Dirent Count Work Finish P_OP\n");
+    PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &p_op->resp);
+    
+    /* This is copying data into the parent frame, which seems to be correct
+     * but the union members used seems all wrong.  We have an op for this,
+     * so we should use it if we can.
+     */
 
     /* getattr for a dirdata should have completed */
     if (js_p->error_code == 0)
@@ -361,10 +376,10 @@ static PINT_sm_action pjmp_get_dirent_count_work_finish(struct PINT_smcb *smcb,
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                        "ADDing dirent_count %ld (%p) to PARENT FRAME %ld (%p)\n",
                        s_op->u.tree_communicate.ds_attr.u.dirdata.dirent_count,
-                       s_op, p_op->resp.u.getattr.attr.u.dir.dirent_count, p_op);
+                       s_op, p_op->resp.u.tree_get_dirent_count.dentcnt[i], p_op);
 
         /* finished correctly - ADD dirent_count to PARENT FRAME */
-        p_op->resp.u.getattr.attr.u.dir.dirent_count +=
+        p_op->resp.u.tree_get_dirent_count.dentcnt[i] =
                        s_op->u.tree_communicate.ds_attr.u.dirdata.dirent_count;
     }
     else
@@ -382,8 +397,9 @@ static PINT_sm_action pjmp_get_dirent_count_work_finish(struct PINT_smcb *smcb,
                            "Dirdata not found, couting zero dirents\n");
             /* there are no attrs, so set up minimum to fake it */
             /* is the parent in dirent_count, not getattr */
-            PVFS_OID_cpy(&p_op->resp.u.getattr.attr.handle, &tc->handle_array_local[i]);
-            p_op->resp.u.getattr.attr.objtype = PVFS_TYPE_DIRDATA;
+            //PVFS_OID_cpy(&p_op->resp.u.getattr.attr.handle, &tc->handle_array_local[i]);
+            //p_op->resp.u.getattr.attr.objtype = PVFS_TYPE_DIRDATA;
+            p_op->resp.u.tree_get_dirent_count.dentcnt[i] = 0;
             js_p->error_code = 0;
         }
         else
@@ -393,7 +409,7 @@ static PINT_sm_action pjmp_get_dirent_count_work_finish(struct PINT_smcb *smcb,
                            js_p->error_code);
         }
     }
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Dirent Count Work Finish P_OP\n");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Dirent Count Work Finish\n");
     PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &p_op->resp);
     return sm_status;
     /* js_p->error_code passes through */
