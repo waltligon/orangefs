@@ -220,11 +220,12 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
             PINT_dist_free(dest->u.meta.dist);
         }
         gossip_ldebug(GOSSIP_COMMON_DEBUG, "Copying dist\n");
-        gossip_ldebug(GOSSIP_COMMON_DEBUG, "&dest->u.meta.dist (%p)\n",
-                                           &(dest->u.meta.dist));
+        gossip_ldebug(GOSSIP_COMMON_DEBUG, "dest->u.meta.dist (%p)\n",
+                                           (dest->u.meta.dist));
         gossip_ldebug(GOSSIP_COMMON_DEBUG, "src->u.meta.dist (%p)\n",
                                            src->u.meta.dist);
         PINT_dist_copy(&(dest->u.meta.dist), src->u.meta.dist);
+        gossip_ldebug(GOSSIP_COMMON_DEBUG, "Dist copy done\n");
         dest->mask |= PVFS_ATTR_META_DIST;
         if (dest->u.meta.dist == NULL)
         {

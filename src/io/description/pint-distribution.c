@@ -160,13 +160,13 @@ PINT_dist *PINT_dist_copy(PINT_dist **dist, const PINT_dist *sdist)
 
     gossip_ldebug(GOSSIP_COMMON_DEBUG, "Starting distribution copy (%p)->(%p)\n", sdist, *dist);
 
+    dist_size = PINT_DIST_PACK_SIZE(sdist);
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "Dist size %d\n", dist_size);
     if (*dist == NULL)
     {
         (*dist) = (PINT_dist *)malloc(dist_size);
         gossip_ldebug(GOSSIP_COMMON_DEBUG, "Mallocing dest (%p)\n", (*dist));
     }
-    dist_size = PINT_DIST_PACK_SIZE(sdist);
-    gossip_ldebug(GOSSIP_COMMON_DEBUG, "Dist size %d\n", dist_size);
     if (*dist)
     {
         gossip_ldebug(GOSSIP_COMMON_DEBUG, "Copying (%p)->(%p)\n", sdist, (*dist));
