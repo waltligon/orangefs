@@ -276,6 +276,9 @@ next_target:
    else
    {
       fprintf(stderr, "SYS-LOOKUP3\n");
+      fprintf(stderr, "fs_id %d\n", fs_id);
+      fprintf(stderr, "pszRelativeFile %s\n", pszRelativeFile);
+      fprintf(stderr, "&lk_response %p\n", &lk_response);
       ret = PVFS_sys_lookup(fs_id, 
                             (char *) pszRelativeFile, 
                             credentials, 

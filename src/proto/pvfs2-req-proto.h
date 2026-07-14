@@ -1058,21 +1058,21 @@ endecode_fields_1aa_struct(
     PVFS_size, size,
     PVFS_error, error);
 
-#define PVFS_debug_servresp_tree_get_file_size(mask, resp)                \
-do {                                                        \
-    struct PVFS_servresp_tree_get_file_size *tresp =                      \
-                                  &((resp)->u.tree_get_file_size);       \
-    gossip_if (mask)                                        \
-    {                                                       \
-        gossip_lsadebug("Tree Get File Size Response:\n");               \
-        gossip_lsadebug("resp = (%p)\n", (resp));             \
-        PVFS_debug_afield(tresp->caller_handle_index, uint32_t);\
-        PVFS_debug_afield(tresp->handle_count, uint32_t);    \
-        PVFS_debug_aafield(tresp->size, PVFS_size, tresp->handle_count);    \
-        PVFS_debug_aafield(tresp->error, PVFS_error, tresp->handle_count);    \
-        gossip_lsadebug("Tree Get File Size End:\n");                   \
-    }                                                       \
-    gossip_end;                                             \
+#define PVFS_debug_servresp_tree_get_file_size(mask, resp)                       \
+do {                                                                             \
+    struct PVFS_servresp_tree_get_file_size *tresp =                             \
+                                  &((resp)->u.tree_get_file_size);               \
+    gossip_if (mask)                                                             \
+    {                                                                            \
+        gossip_lsadebug("Tree Get File Size Response:\n");                       \
+        gossip_lsadebug("resp = (%p)\n", (resp));                                \
+        PVFS_debug_afield(tresp->caller_handle_index, uint32_t);                 \
+        PVFS_debug_afield(tresp->handle_count, uint32_t);                        \
+        PVFS_debug_aafield(tresp->size, PVFS_size, tresp->handle_count);         \
+        PVFS_debug_aafield(tresp->error, PVFS_error, tresp->handle_count);       \
+        gossip_lsadebug("Tree Get File Size End:\n");                            \
+    }                                                                            \
+    gossip_end;                                                                  \
 } while (0)
 
 #define extra_size_PVFS_servresp_tree_get_file_size         \

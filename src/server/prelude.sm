@@ -344,7 +344,7 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
                    "About to retrieve attributes for local handle %s\n",
                    PVFS_OID_str(&s_op->target_handle));
     /* This is reading the attr of target,
-     * this goes in d_attr, don't confuse with attr 
+     * this goes in ds_attr, don't confuse with attr 
      */
     ret = job_trove_dspace_getattr(s_op->target_fs_id,
                                    s_op->target_handle,
@@ -634,12 +634,12 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
         s_op->target_object_attr = &s_op->attr;
 
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Not Auto Create Target ========================\n");
-        PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+        //gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Not Auto Create Target ========================\n");
+        //PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
 
         PINT_copy_object_attr(&s_op->parent_dir_attr, &s_op->attr);
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Saved Parent Attrs  ========================\n");
-        PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->parent_dir_attr);
+        //gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Saved Parent Attrs  ========================\n");
+        //PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->parent_dir_attr);
     }
 
     /* Remaining logic deals with new or existing object. */

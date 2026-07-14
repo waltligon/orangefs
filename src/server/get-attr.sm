@@ -37,44 +37,13 @@
 #include "capcache.h"
 #include "sid.h"
 
-/* this was defined as a handle const - we have those in pvfs2-handle.h */
-/* static uint64_t UINT64_HIGH = 0xffffffffffffffffULL; */
-
 #if defined(ENABLE_SECURITY_KEY) || defined(ENABLE_SECURITY_CERT)
 #define ENABLE_SECURITY_MODE
 #endif
 
-/* New facility for dealing with keyval buffers.
- * Defined in pvfs2-server.c/h
- */
+#define KEEP_BUFFER(buf) keep_keyval_buffers(s_op, buf);
 
-#define KEEP_BUFFER(buf)                          \
-    keep_keyval_buffers(s_op, buf);
-
-
-/* This was moved to src/server/pvfs2-server.c so it is
- * visible across the server code
- */
-#if 0
-/* These are defined in src/common/misc/pvfs2-internal.h
- * This table SHOULD be defined using macros not the strings
- * See Trove_Common_Keys in src/server/pvfs2-server.c
- * This should be fixed as soon as possible
- */
-
-PINT_server_trove_keys_s Trove_Special_Keys[] =
-{
-    {"user.pvfs2.dist_name"     , SPECIAL_DIST_NAME_KEYLEN},
-    {"user.pvfs2.dist_params"   , SPECIAL_DIST_PARAMS_KEYLEN},
-    {"user.pvfs2.num_dfiles"    , SPECIAL_NUM_DFILES_KEYLEN},
-    {"user.pvfs2.layout"        , SPECIAL_LAYOUT_KEYLEN},
-    {"user.pvfs2.server_list"   , SPECIAL_SERVER_LIST_KEYLEN},
-    {"user.pvfs2.meta_hint"     , SPECIAL_METAFILE_HINT_KEYLEN},
-    {"user.pvfs2.mirror.copies" , SPECIAL_MIRROR_COPIES_KEYLEN},
-    {"user.pvfs2.mirror.handles", SPECIAL_MIRROR_HANDLES_KEYLEN},
-    {"user.pvfs2.mirror.status" , SPECIAL_MIRROR_STATUS_KEYLEN},
-};
-#endif
+static uint64_t UINT64_HIGH GCC_UNUSED = 0xffffffffffffffffULL;
 
 enum
 {
@@ -1153,6 +1122,12 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
     if (s_op->u.getattr.attrmask & PVFS_ATTR_COMMON_PARENT)
     {
         s_op->attr.parent = respattr->parent;
+        s_op->attr.parent_sids = (PVFS_SID *)(s_op->attr.parent + 1);
+        s_op->parent_dir_attr.parent = malloc(OSASZ(1, s_op->attr.meta_sid_count));
+        memcpy(s_op->parent_dir_attr.parent,
+               s_op->attr.parent,
+               OSASZ(1, s_op->attr.meta_sid_count));
+        s_op->parent_dir_attr.parent_sids = (PVFS_SID *)(s_op->parent_dir_attr.parent + 1);
     }
     //respattr->u.meta.dist_size = s_op->attr.u.meta.dist_size;
     if (s_op->u.getattr.attrmask & PVFS_ATTR_FASTEST)
@@ -1170,6 +1145,12 @@ static PINT_sm_action getattr_metafile_keyvals_verify(struct PINT_smcb *smcb,
         s_op->resp.u.getattr.attr.mask |= PVFS_ATTR_META_SIZE;
         js_p->error_code = STATE_META_SIZE;
     }
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Parent ATTR Backup\n");
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->parent_dir_attr);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "S_OP Response\n");
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->resp.u.getattr.attr);
 
     /* otherwise deliberately preserve existing error code */
     return SM_ACTION_COMPLETE;
@@ -2076,6 +2057,7 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
 
     memcpy(new_op->req, s_op->req, sizeof(struct PVFS_server_req));
     memcpy(&new_op->resp, &s_op->resp, sizeof(struct PVFS_server_resp));
+    new_op->resp.op = PVFS_SERV_TREE_GET_DIRENT_COUNT;
     new_op->msgarray_op.msgarray = NULL;
     new_op->key_a = NULL;
     new_op->val_a = NULL;
@@ -2221,6 +2203,11 @@ static PINT_sm_action getattr_check_if_capability_required(
                        " skipping to next state\n", js_p->error_code);
         return SM_ACTION_COMPLETE;
     } 
+    /* See the result of the get file size */
+    if (s_op->resp.op == PVFS_SERV_TREE_GET_FILE_SIZE){
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "S_OP Response to get file size\n");
+    PVFS_debug_servresp_tree_get_file_size(GOSSIP_SERVER_DEBUG, &(s_op->resp));
+    }
 
     /* Now check if we need to create a capability
      */
@@ -2266,6 +2253,64 @@ static PINT_sm_action getattr_read_acl(struct PINT_smcb *smcb,
     if (js_p->error_code > 0)
     {
         js_p->error_code = 0;
+    }
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op->resp.p = %d\n", s_op->resp.op);
+    /* clean up response from the tree op */
+    if (s_op->resp.op == PVFS_SERV_TREE_GET_FILE_SIZE)
+    {
+        int i = 0;
+        int caller_handle_index GCC_UNUSED = s_op->resp.u.tree_get_file_size.caller_handle_index;
+            s_op->resp.u.tree_get_file_size.caller_handle_index = 0;
+        int handle_count GCC_UNUSED = s_op->resp.u.tree_get_file_size.handle_count;
+            s_op->resp.u.tree_get_file_size.handle_count = 0;
+        PVFS_size size GCC_UNUSED = *(s_op->resp.u.tree_get_file_size.size);
+            free(s_op->resp.u.tree_get_file_size.size);  /* is this OK? */
+            s_op->resp.u.tree_get_file_size.size = NULL;
+        PVFS_error error GCC_UNUSED = *(s_op->resp.u.tree_get_file_size.error);
+            free(s_op->resp.u.tree_get_file_size.error);  /* is this OK? */
+            s_op->resp.u.tree_get_file_size.error = NULL;
+        /* now update the getattr resp */
+        s_op->resp.u.getattr.attr.handle = s_op->parent_dir_attr.handle;
+        s_op->resp.u.getattr.attr.objtype = s_op->parent_dir_attr.objtype;
+        s_op->resp.u.getattr.attr.mask = s_op->parent_dir_attr.mask;
+        s_op->resp.u.getattr.attr.u.meta.size = 0;
+        for (i = 0; i < handle_count; i++)
+        {
+            s_op->resp.u.getattr.attr.u.meta.size += size;
+        }
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "handle %s objtype %d mask %ld size %ld\n",
+                       PVFS_OID_str(&(s_op->resp.u.getattr.attr.handle)),
+                       s_op->resp.u.getattr.attr.objtype,
+                       s_op->resp.u.getattr.attr.mask,
+                       s_op->resp.u.getattr.attr.u.meta.size);
+    }
+    else if (s_op->resp.op == PVFS_SERV_TREE_GET_DIRENT_COUNT)
+    {
+        int i = 0;
+        int caller_handle_index GCC_UNUSED = s_op->resp.u.tree_get_dirent_count.caller_handle_index;
+            s_op->resp.u.tree_get_dirent_count.caller_handle_index = 0;
+        int handle_count GCC_UNUSED = s_op->resp.u.tree_get_dirent_count.handle_count;
+            s_op->resp.u.tree_get_dirent_count.handle_count = 0;
+        PVFS_size dirent_count GCC_UNUSED = *(s_op->resp.u.tree_get_dirent_count.dentcnt);
+            free(s_op->resp.u.tree_get_dirent_count.dentcnt);  /* is this OK? */
+            s_op->resp.u.tree_get_dirent_count.dentcnt = NULL;
+        PVFS_error error GCC_UNUSED = *(s_op->resp.u.tree_get_dirent_count.error);
+            free(s_op->resp.u.tree_get_dirent_count.error);  /* is this OK? */
+            s_op->resp.u.tree_get_dirent_count.error = NULL;
+        /* now update the getattr resp */
+        s_op->resp.u.getattr.attr.handle = s_op->parent_dir_attr.handle;
+        s_op->resp.u.getattr.attr.objtype = s_op->parent_dir_attr.objtype;
+        s_op->resp.u.getattr.attr.mask = s_op->parent_dir_attr.mask;
+        s_op->resp.u.getattr.attr.u.dir.dirent_count = 0;
+        for (i = 0; i < handle_count; i++)
+        {
+            s_op->resp.u.getattr.attr.u.dir.dirent_count += dirent_count;
+        }
+        gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "handle %s objtype %d mask %ld dirent_count %ld\n",
+                       PVFS_OID_str(&(s_op->resp.u.getattr.attr.handle)),
+                       s_op->resp.u.getattr.attr.objtype,
+                       s_op->resp.u.getattr.attr.mask,
+                       s_op->resp.u.getattr.attr.u.dir.dirent_count);
     }
 
     free_keyval_buffers(s_op);
@@ -2570,6 +2615,7 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
+    s_op->resp.op = PVFS_SERV_GETATTR; /* undoing temp change above */
     PVFS_debug_servresp_getattr(GOSSIP_GETATTR_DEBUG, &(s_op->resp));
 
 #if 0
@@ -2778,11 +2824,9 @@ static PINT_sm_action getattr_setup_op(struct PINT_smcb *smcb,
     s_op->u.getattr.mirror_dfile_status_array = NULL;
 #endif
     /* DEBUG_attr_mask(s_op->req->u.getattr.attrmask); makes a lot of ouput */
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                   "handle %s fs_id %d attrmask %ld credential\n",
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "handle %s fs_id %d\n",
                    PVFS_OID_str(&s_op->u.getattr.handle),
-                   s_op->u.getattr.fs_id,
-                   s_op->u.getattr.attrmask);
+                   s_op->u.getattr.fs_id);
 
     js_p->error_code = 0;
     return SM_ACTION_COMPLETE;

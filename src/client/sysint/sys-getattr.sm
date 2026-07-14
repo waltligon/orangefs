@@ -609,7 +609,7 @@ static int getattr_dirdata_getattr_comp_fn(void *v_p,
         attr_p->mtime = resp_attr_p->mtime;
     }
 
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attr_p->mask);
+    //PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attr_p->mask);
     gossip_ldebug(GOSSIP_GETATTR_DEBUG, "updated directory attrs: "
             "[dirent_count=%llu, atime = %llu, mtime = %llu, ctime = %llu]\n",
             llu(attr_p->u.dir.dirent_count),
@@ -810,15 +810,15 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
      */
     trimmed_mask = sm_p->getattr.req_attrmask & PVFS_ATTR_GETATTR_VALID;
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "request attrmask:\n");
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.req_attrmask);
+    //gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "request attrmask:\n");
+    //PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.req_attrmask);
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "trimmed attrmask:\n");
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, trimmed_mask);
+    //gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "trimmed attrmask:\n");
+    //PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, trimmed_mask);
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "returned cached attrmask: type %d\n",
-                   sm_p->getattr.attr.objtype);
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.attr.mask);
+    //gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "returned cached attrmask: type %d\n",
+    //               sm_p->getattr.attr.objtype);
+    //PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, sm_p->getattr.attr.mask);
 
     /* the trimmed mask is used for making sure that we're only
      * checking attr bits that make sense for the object type
@@ -888,7 +888,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
                      trimmed_mask);
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "missing requested attrmask:\n");
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, missing_attrs);
+    //PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, missing_attrs);
 
     if (missing_attrs == 0)
     {
@@ -950,7 +950,7 @@ static PINT_sm_action getattr_acache_lookup(struct PINT_smcb *smcb,
     {
         /* Some attr(s) are missing. */
         gossip_lsdebug(GOSSIP_ACACHE_DEBUG, "TRULY MISSING attrs:\n");
-        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
+        //PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
 
         /* Was the size missing? */
         if(missing_attrs & PVFS_ATTR_DATA_SIZE)
@@ -1130,13 +1130,13 @@ static PINT_sm_action getattr_object_getattr_setup_msgpair(
      * not the getattr call which should use GOSSIP_GETATTR_DEBUG, or
      * the combination (bitwise OR) of the two.
      */
-    PINT_attrmask_print(GOSSIP_ATTRMASK_DEBUG, sm_p->getattr.req_attrmask);
+    //PINT_attrmask_print(GOSSIP_ATTRMASK_DEBUG, sm_p->getattr.req_attrmask);
     sm_p->getattr.req_attrmask |= PVFS_ATTR_COMMON_ALL
                                | PVFS_ATTR_META_ALL
                                | PVFS_ATTR_DISTDIR_ATTR
                                | PVFS_ATTR_DIR_ALL
                                | PVFS_ATTR_CAPABILITY;
-    PINT_attrmask_print(GOSSIP_ATTRMASK_DEBUG, sm_p->getattr.req_attrmask);
+    //PINT_attrmask_print(GOSSIP_ATTRMASK_DEBUG, sm_p->getattr.req_attrmask);
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "Fill in GETATTR request\n");
     /* setup the msgpair to do a getattr operation */
@@ -1992,17 +1992,17 @@ static PINT_sm_action getattr_acache_insert(struct PINT_smcb *smcb,
          sm_p->getattr.req_attrmask
         );
 
-    gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
-                 "Mask properties of the request:\n");
-    PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, sm_p->getattr.req_attrmask);
-    gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
-                 "Mask properties of the object we are inserting:\n");
-    PINT_attr_dump_object_type(GOSSIP_ACACHE_DEBUG, &sm_p->getattr.attr);
-    PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, sm_p->getattr.attr.mask);
+    //gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+    //             "Mask properties of the request:\n");
+    //PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, sm_p->getattr.req_attrmask);
+    //gossip_lsdebug(GOSSIP_ACACHE_DEBUG,
+    //           "Mask properties of the object we are inserting:\n");
+    //PINT_attr_dump_object_type(GOSSIP_ACACHE_DEBUG, &sm_p->getattr.attr);
+    //PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, sm_p->getattr.attr.mask);
     if(missing_attrs)
     {
         gossip_lsdebug(GOSSIP_ACACHE_DEBUG, "Mask properties missing:\n");
-        PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
+    //    PINT_attrmask_print(GOSSIP_ACACHE_DEBUG, missing_attrs);
     }
     else
     {

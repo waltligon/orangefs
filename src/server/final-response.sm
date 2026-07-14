@@ -98,7 +98,6 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
                                 top->resp.u.tree_get_dirent_count.handle_count);
                 if (top->resp.u.tree_get_dirent_count.dentcnt)
                 {
-                    gossip_lsadebug("BAR----------\n");
                     gossip_lsadebug("dirent_count %ld\n",
                                     *top->resp.u.tree_get_dirent_count.dentcnt);
                 }
@@ -110,7 +109,6 @@ static PINT_sm_action final_response_release(struct PINT_smcb *smcb,
                        top->resp.u.getattr.attr.u.dir.dirent_count, top->resp.u.getattr.attr.objtype);
             }
         }
-        gossip_lsadebug("FOO----------\n");
     }
     gossip_end;
 
@@ -202,7 +200,27 @@ static PINT_sm_action final_response_send_resp(struct PINT_smcb *smcb,
                    "calling PINT_encode, s_op->decoded.enc_type %d\n",
                    s_op->decoded.enc_type);
 
-    PVFS_debug_servresp_getattr(GOSSIP_GETATTR_DEBUG, &s_op->resp);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "S_OP Resp\n");
+    switch(s_op->resp.op)
+    {
+    case PVFS_SERV_CREATE:
+        PVFS_debug_servresp_create(GOSSIP_CREATE_DEBUG, &s_op->resp);
+        break;
+    case PVFS_SERV_MKDIR:
+        PVFS_debug_servresp_mkdir(GOSSIP_MKDIR_DEBUG, &s_op->resp);
+        break;
+    case PVFS_SERV_GETATTR:
+        PVFS_debug_servresp_getattr(GOSSIP_GETATTR_DEBUG, &s_op->resp);
+        break;
+    case PVFS_SERV_TREE_GET_FILE_SIZE:
+        PVFS_debug_servresp_tree_get_file_size(GOSSIP_GETATTR_DEBUG, &s_op->resp);
+        break;
+    case PVFS_SERV_TREE_GET_DIRENT_COUNT:
+        PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_GETATTR_DEBUG, &s_op->resp);
+        break;
+    default:
+        break;
+    }
 
     ret = PINT_encode(&s_op->resp,
                       PINT_ENCODE_RESP,

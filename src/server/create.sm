@@ -25,6 +25,12 @@
 
 machine pvfs2_create_sm
 {
+    state debug
+    {
+        run create_debug;
+        default => prelude;
+    }
+
     state prelude
     {
         jump pvfs2_prelude_sm;
@@ -113,7 +119,14 @@ machine pvfs2_create_sm
 
 /***************** STATE ACTIONS *****************/
 
-static int create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
+static PINT_sm_action create_debug(struct PINT_smcb *smcb, job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_debug_servreq_create(GOSSIP_SERVER_DEBUG, s_op->req);
+    return SM_ACTION_COMPLETE;
+}
+
+static PINT_sm_action create_metafile(struct PINT_smcb *smcb, job_status_s *js_p)
 {
 
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
@@ -587,6 +600,11 @@ static PINT_sm_action setup_resp(struct PINT_smcb *smcb,
      * into the attributes being sent back in the reply.  Should we just
      * copy all of the attributes?
      */
+
+    PINT_copy_object_attr(&s_op->resp.u.create.metafile_attrs,
+                          &s_op->attr);
+
+#if 0
     /* NOTE:  Distribution was sent from the client in the
      * original request structure, so there's no need to
      * send the same information back.
@@ -662,6 +680,7 @@ static PINT_sm_action setup_resp(struct PINT_smcb *smcb,
 
     s_op->resp.u.create.metafile_attrs.u.meta.size = 0;
     s_op->resp.u.create.metafile_attrs.u.meta.flags = 0;
+#endif
 
     /* don't need to return handle, was passed from client */
 #if 0
@@ -673,6 +692,8 @@ static PINT_sm_action setup_resp(struct PINT_smcb *smcb,
     }
 #endif
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "S_OP Resp\n");
+    PVFS_debug_servresp_create(GOSSIP_SERVER_DEBUG, &s_op->resp);
     return SM_ACTION_COMPLETE;
 }
 

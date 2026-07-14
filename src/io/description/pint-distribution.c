@@ -146,24 +146,30 @@ PINT_dist *PINT_dist_copy(PINT_dist **dist, const PINT_dist *sdist)
 {
     int dist_size;
 
-    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Starting distribution copy (%p)->(%p)\n", sdist, *dist);
-
-    if (sdist == NULL)
+    if (dist == NULL)
     {
-        gossip_lerr("source distribution pointer is null\n");
+        gossip_lerr("destination distribution pointer is NULL\n");
         return NULL;
     }
 
-    dist_size = PINT_DIST_PACK_SIZE(sdist);
-    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Dist size %d\n", dist_size);
+    if (sdist == NULL)
+    {
+        gossip_lerr("source distribution pointer is NULL\n");
+        return NULL;
+    }
+
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "Starting distribution copy (%p)->(%p)\n", sdist, *dist);
+
     if (*dist == NULL)
     {
         (*dist) = (PINT_dist *)malloc(dist_size);
-        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Mallocing dest (%p)\n", (*dist));
+        gossip_ldebug(GOSSIP_COMMON_DEBUG, "Mallocing dest (%p)\n", (*dist));
     }
+    dist_size = PINT_DIST_PACK_SIZE(sdist);
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "Dist size %d\n", dist_size);
     if (*dist)
     {
-        gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Copying (%p)->(%p)\n", sdist, (*dist));
+        gossip_ldebug(GOSSIP_COMMON_DEBUG, "Copying (%p)->(%p)\n", sdist, (*dist));
         memcpy((*dist), sdist, dist_size);
         /* fixup pointers to new space */
         (*dist)->dist_name
