@@ -351,7 +351,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
      */
     respattr = &(s_op->resp.u.getattr.attr);
     memset(respattr, 0, sizeof(PVFS_object_attr));
-
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "ELIZA DEBUG: getattr_verify_attribs meta_sid_count(%d)\n", s_op->resp.u.getattr.attr.meta_sid_count);
     /* We are using this routine (which normally would be hidden) because
      * the attr we are copying from was just read from dspace and it has
      * none of its variable length fields yet. If we try  to copy the
@@ -361,6 +361,7 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
     PINT_copy_object_attr_fixed(respattr, &s_op->attr);
     /*PVFS_debug_PVFS_dist_dir_attr(GOSSIP_GETATTR_DEBUG, &(respattr->u.dir.dist_dir_attr));*/
     /*PVFS_debug_PVFS_object_attr(GOSSIP_GETATTR_DEBUG, respattr);*/
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "ELIZA DEBUG: post copy(%d)\n", respattr->meta_sid_count);
 
     /*
      * weed out the attr mask of the response based on what the client
@@ -2376,6 +2377,8 @@ static PINT_sm_action getattr_create_capability(struct PINT_smcb *smcb,
     /* DEBUG_attr_mask(respattr->mask); makes a lot of output */
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p)\n", s_op);
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "ELIZA DEBUG: meta_sid_count in create_capability: %d\n", respattr->meta_sid_count);
 
     /* check return code from keyval read of acl */
     if (js_p->error_code == -TROVE_ENOENT)

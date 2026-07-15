@@ -104,6 +104,8 @@ static int server_parse_config(struct server_configuration_s *config,
     }
 
     assert(fs_config_buf);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "ELIZA DEBUG: server_parse_config fs_config_buf: %s\n", fs_config_buf);
 
     /* get the path to the TEMP directory */
     use_temp_path = GetTempPath(MAX_PATH, temp_path);
@@ -325,6 +327,8 @@ static PINT_sm_action server_get_config_cleanup(struct PINT_smcb *smcb,
                                                 job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "ELIZA DEBUG: server_get_config_cleanup, config buffer: %s\n", sm_p->u.get_config.fs_config_buf);
     if (sm_p && !sm_p->u.get_config.persist_config_buffers)
     {
 	free(sm_p->u.get_config.fs_config_buf);
