@@ -2350,7 +2350,8 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-
+    gossip_lsdebug(GOSSIP_JOB_DEBUG, "ELIZA DEBUG: job_trove_dspace_getattr attributes(%d)\n",
+         out_ds_attr_ptr->meta_sid_count);
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
                                handle,
@@ -2364,7 +2365,9 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     gossip_err("Error: Trove support not enabled.\n");
     ret = -ENOSYS;
 #endif
-
+    
+    gossip_lsdebug(GOSSIP_JOB_DEBUG, "ELIZA DEBUG: job_trove_dspace_getattr attributes(%d)\n",
+         out_ds_attr_ptr->meta_sid_count);
     if (ret < 0)
     {
         /* error posting trove operation */

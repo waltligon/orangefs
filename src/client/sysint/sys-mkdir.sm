@@ -697,7 +697,9 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
                    "MKDIR sets up attributes for new dir based on parent/hints\n");
 
     /* General attributes - inherit */
+    /* eliza - commented out to address replication-inheritance issue for root dir
     SET_DIR_ATTR_FROM_PARENT(meta_sid_count, PVFS_ATTR_COMMON_SID_COUNT);
+    */
     /* Hints pertaining to files - inherit */
     SET_DIR_ATTR_FROM_PARENT(u.dir.hint.dist_name_len, PVFS_ATTR_DIR_HINT_DIST_NAME_LEN);
     if (0 < p_attr->u.dir.hint.dist_name_len)

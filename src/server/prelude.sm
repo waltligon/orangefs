@@ -256,6 +256,12 @@ static PINT_sm_action prelude_req_sched(struct PINT_smcb *smcb,
     int ret = -PVFS_EINVAL;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_REQUESTS, 1, PINT_PERF_ADD);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "ELIZA DEBUG: prelude-req_sched attributes(%d)\n",
+         s_op->resp.u.getattr.attr.meta_sid_count);
+
+    gossip_lsadebug("ELIZA DEBUG: in prelude_validate, meta sid count for ds_attr: %d\n",
+                       s_op->ds_attr.meta_sid_count);
+
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
 
     gossip_if(GOSSIP_SERVER_DEBUG)
@@ -346,6 +352,9 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
     /* This is reading the attr of target,
      * this goes in ds_attr, don't confuse with attr 
      */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "ELIZA DEBUG: prelude-getattr-if-needed attributes(%d)\n",
+         s_op->ds_attr.meta_sid_count);
+
     ret = job_trove_dspace_getattr(s_op->target_fs_id,
                                    s_op->target_handle,
                                    smcb,
@@ -356,6 +365,10 @@ static PINT_sm_action prelude_getattr_if_needed(struct PINT_smcb *smcb,
                                    server_job_context,
                                    s_op->req->hints);
 
+    
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "ELIZA DEBUG: prelude-getattr-if-needed meta_sid_count after trove(%d)\n",
+         s_op->ds_attr.meta_sid_count);
     /* this getattr will not include parent, dirdata/dfile handles, or bitmaps 
      * but none of those things should change, presumably */
     return ret;
@@ -397,6 +410,9 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         */
     }
     gossip_end;
+
+    gossip_lsadebug("ELIZA DEBUG: in prelude_validate, meta sid count: %d & for ds_attr: %d\n",
+                        s_op->attr.meta_sid_count, s_op->ds_attr.meta_sid_count);
 
     /* Profile validate operation */
     INIT_PROFILER(profiler);
