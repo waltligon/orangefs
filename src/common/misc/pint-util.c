@@ -162,41 +162,49 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
 /* this macro is only for OID/SID arrays, we prefer these to be
  * allocated contiguouosly.  If the src has them packed, we simply copy
  * the src, otherwise we allocate space for both and copy in two chunks
+ * args: oids, sids, oid count, sid count, attr mask flags
  */
 #define PACKSID(o,s,oc,sc,f)                                                   \
     do {                                                                       \
-        gossip_ldebug(GOSSIP_COMMON_DEBUG, "Starting PACKSID\n");\
+        gossip_ldebug(GOSSIP_COMMON_DEBUG, "Starting PACKSID\n");              \
         if (NULL != src->u.o && NULL != src->u.s &&                            \
             ((src->mask & (f)) == (f)))                                        \
         {                                                                      \
             if (src->u.s == (PVFS_SID *)(src->u.o + src->u.oc))                \
             {                                                                  \
-                gossip_ldebug(GOSSIP_COMMON_DEBUG, "Pre-Packed\n");\
+                gossip_ldebug(GOSSIP_COMMON_DEBUG, "Pre-Packed\n");            \
                 /* OIDs and SIDs are packed */                                 \
                 CPYFIELD(o, OSASZ(dest->u.oc, dest->u.sc), f);                 \
             }                                                                  \
             else                                                               \
             {                                                                  \
-                gossip_ldebug(GOSSIP_COMMON_DEBUG, "Packing\n");\
+                gossip_ldebug(GOSSIP_COMMON_DEBUG, "Packing\n");               \
                 /* make packed from unpacked */                                \
                 dest->u.o = malloc(OSASZ(dest->u.oc, dest->u.sc));             \
                 memcpy(dest->u.o, src->u.o, OASZ(dest->u.oc));                 \
                 memcpy(dest->u.o + dest->u.oc, src->u.s, SASZ(dest->u.sc));    \
             }                                                                  \
-            gossip_ldebug(GOSSIP_COMMON_DEBUG, "Seting SID ptr\n");\
+            gossip_ldebug(GOSSIP_COMMON_DEBUG, "Seting SID ptr\n");            \
             dest->u.s = (PVFS_SID *)(dest->u.o + dest->u.oc);                  \
         }                                                                      \
         else                                                                   \
         {                                                                      \
             gossip_lerr("cannot PACKSID due to NULL ptr or mask\n");           \
-            /*dest->u.o = dest->u.s = NULL;*/                                      \
+            /*dest->u.o = dest->u.s = NULL;*/                                  \
         }                                                                      \
     } while (0)
 
 int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     gossip_ldebug(GOSSIP_COMMON_DEBUG, "starting oattrv copy (%p)->(%p)\n", src, dest);
+    PVFS_debug_PVFS_attr(GOSSIP_COMMON_DEBUG, src);
+    if (dest == NULL || src == NULL)
+    {
+        gossip_lerr("NULL pointer passed to copy\n");
+        return -PVFS_EINVAL;
+    }
     /* should we copy the capability? */
+    /* copy COMMON attrs */
     if (src->parent && (src->mask &  PVFS_ATTR_COMMON_PARENT))
     {
         dest->parent = malloc(OSASZ(1, src->meta_sid_count));
@@ -210,6 +218,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
         dest->parent = NULL;
         dest->parent_sids = NULL;
     }
+    /* copy objtype specific fields */
     switch(dest->objtype)
     {
     case PVFS_TYPE_METAFILE:
@@ -219,18 +228,29 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
             gossip_ldebug(GOSSIP_COMMON_DEBUG, "freeing old dist\n");
             PINT_dist_free(dest->u.meta.dist);
         }
-        gossip_ldebug(GOSSIP_COMMON_DEBUG, "Copying dist\n");
-        gossip_ldebug(GOSSIP_COMMON_DEBUG, "dest->u.meta.dist (%p)\n",
-                                           (dest->u.meta.dist));
-        gossip_ldebug(GOSSIP_COMMON_DEBUG, "src->u.meta.dist (%p)\n",
-                                           src->u.meta.dist);
-        PINT_dist_copy(&(dest->u.meta.dist), src->u.meta.dist);
-        gossip_ldebug(GOSSIP_COMMON_DEBUG, "Dist copy done\n");
-        dest->mask |= PVFS_ATTR_META_DIST;
-        if (dest->u.meta.dist == NULL)
+
+        //gossip_ldebug(GOSSIP_COMMON_DEBUG, "dest->u.meta.dist (%p)\n",
+        //                                   (dest->u.meta.dist));
+        //gossip_ldebug(GOSSIP_COMMON_DEBUG, "src->u.meta.dist (%p)\n",
+        //                                   src->u.meta.dist);
+        //gossip_ldebug(GOSSIP_COMMON_DEBUG, "src->u.meta.dist->name_size %d\n",
+        //                                   src->u.meta.dist->name_size);
+
+        if (src->u.meta.dist == NULL)
         {
-            gossip_ldebug(GOSSIP_COMMON_DEBUG, "Dist is NULL\n");
-            return -PVFS_ENOMEM;
+            gossip_ldebug(GOSSIP_COMMON_DEBUG, "Copying dist\n");
+            PINT_dist_copy(&(dest->u.meta.dist), src->u.meta.dist);
+            gossip_ldebug(GOSSIP_COMMON_DEBUG, "Dist copy done\n");
+            dest->mask |= PVFS_ATTR_META_DIST;
+            if (dest->u.meta.dist == NULL)
+            {
+                gossip_ldebug(GOSSIP_COMMON_DEBUG, "Dist is NULL\n");
+                return -PVFS_ENOMEM;
+            }
+        }
+        else
+        {
+            gossip_ldebug(GOSSIP_COMMON_DEBUG, "Skipping copy of NULL dist\n");
         }
         gossip_ldebug(GOSSIP_COMMON_DEBUG, "Packing dfile\n");
         /* dest->u.meta.dist_size = src->u.meta.dist_size; */
@@ -258,6 +278,13 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
                  (dest->u.dir.dist_dir_attr.bitmap_size *
                         sizeof(PVFS_dist_dir_bitmap_basetype)),
                  PVFS_ATTR_DIR_BITMAP_SIZE);
+
+        gossip_ldebug(GOSSIP_COMMON_DEBUG, "o (%p) s (%p) oc %d sc %d\n",
+                src->u.dir.dirdata_handles,
+                src->u.dir.dirdata_sids,
+                src->u.dir.dist_dir_attr.dirdata_count,
+                src->u.dir.dist_dir_attr.sid_count);
+
         PACKSID(dir.dirdata_handles,
                 dir.dirdata_sids,
                 dir.dist_dir_attr.dirdata_count,
@@ -272,6 +299,13 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
                  (dest->u.dirdata.dist_dir_attr.bitmap_size *
                         sizeof(PVFS_dist_dir_bitmap_basetype)),
                  PVFS_ATTR_DIRDATA_BITMAP_SIZE);
+
+        gossip_ldebug(GOSSIP_COMMON_DEBUG, "o (%p) s (%p) oc %d sc %d\n",
+                src->u.dirdata.dirdata_handles,
+                src->u.dirdata.dirdata_sids,
+                src->u.dirdata.dist_dir_attr.dirdata_count,
+                src->u.dirdata.dist_dir_attr.sid_count);
+
         PACKSID(dirdata.dirdata_handles,
                 dirdata.dirdata_sids,
                 dirdata.dist_dir_attr.dirdata_count,

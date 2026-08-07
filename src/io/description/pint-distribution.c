@@ -88,13 +88,13 @@ int PINT_unregister_distribution(char *dist_name)
 PINT_dist *PINT_dist_create(const char *name)
 {
     PINT_dist old_dist;
-    PINT_dist *new_dist = 0;
+    PINT_dist *new_dist = NULL;
 
     gossip_ldebug(GOSSIP_DIST_DEBUG, "Creating new Dist from table\n");
 
     if (!name)
     {
-        return 0;
+        return NULL;
     }
     old_dist.dist_name = (char*)name;
     old_dist.params = 0;
@@ -115,6 +115,7 @@ PINT_dist *PINT_dist_create(const char *name)
             new_dist->params
                 = (void *)(new_dist->dist_name + roundup8(new_dist->name_size));
             /* after lookup there must be enough room to hold name */
+            /* NOTE ASSERT AS ERROR CHECK! */
             assert(old_dist.name_size >= (strlen(old_dist.dist_name) + 1));
             /* copy using length of string passed in by caller
              * rather than rounded up name_size used for distribution packing

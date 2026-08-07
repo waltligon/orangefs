@@ -322,7 +322,8 @@ static PINT_sm_action getattr_verify_attribs(struct PINT_smcb *smcb,
      */
     respattr = &(s_op->resp.u.getattr.attr);
     memset(respattr, 0, sizeof(PVFS_object_attr));
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "ELIZA DEBUG: getattr_verify_attribs meta_sid_count(%d)\n", s_op->resp.u.getattr.attr.meta_sid_count);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "ELIZA DEBUG: meta_sid_count(%d)\n",
+                                         s_op->resp.u.getattr.attr.meta_sid_count);
     /* We are using this routine (which normally would be hidden) because
      * the attr we are copying from was just read from dspace and it has
      * none of its variable length fields yet. If we try  to copy the
@@ -1317,8 +1318,6 @@ static PINT_sm_action getattr_read_directory_keyvals(struct PINT_smcb *smcb,
 
     respattr = &s_op->resp.u.getattr.attr;
 
-    /* DEBUG_attr_mask(attr->mask); makes a lot of output */
-
     /* This thinks we just read dist_dir_attr from keyval
      * We don't do that any more, but we may have just
      * read something we should check.  If not, we should
@@ -1530,43 +1529,6 @@ static PINT_sm_action getattr_get_dir_hint(struct PINT_smcb *smcb,
     }
 
     PVFS_debug_PVFS_attr(GOSSIP_GETATTR_DEBUG, respattr_p);
-
-#if 0
-    /* gossip parent */
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                 "kvals of directory %s\n"
-                 "\t\tdirdata_handles (%p)\n"
-                 "\t\tdist_dir_bitmap (%p)\n"
-                 "\t\tparent: %s\n"
-                 "\t\tdirdata_count %d\n",
-                 PVFS_OID_str(&s_op->target_handle),
-                 respattr_p->u.dir.dirdata_handles,
-                 respattr_p->u.dir.dist_dir_bitmap,
-                 PVFS_OID_str(respattr_p->parent),
-                 respattr_p->u.dir.dist_dir_attr.dirdata_count);
-
-    /* gossip dir bitmap */
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                 "dist_dir_bitmap: \n");
-
-    for(i = respattr_p->u.dir.dist_dir_attr.bitmap_size - 1; i >= 0 ; i--)
-    {
-        c = (unsigned char *)(respattr_p->u.dir.dist_dir_bitmap + i);
-        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                     "i=%d : %02x %02x %02x %02x\n",
-                     i, c[3], c[2], c[1], c[0]);
-    }
-
-    /* gossip dirdata handles */
-
-    for(i = 0; i < respattr_p->u.dir.dist_dir_attr.dirdata_count; i++)
-    {
-        gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
-                       "dirdata server %d: (%s %s)\n",
-                       i, PVFS_OID_str(&respattr_p->u.dir.dirdata_handles[i]),
-                       PVFS_SID_str(&respattr_p->u.dir.dirdata_sids[i]));
-    }
-#endif
 
     /*
      * Start to get DIR HINTS
@@ -1805,7 +1767,6 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
 
     PVFS_credential *cred;
     PINT_server_req_get_credential(s_op->req, &cred);
-    //PVFS_debug_PVFS_credential(GOSSIP_SECURITY_DEBUG, cred);
     PINT_copy_credential(cred, &s_op->u.getattr.credential);
     if (js_p->error_code != 0 && js_p->error_code != -TROVE_ENOENT)
     {
@@ -1868,28 +1829,6 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
             respattr_p->u.dir.hint.dist_params_len = 0;
         }
 
-#if 0
-        /* no longer in keyvals, read along with dspace */
-        if (s_op->error_a[DEFAULT_NUM_DFILES_KEY] == 0)
-        {
-            long int dfile_count = 0;
-            char *endptr = NULL;
-            gossip_debug(GOSSIP_SERVER_DEBUG,
-                         "val_a[DEFAULT_NUM_DFILES_KEY] %p read_sz = %d\n", 
-                         s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer, 
-                         s_op->val_a[DEFAULT_NUM_DFILES_KEY].read_sz);
-
-            dfile_count = strtol(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer,
-                                 &endptr,
-                                 10);
-
-            if (*endptr != '\0' || dfile_count < 0)
-            {
-                dfile_count = 0;
-            }
-            s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
-        }
-#endif
 /* commented out in trunk, not sure why WBL */
 #if 0
         if(s_op->val_a[DEFAULT_NUM_DFILES_KEY].buffer)
@@ -2018,6 +1957,13 @@ static PINT_sm_action getattr_interpret_dir_hint(struct PINT_smcb *smcb,
                  respattr_p->u.dir.dirdata_handles,
                  respattr_p->u.dir.dist_dir_bitmap,
                  PVFS_OID_str(respattr_p->parent));
+
+/* 
+ * we should be able to copy the var stuff now
+ * we need it because this is about to overwrite the
+ * resp with the resp from the tree_get_dirent_count
+ */
+    PINT_copy_object_attr(&(s_op->parent_dir_attr), respattr_p);
 
     return SM_ACTION_COMPLETE;
 }

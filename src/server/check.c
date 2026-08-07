@@ -66,7 +66,7 @@ int PINT_get_capabilities(void *acl_buf,
                           PVFS_gid *group_array, 
                           uint32_t num_groups,
                           const PVFS_object_attr *attr, 
-                          uint32_t *op_mask)
+                          uint32_t *op_mask)             /* out */
 {
     PVFS_gid active_group;
     int ret;
@@ -245,8 +245,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     perm_fun = PINT_server_req_get_perm_fun(s_op->req);
     if (perm_fun == NULL)
     {
-        gossip_err("%s: permission check for operation with no permission "
-                   "function\n", __func__);
+        gossip_lerr("permission check for operation with no permission function\n");
 
         return -PVFS_EINVAL;
     }
@@ -265,8 +264,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                 handle = PINT_HINT_GET_HANDLE(s_op->req->hints);
                 if (PVFS_OID_EQ(&handle, &PVFS_HANDLE_NULL))
                 {
-                    gossip_err("%s: could not retrieve parent/metafile handle "
-                               "from hint\n", __func__);
+                    gossip_lerr("could not retrieve parent/metafile handle from hint\n");
                     ret = -PVFS_EINVAL;
                     goto PINT_perm_check_exit;
                 }
@@ -278,8 +276,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                     handle = PINT_HINT_GET_HANDLE(s_op->req->hints);
                     if (PVFS_OID_EQ(&handle, &PVFS_HANDLE_NULL))
                     {
-                        gossip_err("%s: could not retrieve parent handle from "
-                                   "hint\n", __func__);
+                        gossip_lerr("could not retrieve parent handle from hint\n");
                         ret = -PVFS_EINVAL;
                         goto PINT_perm_check_exit;
                     }
@@ -289,11 +286,20 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                     handle = s_op->target_handle;
                 }
                 break;
+            case PVFS_SERV_CREATE:
+            case PVFS_SERV_MKDIR:
+                /* We are creating so the target isn't in the db yet, and
+                 * isn't in the capability.  Instead we verify the parent
+                 * is in the capability - we have already looked it up
+                 * possibly on a different server.
+                 */
+                handle = *s_op->attr.parent;
+                break;
             default:
                 handle = s_op->target_handle;
                 break;
         }
-
+        PVFS_debug_PVFS_capability(GOSSIP_SECURITY_DEBUG, cap);
         if (PVFS_OID_NE(&handle, &PVFS_HANDLE_NULL))
         {
             gossip_ldebug(GOSSIP_SECURITY_DEBUG,

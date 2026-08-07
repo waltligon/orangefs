@@ -566,22 +566,28 @@ static PINT_sm_action mkdir_init(struct PINT_smcb *smcb, job_status_s *js_p)
     assert((js_p->error_code == 0) ||
            (js_p->error_code == MKDIR_RETRY));
 
-    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "MKDIR CALLING GETATTR on parent\n");
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Setup calling GETATTR on parent\n");
+    gossip_lsdebug(GOSSIP_CREATE_DEBUG, "sm_p (%p)\n", sm_p);
 
     /* set up to read the attributes of the parent,
      * which must be a directory
      */
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
     PINT_SM_GETATTR_STATE_FILL(
                     sm_p->getattr,
                     sm_p->parent_ref,
-                    (PVFS_ATTR_COMMON_NOTIME | PVFS_ATTR_DIR_HINT |
-                         PVFS_ATTR_CAPABILITY | PVFS_ATTR_DISTDIR_ATTR), 
+                    (PVFS_ATTR_COMMON_NOTIME |
+                         PVFS_ATTR_DIR_ALL |
+                         PVFS_ATTR_CAPABILITY),
                      PVFS_TYPE_DIRECTORY,
                     0);
 
     if (js_p->error_code == MKDIR_RETRY)
     {
         js_p->error_code = 0;
+        gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Calling post timer\n");
 
         return job_req_sched_post_timer(sm_p->msgarray_op.params.retry_delay,
                                         smcb,
@@ -590,7 +596,7 @@ static PINT_sm_action mkdir_init(struct PINT_smcb *smcb, job_status_s *js_p)
                                         &tmp_id,
                                         pint_client_sm_context);
     }
-
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Returning from mkdir_init\n");
     return SM_ACTION_COMPLETE;
 }
 
@@ -614,6 +620,7 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     int ret = 0; */
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "MKDIR inspects parent GETATTR\n");
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "sm_p (%p)\n", sm_p);
 
     /*
      * The getattr leaves the attributes (obj) of the parent in sm_p->getattr.attr
@@ -623,22 +630,13 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
      * attributes including hints, and meta_sid_count
      */
 
-    PVFS_debug_PVFS_attr(GOSSIP_CLIENT_DEBUG, &sm_p->getattr.attr);
+    //PVFS_debug_PVFS_attr(GOSSIP_CLIENT_DEBUG, &sm_p->getattr.attr);
+
+    dir_attr = &sm_p->u.mkdir.dir_attr; /* new dir attributes */
 
     p_attr = &sm_p->getattr.attr;       /* parent attributes */
-    assert(p_attr);
-    dir_attr = &sm_p->u.mkdir.dir_attr; /* new dir attributes */
-    assert(dir_attr);
+
     sys_attr = &sm_p->u.mkdir.sys_attr;   /* system attributes from user */
-    assert(sys_attr);
-
-    DEBUG_attr_mask(p_attr->mask);
-    DEBUG_attr_mask(sys_attr->mask);
-    DEBUG_attr_mask(dir_attr->mask);
-
-    distr_dir_servers_initial_requested = sys_attr->distr_dir_servers_initial;
-    distr_dir_servers_max_requested = sys_attr->distr_dir_servers_max;
-    distr_dir_split_size_requested = sys_attr->distr_dir_split_size;
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
         "parent owner: %d, group: %d, perms: %d, dirdata_count: %d\n",
@@ -648,19 +646,17 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
     PINT_debug_capability(&sm_p->getattr.attr.capability,
                           "mkdir_parent_getattr_inspect");
 
+    //DEBUG_attr_mask(p_attr->mask);
+    //DEBUG_attr_mask(sys_attr->mask);
+    //DEBUG_attr_mask(dir_attr->mask);
+
+    distr_dir_servers_initial_requested = sys_attr->distr_dir_servers_initial;
+    distr_dir_servers_max_requested = sys_attr->distr_dir_servers_max;
+    distr_dir_split_size_requested = sys_attr->distr_dir_split_size;
+
     PINT_debug_dist_dir_handles(GOSSIP_CLIENT_DEBUG, p_attr->u.dir.dist_dir_attr,
                                 p_attr->u.dir.dirdata_handles);
 
-    /* do we have a setgid bit? */
-    if(p_attr->perms & PVFS_G_SGID)
-    {
-        gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "parent has setgid bit set.\n");
-        gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
-                     " - modifying requested attr for new file.\n");
-        sys_attr->group = p_attr->group;
-        sys_attr->perms |= PVFS_G_SGID;
-        /* note that permission checking is left to server even in this case */
-    }
 
     /* set up redundancy defaults */
 #if 0
@@ -693,6 +689,16 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
         gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "Add P attr to C " #mbit "(%16lx)\n", mbit); \
     }
 
+    /* do we have a setgid bit? */
+    if(p_attr->perms & PVFS_G_SGID)
+    {
+        gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "parent has setgid bit set.\n");
+        gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
+                     " - modifying requested attr for new directory.\n");
+        sys_attr->group = p_attr->group;
+        sys_attr->perms |= PVFS_G_SGID;
+        /* note that permission checking is left to server even in this case */
+    }
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
                    "MKDIR sets up attributes for new dir based on parent/hints\n");
 
@@ -871,7 +877,7 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
                  dir_attr->u.dir.dist_dir_attr.split_size,
                  distr_dir_split_size_requested);
 
-    DEBUG_attr_mask(dir_attr->mask);
+    //DEBUG_attr_mask(dir_attr->mask);
 
     return SM_ACTION_COMPLETE;
 }
@@ -884,16 +890,14 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -PVFS_EINVAL;
-    int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_lsdebug(GOSSIP_MKDIR_DEBUG,
-                 "sm_p (%p) mkdir_msg_setup_msgpair\n", sm_p);
+    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "sm_p (%p)\n", sm_p);
 
     js_p->error_code = 0;
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "posting mkdir req, "
-                                    "[distr_dir_servers_initial=%d]\n", 
+                                    "dist_dir_attr.dirdata_min %d\n", 
                                     sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_min);
 
     /* Allocate OIDs and SIDs for a directory.
@@ -925,16 +929,27 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "mkdir selected DIR OID: %s\n",
+    gossip_if(GOSSIP_MKDIR_DEBUG)
+    {
+        int i = 0, j = 0, metacnt = 0;
+        gossip_lsadebug("mkdir selected DIR OID: %s\n",
                    PVFS_OID_str(sm_p->u.mkdir.newdir_handle));
     
-    gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "DIRDATA OIDs:\n");
+        gossip_lsadebug("DIRDATA OIDs:\n");
 
-    for (i = 0; i < sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max; i++)
-    {
-        gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "\tOID: %s\n",
-                     PVFS_OID_str(&sm_p->u.mkdir.dirdata_handles[i]));
+        metacnt = sm_p->u.mkdir.dir_attr.meta_sid_count;
+        for (i = 0; i < sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max; i++)
+        {
+            gossip_lsadebug("\tOID: %s\n",
+                         PVFS_OID_str(&sm_p->u.mkdir.dirdata_handles[i]));
+            for (j = 0; j < metacnt; j++)
+            {
+                gossip_lsadebug("\tSID: %s\n",
+                         PVFS_SID_str(&sm_p->u.mkdir.dirdata_sid_array[i * metacnt + j]));
+            }
+        }
     }
+    gossip_end;
 
     /* object ref will now refer to newly created metadata object */
     sm_p->object_ref.handle    = *sm_p->u.mkdir.newdir_handle;
@@ -942,8 +957,10 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     sm_p->object_ref.sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
     sm_p->object_ref.sid_array = sm_p->u.mkdir.newdir_sid_array;
 
-    /* objet handle also goes int attributes for debugging */
-    sm_p->u.mkdir.dir_attr.handle = sm_p->object_ref.handle;
+    /* object handle also goes in attributes for debugging */
+    memcpy(&sm_p->u.mkdir.dir_attr.handle,
+           &sm_p->object_ref.handle,
+           sizeof(PVFS_handle));
 
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
@@ -977,6 +994,8 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
      * On the other side we need to remember to put everything back.
      * This stops the encoder from trying to encode lists that aren't there.
      */
+    /* create works without this - let's see if mkdir can */
+    /*
     msg_p->req.u.mkdir.attr.parent = NULL;
     msg_p->req.u.mkdir.attr.parent_sids = NULL;
     msg_p->req.u.mkdir.attr.meta_sid_count = 0;
@@ -985,16 +1004,17 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     msg_p->req.u.mkdir.attr.u.dir.dist_dir_attr.dirdata_count = 0;
     msg_p->req.u.mkdir.attr.u.dir.dist_dir_attr.sid_count = 0;
     msg_p->req.u.mkdir.attr.u.dir.dist_dir_attr.bitmap_size = 0;
+    */
+
     /* now fill in various msg_p fields */
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
-    //dirdata_attr.u.dirdata.dist_dir_attr.dirdata_count = sm_p->u.mkdir.dirdata_count;
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
+
     msg_p->handle = *sm_p->u.mkdir.newdir_handle; /* collapse into object_ref */
-    /* V3 this assumes fan out from client */
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
-    msg_p->sid_index = 0;
     msg_p->sid_array = sm_p->u.mkdir.newdir_sid_array;
+    msg_p->sid_index = 0;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = mkdir_msg_comp_fn;
 

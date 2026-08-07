@@ -25,12 +25,15 @@
 
 machine pvfs2_create_sm
 {
+    /* this state is just a convenient place to dump structures */
     state debug
     {
         run create_debug;
         default => prelude;
     }
 
+    /* among the things prelude does is a getattr,
+     * do we need a getattr? */
     state prelude
     {
         jump pvfs2_prelude_sm;
@@ -38,6 +41,8 @@ machine pvfs2_create_sm
         default => setup_final_response;
     }
 
+    /* seems like we need the parent for defaults,
+     * maybe that is what prelude does */
     state create_metafile
     {
         run create_metafile;
@@ -49,6 +54,7 @@ machine pvfs2_create_sm
     }
 
 /*
+ * We skip this and let them be created later to reduce latency
     state create_local_datafiles
     {
         run create_local_datafiles;
@@ -144,13 +150,16 @@ static PINT_sm_action create_metafile(struct PINT_smcb *smcb, job_status_s *js_p
      */
     if( ! (s_op->req->u.create.attr.mask & PVFS_ATTR_META_DIST) )
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "%s: invalid create request, "
-                     "attribute mask did not include the distribution\n",
-                     __func__);
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "invalid create request, "
+                     "attribute mask did not include the distribution\n");
         js_p->error_code = -PVFS_EINVAL;
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "fsid %d handle %s\n",
+                   s_op->req->u.create.object.fs_id,
+                   PVFS_OID_str(&(s_op->req->u.create.object.handle)));
+                   
     ret = job_trove_dspace_create(s_op->req->u.create.object.fs_id,
                                   s_op->req->u.create.object.handle,
                                   PVFS_TYPE_METAFILE,
@@ -865,7 +874,8 @@ static int PINT_get_object_ref_create(struct PVFS_server_req *req,
                                       PVFS_handle *handle)
 {
     *fs_id = req->u.create.object.fs_id;
-    *handle = PVFS_HANDLE_NULL;
+    *handle = req->u.create.object.handle;
+    //*handle = PVFS_HANDLE_NULL;
     return 0;
 };
 

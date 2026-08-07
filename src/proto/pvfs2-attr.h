@@ -1236,6 +1236,7 @@ static inline void encode_PVFS_object_attr(char **pptr,
                                            const PVFS_object_attr *x) 
 { 
     int index_i = 0;
+    encode_PVFS_handle(pptr,          &(x)->handle); 
     encode_PVFS_ds_type(pptr,         &(x)->objtype); 
     encode_PVFS_object_attrmask(pptr, &(x)->mask); 
     encode_PVFS_uid(pptr,             &(x)->owner); 
@@ -1308,6 +1309,7 @@ static inline void encode_PVFS_object_attr(char **pptr,
 static inline void decode_PVFS_object_attr(char **pptr, PVFS_object_attr *x) 
 {
     int index_i = 0;
+    decode_PVFS_handle(pptr, &(x)->handle); 
     decode_PVFS_ds_type(pptr, &(x)->objtype); 
     decode_PVFS_object_attrmask(pptr, &(x)->mask); 
     decode_PVFS_uid(pptr, &(x)->owner); 
