@@ -513,6 +513,10 @@ static PINT_sm_action msgpairarray_post_recv_send(struct PINT_smcb *smcb,
                        msg_p->req.u.tree_get_file_size.credential.sig_size);
 #endif
 
+        if (msg_p->req.op == PVFS_SERV_MKDIR)
+        {
+            PVFS_debug_servreq_mkdir(GOSSIP_MKDIR_DEBUG, &msg_p->req);
+        }
         ret = PINT_encode(&(msg_p->req),
                           PINT_ENCODE_REQ,
                           &(msg_p->encoded_req),

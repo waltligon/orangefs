@@ -158,7 +158,7 @@ machine pvfs2_client_create_sm
  */
 PVFS_error PVFS_isys_create(char *object_name,
                             PVFS_object_ref parent_ref,
-                            PVFS_sys_attr attr,
+                            PVFS_sys_attr sys_attr,
                             const PVFS_credential *credential,
                             PVFS_sys_dist *dist,
                             PVFS_sys_layout *layout,
@@ -192,27 +192,27 @@ PVFS_error PVFS_isys_create(char *object_name,
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "Check Attributes\n");
 
     /* check to make sure all expected attributes are present */
-    if ((attr.mask & PVFS_ATTR_SYS_CREATE_REQUIRED) != PVFS_ATTR_SYS_CREATE_REQUIRED)
+    if ((sys_attr.mask & PVFS_ATTR_SYS_CREATE_REQUIRED) != PVFS_ATTR_SYS_CREATE_REQUIRED)
     {
         gossip_lerr("PVFS_isys_create() failure: invalid attribute mask: %lu, "
                     "expected PVFS_ATTR_SYS_CREATE_REQUIRED (%lu)\n",
-                    attr.mask, PVFS_ATTR_SYS_CREATE_REQUIRED);
+                    sys_attr.mask, PVFS_ATTR_SYS_CREATE_REQUIRED);
         return ret;
     }
 
     /* useless, if SYS_DFILE_COUNT is set previous test will error out */
-    if ((attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) &&
-        ((attr.dfile_count < 1) ||
-         (attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
+    if ((sys_attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) &&
+        ((sys_attr.dfile_count < 1) ||
+         (sys_attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
     {
         gossip_err("Error: invalid number of datafiles (%d) specified "
-                   "in PVFS_sys_create().\n", (int)attr.dfile_count);
+                   "in PVFS_sys_create().\n", (int)sys_attr.dfile_count);
         return ret;
     }
 
     if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
     {
-        gossip_err("Error: object name too long ");
+        gossip_lerr("Error: object name too long ");
         return -PVFS_ENAMETOOLONG;
     }
 
@@ -222,20 +222,20 @@ PVFS_error PVFS_isys_create(char *object_name,
     /* if owner/group differ from credential values, and credential is 
        not for root, create with owner/group equal to credential values
        (in cert. mode the credential fields aren't used) */
-    if (attr.owner != credential->userid &&
+    if (sys_attr.owner != credential->userid &&
         credential->userid != 0)
     {
         gossip_ldebug(GOSSIP_CREATE_DEBUG, "Replacing owner uid %d with %d "
-                     "on create\n", attr.owner, credential->userid);
-        attr.owner = credential->userid;
+                     "on create\n", sys_attr.owner, credential->userid);
+        sys_attr.owner = credential->userid;
     }
 
-    if (attr.group != credential->group_array[0] && 
+    if (sys_attr.group != credential->group_array[0] && 
         credential->group_array[0] != 0)
     {
         gossip_ldebug(GOSSIP_CREATE_DEBUG, "Replacing group gid %d with %d "
-                     "on create\n", attr.group, credential->group_array[0]);
-        attr.group = credential->group_array[0];
+                     "on create\n", sys_attr.group, credential->group_array[0]);
+        sys_attr.group = credential->group_array[0];
     }
 #endif
 
@@ -262,15 +262,12 @@ PVFS_error PVFS_isys_create(char *object_name,
 
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "Initializing msgarray\n");
 
-//CALLS GET/PUT CONFIG WITH LOCK
+    //CALLS GET/PUT CONFIG WITH LOCK
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.object_name = object_name;
-
     file_attr = &sm_p->u.create.file_attr;
-    /* meta_sid_count is needed for calculating malloc sizes */
-    //file_attr->meta_sid_count = fs_config->metadata_replication_factor;
 
     //gossip_ldebug(GOSSIP_CREATE_DEBUG, "File ATTR passed in\n");
     //PVFS_debug_PVFS_object_attr(GOSSIP_CREATE_DEBUG, file_attr);
@@ -280,15 +277,9 @@ PVFS_error PVFS_isys_create(char *object_name,
      */
     //PINT_CONVERT_ATTR(&sm_p->u.create.attr, &attr, PVFS_ATTR_META_ALL);
     gossip_ldebug(GOSSIP_CREATE_DEBUG, "Copying SYS ATTRS\n");
-    PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
+    PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &sys_attr);
 
-    gossip_if (GOSSIP_CREATE_DEBUG)
-    {
-        //PVFS_debug_object_ref(&parent_ref); /* does not check mask */
-    }
-    gossip_end;
-
-//GET CONFIG STRUCTS
+    /* GET CONFIG STRUCTS */
     /* get config for this filesystem */
     server_config = PINT_server_config_mgr_get_config(parent_ref.fs_id);
     fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
@@ -351,13 +342,15 @@ PVFS_error PVFS_isys_create(char *object_name,
     memset (&file_attr->handle, 0, sizeof(PVFS_OID));
     file_attr->objtype = PVFS_TYPE_METAFILE;
     file_attr->mask |= PVFS_ATTR_COMMON_TYPE;
+    //file_attr->meta_sid_count = meta_sid_count;
+    //file_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT;
     file_attr->owner = credential->userid;
     file_attr->mask |= PVFS_ATTR_COMMON_UID;
     file_attr->group = credential->group_array[0];
     file_attr->mask |= PVFS_ATTR_COMMON_GID;
     file_attr->perms = 0700;
     file_attr->mask |= PVFS_ATTR_COMMON_PERM;
-    file_attr->meta_sid_count = 1;
+    //file_attr->meta_sid_count = 1;
     file_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT;
     //file_attr->parent = NULL;
     //file_attr->parent_sids = NULL;
@@ -377,8 +370,8 @@ PVFS_error PVFS_isys_create(char *object_name,
     file_attr->u.meta.dfile_count = 1;      /* zero out for transmit */
     file_attr->mask |= PVFS_ATTR_META_DFILE_COUNT;
     file_attr->u.meta.dfile_array = NULL;
-    file_attr->u.meta.sid_count = 1;        /* zero out for transmit */
-    file_attr->mask |= PVFS_ATTR_META_SID_COUNT;
+    //file_attr->u.meta.sid_count = 1;        /* zero out for transmit */
+    //file_attr->mask |= PVFS_ATTR_META_SID_COUNT;
     file_attr->u.meta.sid_array = NULL;
     file_attr->u.meta.mirror_mode = 0;
     file_attr->mask |= PVFS_ATTR_META_MIRROR_MODE;
@@ -503,7 +496,7 @@ PVFS_error PVFS_isys_create(char *object_name,
  * part of sys_attr attributes, as is done in sys_mkdir where they
  * are used as a hint. in the sys_attr there is only a string for
  * the distribution name, and a string for the encoded parameters.
- * These will be interpreted out of the user attr in the SM frame
+ * These will be interpreted out of the user sys_attr in the SM frame
  * during the interpret phase.
  */
 #if 0
@@ -556,7 +549,7 @@ PVFS_error PVFS_isys_create(char *object_name,
      * retries we need to rebuild the attributes on each retry.
      */
 
-    PVFS_debug_PVFS_attr(GOSSIP_CLIENT_DEBUG, &(sm_p->u.create.file_attr));
+    //PVFS_debug_PVFS_attr(GOSSIP_CLIENT_DEBUG, &(sm_p->u.create.file_attr));
     gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Copying Attributes\n");
     PINT_copy_object_attr(&(sm_p->u.create.store_attr),
                           &(sm_p->u.create.file_attr));
@@ -1416,7 +1409,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
          * rendering this a true error - but eventually we will need to
          * have resolution code
          */
-        gossip_err("PVFS_sys_create: failed to look up SID\n");
+        gossip_lerr("PVFS_sys_create: failed to look up SID\n");
         /* V3 how to handle failure here ?
          * If we have to do a SID lookup we need to have SM block on
          * that action, or call a nested SM or something

@@ -389,8 +389,10 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
      * if the object doesn't exist, we need to create it using s_op->attr
      * and return that just like before.
      */
-    /*PVFS_debug_PVFS_ds_attr(GOSSIP_SERVER_DEBUG, &s_op->ds_attr);*/
-    /*PVFS_debug_PVFS_ds_dir_attr(GOSSIP_SERVER_DEBUG, &s_op->ds_attr);*/
+    if (s_op->req->op == PVFS_SERV_MKDIR)
+    {
+        PVFS_debug_servreq_mkdir(GOSSIP_SERVER_DEBUG, s_op->req);
+    }
 
     /* What if this is create (or mkdir for that matter)?
      * What does prelude do?  Does create need to actually look up something
@@ -436,13 +438,15 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
      */
     ret = PINT_server_req_get_attr(s_op->req, &s_op->attr); /* copys parent attrs out */
 
+    //PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+
     s_op->target_object_attr = &s_op->attr; /* is this used? */
 
-    s_op->attr.handle = s_op->target_handle;
+    //s_op->attr.handle = s_op->target_handle;
 
     /* Don't we need to read this? */
-    s_op->attr.parent = &(s_op->req->u.crdirent.parent_ref.handle);
-    s_op->attr.parent_sids = s_op->req->u.crdirent.parent_ref.sid_array;
+    //s_op->attr.parent = &(s_op->req->u.crdirent.parent_ref.handle);
+    //s_op->attr.parent_sids = s_op->req->u.crdirent.parent_ref.sid_array;
 
     /* Next we see if we need to create a new object.
      * The only objects created by prelude are DATAFILE and DIRDATA objects
@@ -640,13 +644,18 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             }
         }
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Auto Create Target ========================\n");
-        PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+        //PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
 
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                        "create_object is %d\n", create_object);
 
     } /* endif object not found */
-    else
+    else if (s_op->req->op == PVFS_SERV_MKDIR || s_op->req->op == PVFS_SERV_CREATE)
+    {
+        /* We never actually searched because we are creating an object */
+        s_op->target_object_attr = &s_op->attr;
+    }
+    else /* we found the object */
     {
         /* Translate the dspace attributes read from db into object attributes */
         gossip_lsdebug(GOSSIP_SERVER_DEBUG,
@@ -654,6 +663,8 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
 
         PVFS_object_attr_from_ds_attr(&s_op->attr, &s_op->ds_attr);
         s_op->target_object_attr = &s_op->attr;
+
+        //PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
 
         //gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Saving Parent Fixed Attrs  ===================\n");
         //PINT_copy_object_attr_fixed(&s_op->parent_dir_attr, &s_op->attr);
@@ -829,12 +840,15 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
     /* do not verify cap on cache hit */
     ret = (capcache_hit) ? 1 : PINT_verify_capability(&s_op->req->capability);
 
+    PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, &s_op->attr);
+
     /* check operation permissions */
     if (ret)
     {
         ret = 0; /* clear from revious ops */
         if (!create_object) /* if create_object allow all attrs to be set */
         {
+            gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Calling PINT_perm_check\n");
             ret = PINT_perm_check(s_op);
             gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                            "return from PINT_perm_check = %d\n",ret);

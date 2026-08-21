@@ -205,7 +205,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
     }
     /* should we copy the capability? */
     /* copy COMMON attrs */
-    if (src->parent && (src->mask &  PVFS_ATTR_COMMON_PARENT))
+    if (src->parent /* && (src->mask &  PVFS_ATTR_COMMON_PARENT)*/)
     {
         dest->parent = malloc(OSASZ(1, src->meta_sid_count));
         dest->parent_sids = (PVFS_SID *)(dest->parent + 1);

@@ -194,7 +194,7 @@ machine pvfs2_client_mkdir_sm
  */
 PVFS_error PVFS_isys_mkdir(char *object_name,
                            PVFS_object_ref parent_ref,
-                           PVFS_sys_attr attr,
+                           PVFS_sys_attr sys_attr,
                            const PVFS_credential *credential,
                            PVFS_sysresp_mkdir *resp,
                            PVFS_sys_op_id *op_id,
@@ -208,7 +208,9 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     struct filesystem_configuration_s *fs_config = NULL;
     PVFS_object_attr *dir_attr = NULL;
 
-    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_mkdir entered\n");
+    gossip_ldebug(GOSSIP_MKDIR_DEBUG,
+                  "--------------------------------------------\n");
+    gossip_ldebug(GOSSIP_MKDIR_DEBUG, "PVFS_isys_mkdir entered\n");
    
     if (!PVFS_OID_cmp(&parent_ref.handle, &PVFS_HANDLE_NULL) ||
         (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
@@ -219,16 +221,21 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     }
 
     /* check to make sure all expected attributes are present */
-    if ((attr.mask & PVFS_ATTR_SYS_MKDIR_REQUIRED) != PVFS_ATTR_SYS_MKDIR_REQUIRED)
+    if ((sys_attr.mask & PVFS_ATTR_SYS_MKDIR_REQUIRED) != PVFS_ATTR_SYS_MKDIR_REQUIRED)
     {
         gossip_lerr("PVFS_isys_mkdir() failure: invalid attribute mask %ld, "
                     "expected SYS_MKDIR_RREQUIRED (%ld)\n",
-                    attr.mask, PVFS_ATTR_SYS_MKDIR_REQUIRED);
+                    sys_attr.mask, PVFS_ATTR_SYS_MKDIR_REQUIRED);
         return ret;
     }
 
+    /* directories do not allow direct setting of num dirdata
+     * rather the user sets INIT, MAX, SPLIT_SIZE
+     */
+
     if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
     {
+        gossip_lerr("Error: object name too long ");
         return -PVFS_ENAMETOOLONG;
     }
 
@@ -236,20 +243,20 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     /* if owner/group differ from credential values, and credential is
        not for root, create with owner/group equal to credential values
        (in cert. mode the credential fields aren't used) */
-    if (attr.owner != credential->userid &&
+    if (sys_attr.owner != credential->userid &&
         credential->userid != 0)
     {
-        gossip_ldebug(GOSSIP_CREATE_DEBUG, "Replacing owner uid %d with %d "
-                     "on create\n", attr.owner, credential->userid);
-        attr.owner = credential->userid;
+        gossip_ldebug(GOSSIP_MKDIR_DEBUG, "Replacing owner uid %d with %d "
+                     "on mkdir\n", sys_attr.owner, credential->userid);
+        sys_attr.owner = credential->userid;
     }
 
-    if (attr.group != credential->group_array[0] &&
+    if (sys_attr.group != credential->group_array[0] &&
         credential->group_array[0] != 0)
     {
-        gossip_ldebug(GOSSIP_CREATE_DEBUG, "Replacing group gid %d with %d "
-                     "on create\n", attr.group, credential->group_array[0]);
-        attr.group = credential->group_array[0];
+        gossip_ldebug(GOSSIP_MKDIR_DEBUG, "Replacing group gid %d with %d "
+                     "on mkdir\n", sys_attr.group, credential->group_array[0]);
+        sys_attr.group = credential->group_array[0];
     }
 #endif
 
@@ -268,8 +275,13 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
 
     PINT_state_machine_locate(smcb, 1);
 
+    gossip_ldebug(GOSSIP_MKDIR_DEBUG, "Get Frame \n");
+
     sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
 
+    gossip_ldebug(GOSSIP_MKDIR_DEBUG, "Initializing msgarray\n");
+
+    /* calls get/put server/fs config */
     PINT_init_msgarray_params(sm_p, parent_ref.fs_id);
     PINT_init_sysint_credential(sm_p->cred_p, credential);
     sm_p->u.mkdir.mkdir_resp = resp;
@@ -279,12 +291,13 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     /*
      * I really hate sys_attr's - I would really rather convert them to
      * object_attr's right here and then work on with those.  Same for
-     * returning attrs- convert them right before returning if that's
+     * returning sys_attrs- convert them right before returning if that's
      * possible - tricky because of return struct we use.
      */
     
     /* COPY the user provided attributes into the sys_attr sm block */
-    PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
+    gossip_ldebug(GOSSIP_MKDIR_DEBUG, "Copying SYS ATTRS\n");
+    PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &sys_attr);
 
     sm_p->u.mkdir.stored_error_code = 0;
     sm_p->u.mkdir.retry_count = 0;
@@ -295,6 +308,12 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
                   PVFS_HINT_HANDLE_NAME,
                   sizeof(PVFS_handle),
                   &parent_ref.handle);
+
+    /* get config for this filesystem */
+    server_config = PINT_server_config_mgr_get_config(parent_ref.fs_id);
+    fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
+    /* Get from config, not read yet */
+    //meta_sid_count =  fs_config->metadata_replication_factor;
 
     sm_p->parent_ref = parent_ref;
 
@@ -313,8 +332,14 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     /* General attributes */
     dir_attr->objtype = PVFS_TYPE_DIRECTORY;
     dir_attr->mask |= PVFS_ATTR_COMMON_TYPE;
-    dir_attr->meta_sid_count = 1;
-    dir_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT;
+    //dir_attr->meta_sid_count = meta_sid_count;
+    //dir_attr->mask |= PVFS_ATTR_COMMON_SID_COUNT;
+    dir_attr->owner = credential->userid;
+    dir_attr->mask |= PVFS_ATTR_COMMON_UID;
+    dir_attr->group = credential->group_array[0];
+    dir_attr->mask |= PVFS_ATTR_COMMON_GID;
+    dir_attr->perms = 0700;
+    dir_attr->mask |= PVFS_ATTR_COMMON_PERM;
     dir_attr->u.dir.dirent_count = 0;
     dir_attr->mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
     /* Hints pertaining to files - none are present by default */
@@ -345,8 +370,10 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_MAX;
     dir_attr->u.dir.dist_dir_attr.dirdata_count = 1;  /* this is really initial */
     dir_attr->mask |= PVFS_ATTR_DIR_DIRDATA_COUNT;
+
     dir_attr->u.dir.dist_dir_attr.sid_count = 1;      /* I think this is obsolete */
     dir_attr->mask |= PVFS_ATTR_DIR_SID_COUNT;
+
     dir_attr->u.dir.dist_dir_attr.bitmap_size = 0;    /* bitmap set up on server */
     dir_attr->mask |= PVFS_ATTR_DIR_BITMAP_SIZE;
     dir_attr->u.dir.dist_dir_attr.split_size = 8192;
@@ -361,8 +388,8 @@ PVFS_error PVFS_isys_mkdir(char *object_name,
     /*********************************/
 
     /* get config for this filesystem */
-    server_config = PINT_server_config_mgr_get_config(parent_ref.fs_id);
-    fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
+    //server_config = PINT_server_config_mgr_get_config(parent_ref.fs_id);
+    //fs_config = PINT_config_find_fs_id(server_config, parent_ref.fs_id);
 
     if (fs_config->default_distr_dir_servers_initial > 0)
     {
@@ -473,10 +500,10 @@ static int mkdir_msg_comp_fn(void *v_p,
         return resp_p->status;
     }
 
-    PINT_debug_capability(&resp_p->u.mkdir.capability, "mkdir returned");
+    //PINT_debug_capability(&resp_p->u.mkdir.capability, "mkdir returned");
     /* where do we want to copy this? */
     /* BROKEN - COPIES TO ITSELF */
-    PINT_copy_capability(&resp_p->u.mkdir.capability, &resp_p->u.mkdir.capability);
+    //PINT_copy_capability(&resp_p->u.mkdir.capability, &resp_p->u.mkdir.capability);
 
     /* What needs to be copied from sm_p to psm_p? */
 
@@ -621,6 +648,8 @@ static PINT_sm_action mkdir_parent_getattr_inspect(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "MKDIR inspects parent GETATTR\n");
     gossip_lsdebug(GOSSIP_MKDIR_DEBUG, "sm_p (%p)\n", sm_p);
+
+    PVFS_debug_PVFS_attr(GOSSIP_MKDIR_DEBUG, &sm_p->getattr.attr);
 
     /*
      * The getattr leaves the attributes (obj) of the parent in sm_p->getattr.attr
@@ -957,6 +986,25 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
     sm_p->object_ref.sid_count = sm_p->u.mkdir.dir_attr.meta_sid_count;
     sm_p->object_ref.sid_array = sm_p->u.mkdir.newdir_sid_array;
 
+    /* get these into the attrs */
+    sm_p->u.mkdir.dir_attr.u.dir.dirdata_handles = sm_p->u.mkdir.dirdata_handles;
+    sm_p->u.mkdir.dir_attr.u.dir.dirdata_sids = sm_p->u.mkdir.dirdata_sid_array;
+
+    sm_p->u.mkdir.dir_attr.parent = &sm_p->parent_ref.handle;
+    sm_p->u.mkdir.dir_attr.parent_sids = sm_p->parent_ref.sid_array;
+    /* initialize the dist_dir_attr */
+
+    PINT_init_dist_dir_state(&sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr,
+                             &sm_p->u.mkdir.dir_attr.u.dir.dist_dir_bitmap, /* malloc'd */
+                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_count,
+                             sm_p->u.mkdir.dir_attr.meta_sid_count,
+                             0,
+                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.dirdata_max,
+                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size
+                            );
+
+    PVFS_debug_PVFS_attr(GOSSIP_MKDIR_DEBUG, &sm_p->u.mkdir.dir_attr);
+
     /* object handle also goes in attributes for debugging */
     memcpy(&sm_p->u.mkdir.dir_attr.handle,
            &sm_p->object_ref.handle,
@@ -989,6 +1037,10 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
                             sm_p->u.mkdir.dir_attr.u.dir.dist_dir_attr.split_size, /* redundant */
                             sm_p->hints);
 
+    /* WBL - I'm going to get rid of all this double listing - if an item
+     * fits in the attr (like meta_sid_count for example) then I'm going to remove from
+     * the request proper and let it ride in the attr.
+     */
     /* After setting up the request, zero out the handle and sid counts in the attr
      * We don't send lists of oids and sids in the attr, but in the req.
      * On the other side we need to remember to put everything back.
@@ -1032,6 +1084,12 @@ static PINT_sm_action mkdir_msg_setup_msgpair(struct PINT_smcb *smcb,
          */
         js_p->error_code = ret;
     }
+    else
+    {
+        gossip_lsdebug(GOSSIP_CREATE_DEBUG, "sys-mkdir target SID: %s\n",
+                     PVFS_SID_str(&msg_p->sid_array[0]));
+    }
+
 
     /* this is a mop set up for jumping to MPA */
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
@@ -1050,6 +1108,10 @@ static PINT_sm_action mkdir_msg_failure(struct PINT_smcb *smcb,
 
 /* This sends setattrs to all of the new remote dirdata,
  * which will create them and update their metadata
+ *
+ * now that prelude auto-creates dirdata and dfiles the first time they
+ * are referenced by a request, we don't need to do this.  We go ahead
+ * and make local objects, but save the transit time for remote.
  */
 /* send a setattr to each new dirdata to set up data */
 #if 0

@@ -243,6 +243,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                    PINT_map_server_op_to_string(s_op->req->op));
 
     perm_fun = PINT_server_req_get_perm_fun(s_op->req);
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "finished getting perm func\n"); 
     if (perm_fun == NULL)
     {
         gossip_lerr("permission check for operation with no permission function\n");
@@ -253,6 +254,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
     /* do not check handles for null caps */
     if (!PINT_capability_is_null(cap))
     {                
+        gossip_ldebug(GOSSIP_SECURITY_DEBUG, "Not a NULL cap\n"); 
         switch (s_op->req->op)
         {
             /* remove ops use parent handle from hint */
@@ -299,7 +301,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                 handle = s_op->target_handle;
                 break;
         }
-        PVFS_debug_PVFS_capability(GOSSIP_SECURITY_DEBUG, cap);
+        //PVFS_debug_PVFS_capability(GOSSIP_SECURITY_DEBUG, cap);
         if (PVFS_OID_NE(&handle, &PVFS_HANDLE_NULL))
         {
             gossip_ldebug(GOSSIP_SECURITY_DEBUG,
@@ -331,6 +333,7 @@ int PINT_perm_check(struct PINT_server_op *s_op)
                   PINT_capability_is_null(cap) ? "[null]" : 
                       PINT_print_op_mask(cap->op_mask, op_mask));
 
+    gossip_ldebug(GOSSIP_SECURITY_DEBUG, "calling perm fun\n"); 
     ret = perm_fun(s_op);
 
 PINT_perm_check_exit:

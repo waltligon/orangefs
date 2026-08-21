@@ -75,85 +75,87 @@ static int dist_dir_calc_branch_level(
  *  root dir and dirdata.
  */
 
-int PINT_init_dist_dir_state(
-		PVFS_dist_dir_attr *dist_dir_attr, 
-		PVFS_dist_dir_bitmap *bitmap_ptr,
-		const int dirdata_count, 
-		const int sid_count, 
-		const int server_no, 
-		int pre_dsg_num_server,
-                const int split_size)
+int PINT_init_dist_dir_state(PVFS_dist_dir_attr *dist_dir_attr, 
+                             PVFS_dist_dir_bitmap *bitmap_ptr,
+                             const int dirdata_count, 
+                             const int sid_count, 
+                             const int server_no, 
+                             int pre_dsg_num_server,
+                             const int split_size)
 {
-	int i;
-        double cval;
+    int i;
+    double cval;
 
-	assert(dist_dir_attr != NULL);
+    assert(dist_dir_attr != NULL);
 
-	/* -1 <= server_no < dirdata_count &&
+    /* -1 <= server_no < dirdata_count &&
          *  0 < pre_dsg_num_server <= dirdata_count */
-	assert(	(dirdata_count > 0) &&
-	 	(server_no >= -1) && /* metadata handle has server_no = -1 */
-		(server_no < dirdata_count));
+    assert((dirdata_count > 0) &&
+           (server_no >= -1) && /* metadata handle has server_no = -1 */
+           (server_no < dirdata_count));
 
-	if ((pre_dsg_num_server <= 0) ||
-		(pre_dsg_num_server > dirdata_count))
-	{
-		pre_dsg_num_server = dirdata_count;	
-	}
+    if ((pre_dsg_num_server <= 0) ||
+        (pre_dsg_num_server > dirdata_count))
+    {
+        pre_dsg_num_server = dirdata_count;	
+    }
 
-	dist_dir_attr->dirdata_count = dirdata_count;
-	dist_dir_attr->sid_count = sid_count;
-	dist_dir_attr->server_no = server_no;
-	/* tree_height start from 0 */
-        cval = ceil(my_log2((double)dirdata_count)); 
-	dist_dir_attr->tree_height = (int)cval;
+    dist_dir_attr->dirdata_count = dirdata_count;
+    dist_dir_attr->sid_count = sid_count;
+    dist_dir_attr->server_no = server_no;
+    /* tree_height start from 0 */
+    cval = ceil(my_log2((double)dirdata_count)); 
+    dist_dir_attr->tree_height = (int)cval;
 
-	/* increase bitmap_size if 2^tree_height > 32
-	 * bitmap has at least 2^tree_height bits,
-         * that is, the number of leaves of a full tree.
-         */
-	if( (1l << dist_dir_attr->tree_height) >
-		(sizeof(PVFS_dist_dir_bitmap_basetype) * 8))
-	{
-		dist_dir_attr->bitmap_size =
-                         ((1l << dist_dir_attr->tree_height) >> 5);
-	}
-	else
-	{
-		dist_dir_attr->bitmap_size = 1;
-	}
+    /* increase bitmap_size if 2^tree_height > 32
+     * bitmap has at least 2^tree_height bits,
+     * that is, the number of leaves of a full tree.
+     */
+    if((1l << dist_dir_attr->tree_height) >
+       (sizeof(PVFS_dist_dir_bitmap_basetype) * 8))
+    {
+        dist_dir_attr->bitmap_size =
+                       ((1l << dist_dir_attr->tree_height) >> 5);
+    }
+    else
+    {
+        dist_dir_attr->bitmap_size = 1;
+    }
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "bitmap size set to %d\n",
+                                       dist_dir_attr->bitmap_size);
 
-	*bitmap_ptr = (PVFS_dist_dir_bitmap) malloc(
+    *bitmap_ptr = (PVFS_dist_dir_bitmap) malloc(
                                        dist_dir_attr->bitmap_size *
-                                       sizeof(PVFS_dist_dir_bitmap_basetype));
-	if ((*bitmap_ptr) == NULL)
-	{
-		return -1;
-	}
+                                           sizeof(PVFS_dist_dir_bitmap_basetype));
+    if ((*bitmap_ptr) == NULL)
+    {
+        gossip_lerr("bitmap_ptr is NULL\n");
+        return -1;
+    }
 
-	memset((*bitmap_ptr),
-               0,
-               dist_dir_attr->bitmap_size *
-                              sizeof(PVFS_dist_dir_bitmap_basetype));
+    memset((*bitmap_ptr),
+           0,
+           dist_dir_attr->bitmap_size *
+                          sizeof(PVFS_dist_dir_bitmap_basetype));
 
-	for(i = pre_dsg_num_server-1; i >= 0; i--)
-	{
-		SET_BIT((*bitmap_ptr), i);
-	}
+    for(i = pre_dsg_num_server-1; i >= 0; i--)
+    {
+        SET_BIT((*bitmap_ptr), i);
+    }
 
-	if(server_no > -1) /* an dirdata server */
-	{
-		dist_dir_attr->branch_level =
-                        dist_dir_calc_branch_level(dist_dir_attr, *bitmap_ptr);
-	}
-	else /* a meta server */
-	{
-		dist_dir_attr->branch_level = -1;
-	}
+    if(server_no > -1) /* an dirdata server */
+    {
+        dist_dir_attr->branch_level =
+               dist_dir_calc_branch_level(dist_dir_attr, *bitmap_ptr);
+    }
+    else /* a meta server */
+    {
+        dist_dir_attr->branch_level = -1;
+    }
 
-	/* set split size */
-	dist_dir_attr->split_size = split_size;
-	return 0;
+    /* set split size */
+    dist_dir_attr->split_size = split_size;
+    return 0;
 }
 
 /* this function copies a dist_dir_attr, mostly for creating dirdatas from
@@ -169,10 +171,9 @@ int PINT_copy_dist_dir_attr(PVFS_dist_dir_attr *src,
 /* functions to test whether a dirdata server is active or not. 
  * will return 0 if server_no is out of bound or server is inactive.
  */
-int PINT_is_dist_dir_bucket_active(
-		const PVFS_dist_dir_attr *dist_dir_attr_p, 
-		const PVFS_dist_dir_bitmap bitmap,
-		const int server_no)
+int PINT_is_dist_dir_bucket_active(const PVFS_dist_dir_attr *dist_dir_attr_p, 
+                                   const PVFS_dist_dir_bitmap bitmap,
+                                   const int server_no)
 {
     if((server_no < 0) ||
             (server_no >= dist_dir_attr_p->dirdata_count))
@@ -196,75 +197,74 @@ int PINT_is_dist_dir_bucket_active(
  * a new dir entry, based on the current tree
  * hash can be any value, whose rightmost several bits will be examined.
  */
-int PINT_find_dist_dir_bucket(
-		const PVFS_dist_dir_hash_type hash, 
-		const PVFS_dist_dir_attr *const dist_dir_attr,
-		const PVFS_dist_dir_bitmap bitmap)
+int PINT_find_dist_dir_bucket(const PVFS_dist_dir_hash_type hash, 
+                              const PVFS_dist_dir_attr *const dist_dir_attr,
+                              const PVFS_dist_dir_bitmap bitmap)
 {
-	PVFS_dist_dir_hash_type node_val;
-	int level;
+    PVFS_dist_dir_hash_type node_val;
+    int level;
 
-	assert(dist_dir_attr != NULL);
-	assert(bitmap != NULL);
+    assert(dist_dir_attr != NULL);
+    assert(bitmap != NULL);
 
-	level = dist_dir_attr->tree_height;
+    level = dist_dir_attr->tree_height;
 
-	if(level < 0)
-	{
-		return -1;
-	}
+    if(level < 0)
+    {
+        return -1;
+    }
 
-        /* use the rightmost 'tree_height' bits */
-	for(node_val = hash & ((1l << level) - 1);
-            /* test if node_val bit is set */
-            (level >= 0) && !(TST_BIT(bitmap, node_val));
-            /* if it's not, use less bits of the hash value */
-            node_val &= ((1l << (--level)) - 1) );
+    /* use the rightmost 'tree_height' bits */
+    for(node_val = hash & ((1l << level) - 1);
+        /* test if node_val bit is set */
+        (level >= 0) && !(TST_BIT(bitmap, node_val));
+        /* if it's not, use less bits of the hash value */
+        node_val &= ((1l << (--level)) - 1) );
 
-	return (int)node_val; /* assume tree_height < 32 */
+    return (int)node_val; /* assume tree_height < 32 */
 }
 
 
 /*
  * this code return the index of the new node when a bucket is to be split
  */
-int PINT_find_dist_dir_split_node(
-		PVFS_dist_dir_attr *const dist_dir_attr, 
-		PVFS_dist_dir_bitmap bitmap)
+int PINT_find_dist_dir_split_node(PVFS_dist_dir_attr *const dist_dir_attr, 
+                                  PVFS_dist_dir_bitmap bitmap)
 {
-	int new_node_val;
-	int branch_level;
+    int new_node_val;
+    int branch_level;
 
-	assert((dist_dir_attr != NULL) && 
-		   (dist_dir_attr->server_no > -1) &&
-		   (bitmap != NULL));
+    assert((dist_dir_attr != NULL) && 
+           (dist_dir_attr->server_no > -1) &&
+           (bitmap != NULL));
 
-	branch_level = dist_dir_attr->branch_level;
+    branch_level = dist_dir_attr->branch_level;
 
-	/* meta server or inactive dirdata server should not come here */
-	assert(branch_level > -1);
+    /* meta server or inactive dirdata server should not come here */
+    assert(branch_level > -1);
 
-	/* if it reaches the maximum tree height */
-	if (branch_level >= dist_dir_attr->tree_height)
-	{
-		return -1;
-	}
+    /* if it reaches the maximum tree height */
+    if (branch_level >= dist_dir_attr->tree_height)
+    {
+        gossip_lerr("branch level >= tree_height\n");
+        return -1;
+    }
 
-	/* calculate new node value */
-	new_node_val = dist_dir_attr->server_no 
-				+ (1l << branch_level);
-	if(new_node_val >= dist_dir_attr->dirdata_count)
-	{
-		return -1;
-	}
+    /* calculate new node value */
+    new_node_val = dist_dir_attr->server_no + (1l << branch_level);
+    if(new_node_val >= dist_dir_attr->dirdata_count)
+    {
+        gossip_lerr("new_node_val >= dirdata_count\n");
+        return -1;
+    }
 
-	/* new node must be unset, otherwise branch_level is messed up */
-	assert(!TST_BIT(bitmap, new_node_val));
-        SET_BIT(bitmap, new_node_val);
-        dist_dir_attr->branch_level =
+    /* new node must be unset, otherwise branch_level is messed up */
+    assert(!TST_BIT(bitmap, new_node_val));
+           SET_BIT(bitmap, new_node_val);
+           dist_dir_attr->branch_level =
                        dist_dir_calc_branch_level(dist_dir_attr, bitmap);
 
-	return new_node_val;
+    return new_node_val;
 }
 
 /*
@@ -276,10 +276,10 @@ int PINT_update_dist_dir_bitmap_from_bitmap(
 		const PVFS_dist_dir_attr *from_dir_attr, 
 		const PVFS_dist_dir_bitmap from_dir_bitmap)
 {
-	int i;
+    int i;
 
-	assert((to_dir_attr != NULL) && (from_dir_attr != NULL));
-	assert((to_dir_bitmap != NULL) && (from_dir_bitmap != NULL));
+    assert((to_dir_attr != NULL) && (from_dir_attr != NULL));
+    assert((to_dir_bitmap != NULL) && (from_dir_bitmap != NULL));
 
 #if 0
 	if( (to_dir_attr->dirdata_count != from_dir_attr->dirdata_count) ||
@@ -289,24 +289,24 @@ int PINT_update_dist_dir_bitmap_from_bitmap(
 	}
 #endif
 
-	/* bitmap is with a type of (uint32_t *)
-	 */
-	for(i = to_dir_attr->bitmap_size - 1;
-		i >= 0; i--) 
-	{
-		to_dir_bitmap[i] |= from_dir_bitmap[i];
-	}
+    /* bitmap is with a type of (uint32_t *)
+     */
+    for(i = to_dir_attr->bitmap_size - 1;
+    	i >= 0; i--) 
+    {
+        to_dir_bitmap[i] |= from_dir_bitmap[i];
+    }
 
 	/* update branch level */
-	if(to_dir_attr->server_no > -1) /* dirdata server */
-	{
-	to_dir_attr->branch_level =
-                    dist_dir_calc_branch_level(to_dir_attr, to_dir_bitmap);
-	}
+    if(to_dir_attr->server_no > -1) /* dirdata server */
+    {
+        to_dir_attr->branch_level =
+                   dist_dir_calc_branch_level(to_dir_attr, to_dir_bitmap);
+    }
 
-	/* anything else to update? */
+    /* anything else to update? */
 
-	return 0;
+    return 0;
 }
 
 
@@ -337,17 +337,16 @@ int PINT_dist_dir_set_serverno(const int server_no,
 	PVFS_dist_dir_attr *ddattr, 
 	PVFS_dist_dir_bitmap ddbitmap)
 {
-	assert(ddattr != NULL && 
-			ddbitmap != NULL &&
-			server_no >= -1 &&
-			server_no < ddattr->dirdata_count);
+    assert(ddattr != NULL && 
+           ddbitmap != NULL &&
+           server_no >= -1 &&
+           server_no < ddattr->dirdata_count);
 
-
-	ddattr->server_no = server_no;
+    ddattr->server_no = server_no;
 	
-	ddattr->branch_level = dist_dir_calc_branch_level(ddattr, ddbitmap);
+    ddattr->branch_level = dist_dir_calc_branch_level(ddattr, ddbitmap);
 
-        return 0;
+    return 0;
 }
 
 /*

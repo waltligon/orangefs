@@ -332,10 +332,10 @@ do {                                                                      \
     int i;                                                                \
     gossip_ladebug("Dist_Dir_Bitmap: " #_dattr " = (%p)\n", (_dattr));    \
     gossip_ladebug("    " #_dattr "bitmap_size %d\n", (_dattr)->dist_dir_attr.bitmap_size); \
-    gossip_ladebug("    " #_dattr "bitmap ptr (%p)\n", (_dattr)->dist_dir_bitmap); \
+    gossip_ladebug("    " #_dattr "dist_dir_bitmap (%p)\n", (_dattr)->dist_dir_bitmap); \
     if ((_dattr) == NULL || (_dattr)->dist_dir_bitmap == NULL)            \
     {                                                                     \
-        gossip_ladebug("    " #_dattr "->dist-dir-bitmap: (nil)\n");      \
+        gossip_ladebug("    " #_dattr "->dist-dir-bitmap: is NULL\n");    \
     }                                                                     \
     else                                                                  \
     {                                                                     \
