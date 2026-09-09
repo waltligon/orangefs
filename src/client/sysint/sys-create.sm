@@ -866,9 +866,21 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
      * both here and convert the right one, and put a comment below in the user
      * attr area.
      */
+    gossip_if (GOSSIP_CREATE_DEBUG)
+    {
+        if (sys_attr->dist_name)
+            gossip_lsadebug("sys_attr->dist_name %s\n", sys_attr->dist_name);
+        gossip_lsadebug("sys_attr->dist_params (%p)\n", sys_attr->dist_params);
+        if (pattr->u.dir.hint.dist_name)
+            gossip_lsadebug("pattr->u.dir.hint.dist_name %s\n", pattr->u.dir.hint.dist_name);
+        gossip_lsadebug("pattr->u.dir.hint.dist_params (%p)\n", pattr->u.dir.hint.dist_params);
+        gossip_lsadebug("file_attr->u.meta.dist (%p)\n", file_attr->u.meta.dist);
+    }
+    gossip_end;
+
     if (sys_attr->dist_name && sys_attr->dist_params)
     {
-        /* set distribution from user sys_attr */
+        gossip_lsdebug(GOSSIP_CREATE_DEBUG, "set distribution from user sys_attr\n");
         ret = convert_dist(sys_attr->dist_name,
                            sys_attr->dist_params,
                            &file_attr->u.meta.dist);
@@ -877,7 +889,7 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
     {
         if (pattr->u.dir.hint.dist_name && pattr->u.dir.hint.dist_params)
         {
-            /* set distribution from parent */
+            gossip_lsdebug(GOSSIP_CREATE_DEBUG, "set distribution from parent hint\n");
             ret = convert_dist(pattr->u.dir.hint.dist_name,
                                pattr->u.dir.hint.dist_params,
                                &file_attr->u.meta.dist);
@@ -887,10 +899,10 @@ static PINT_sm_action create_parent_getattr_inspect(struct PINT_smcb *smcb,
             if(!file_attr->u.meta.dist)
             {
                 /* error, no distribution!, code should guarantee a dist! */
-                gossip_err("In sys_create:getattr_inspect - no distribution!");
+                gossip_lerr("no distribution!");
                 ret = -1;
             }
-            /* else we use what is already there */
+            gossip_lsdebug(GOSSIP_CREATE_DEBUG, "else we use what is already there\n");
             ret = 0;
         }
     }
@@ -1314,8 +1326,15 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
         gossip_lsadebug("dfile_array before = (%p)\n",
                    sm_p->u.create.file_attr.u.meta.dfile_array);
 
-        gossip_lsadebug("create selected DIR OID: %s\n",
+        gossip_lsadebug("create selected META OID: %s\n",
                    PVFS_OID_str(sm_p->u.create.metadata_handle));
+
+        gossip_lsadebug("create selected META SIDs:\n");
+        for (i = 0; i < sm_p->u.create.file_attr.u.meta.dfile_count; i++)
+        {
+            gossip_lsadebug("\tSID: %s\n",
+                   PVFS_SID_str(&(sm_p->u.create.metadata_sid_array[i])));
+        }
 
         gossip_lsadebug("DATAFILE OIDs:\n");
 
@@ -1332,7 +1351,6 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
         }
     }
     gossip_end;
-
 
     /* object ref will now refer to newly created metadata object */
     sm_p->object_ref.handle    = *sm_p->u.create.metadata_handle;

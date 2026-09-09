@@ -229,14 +229,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
             PINT_dist_free(dest->u.meta.dist);
         }
 
-        //gossip_ldebug(GOSSIP_COMMON_DEBUG, "dest->u.meta.dist (%p)\n",
-        //                                   (dest->u.meta.dist));
-        //gossip_ldebug(GOSSIP_COMMON_DEBUG, "src->u.meta.dist (%p)\n",
-        //                                   src->u.meta.dist);
-        //gossip_ldebug(GOSSIP_COMMON_DEBUG, "src->u.meta.dist->name_size %d\n",
-        //                                   src->u.meta.dist->name_size);
-
-        if (src->u.meta.dist == NULL)
+        if (src->u.meta.dist != NULL)
         {
             gossip_ldebug(GOSSIP_COMMON_DEBUG, "Copying dist\n");
             PINT_dist_copy(&(dest->u.meta.dist), src->u.meta.dist);
@@ -252,6 +245,7 @@ int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
         {
             gossip_ldebug(GOSSIP_COMMON_DEBUG, "Skipping copy of NULL dist\n");
         }
+
         gossip_ldebug(GOSSIP_COMMON_DEBUG, "Packing dfile\n");
         /* dest->u.meta.dist_size = src->u.meta.dist_size; */
         PACKSID(meta.dfile_array,
