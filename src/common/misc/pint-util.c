@@ -197,7 +197,7 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
 int PINT_copy_object_attr_var(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     gossip_ldebug(GOSSIP_COMMON_DEBUG, "starting oattrv copy (%p)->(%p)\n", src, dest);
-    PVFS_debug_PVFS_attr(GOSSIP_COMMON_DEBUG, src);
+    //PVFS_debug_PVFS_attr(GOSSIP_COMMON_DEBUG, src);
     if (dest == NULL || src == NULL)
     {
         gossip_lerr("NULL pointer passed to copy\n");
@@ -405,6 +405,7 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     memset(dest, 0, sizeof(*dest));
     //PVFS_debug_PVFS_attr(GOSSIP_SERVER_DEBUG, dest); 
 
+    gossip_ldebug(GOSSIP_COMMON_DEBUG, "Only showing clear operations - copies are silent \n");
     /* should not need to copy the mask - each mask bit is being
      * set by copy_attr() and all of the relevant fields should be 
      * referenced here
@@ -435,12 +436,12 @@ int PINT_copy_object_attr_fixed(PVFS_object_attr *dest, PVFS_object_attr *src)
     {
     case PVFS_TYPE_METAFILE :
         gossip_ldebug(GOSSIP_COMMON_DEBUG, "type metafile\n");
-        /* these is a var field copied after the fixed fields */
+        /* this is a var field copied after the fixed fields */
         CLRFIELD(dest->u.meta.dist);
 
         copy_attr(u.meta.dist_size, PVFS_ATTR_META_DIST_SIZE);
 
-        /* these is a var field copied after the fixed fields */
+        /* this is a var field copied after the fixed fields */
         CLRPACK(meta.dfile_array, meta.sid_array, meta.dfile_count);
 
         copy_attr(u.meta.dfile_count, PVFS_ATTR_META_DFILE_COUNT);
@@ -544,6 +545,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
 {
     int ret = -PVFS_EINVAL;
     gossip_ldebug(GOSSIP_COMMON_DEBUG, "starting oattr copy (%p)->(%p)\n", src, dest);
+    PVFS_debug_PVFS_attr(GOSSIP_COMMON_DEBUG, src);
     ret = PINT_copy_object_attr_fixed(dest, src);
     gossip_ldebug(GOSSIP_COMMON_DEBUG, "fixed complete\n");
     ret = PINT_copy_object_attr_var(dest, src);
@@ -561,6 +563,7 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         PINT_copy_capability(&src->capability, &dest->capability);
         dest->mask |= PVFS_ATTR_CAPABILITY;
     }
+    PVFS_debug_PVFS_attr(GOSSIP_COMMON_DEBUG, dest);
     gossip_ldebug(GOSSIP_COMMON_DEBUG, "copy done\n");
     return ret;
 }

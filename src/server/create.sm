@@ -55,6 +55,7 @@ machine pvfs2_create_sm
 
 /*
  * We skip this and let them be created later to reduce latency
+ * If they are local, can't we go ahead?
     state create_local_datafiles
     {
         run create_local_datafiles;
@@ -381,7 +382,7 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
     int ret = -1;
     job_id_t j_id;
 
-    /* start with 2 keyvals: the distribution and the datafile handles */
+    /* start with 3 keyvals: the distribution the datafile handles and parent */
     int keyval_count = 3;
 
     s_op->key_a = malloc(sizeof(PVFS_ds_keyval) * keyval_count);
@@ -400,6 +401,8 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
         return SM_ACTION_COMPLETE;
     }
     ZEROMEM(s_op->val_a, sizeof((PVFS_ds_keyval) * keyval_count));
+
+    PVFS_debug_servreq_create(GOSSIP_CREATE_DEBUG, s_op->req);
 
     /* writing list of handles/sids for datafile handles and sids*/
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[METAFILE_HANDLES_KEY].size;
@@ -435,10 +438,11 @@ static PINT_sm_action write_keyvals(struct PINT_smcb *smcb, job_status_s *js_p)
  * the network, so unless there is a reason ... 
  * Does getattr decode this?
  */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SETTING UP DISTRO\n");
     PVFS_debug_PINT_dist(GOSSIP_SERVER_DEBUG, s_op->req->u.create.attr.u.meta.dist);
-    //PINT_dist_encode(s_op->val_a[1].buffer, s_op->req->u.create.attr.u.meta.dist);
-    PINT_dist_copy((struct PINT_dist_s **)&s_op->val_a[1].buffer,
-                   s_op->req->u.create.attr.u.meta.dist);
+    PINT_dist_encode(s_op->val_a[1].buffer, s_op->req->u.create.attr.u.meta.dist);
+    //PINT_dist_copy((struct PINT_dist_s **)&s_op->val_a[1].buffer,
+    //               s_op->req->u.create.attr.u.meta.dist);
     //PVFS_debug_PINT_dist(GOSSIP_SERVER_DEBUG, s_op->val_a[1].buffer);
 
     /* writing object parent handle and sids */
@@ -561,20 +565,7 @@ static PINT_sm_action write_metafile_attribs(struct PINT_smcb *smcb,
     }
 #endif
 
-    PVFS_debug_PVFS_object_attr(GOSSIP_CREATE_DEBUG, dspace_a_p);
-#if 0
-    gossip_debug(
-         GOSSIP_SERVER_DEBUG,
-         "[STUFFED CREATE]: WRITING attrs: [owner = %d, group = %d\n\t"
-         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-         "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
-         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
-         dspace_a_p->objtype, llu(dspace_a_p->atime),
-         llu(PINT_util_mkversion_time(dspace_a_p->mtime)),
-         llu(dspace_a_p->ctime),
-         (int)dspace_a_p->u.meta.dfile_count,
-         (int)dspace_a_p->u.meta.dist_size);
-#endif
+    PVFS_debug_PVFS_metafile_attr(GOSSIP_CREATE_DEBUG, dspace_a_p);
 
     /* translate attrs to storage attr format */
     ds_attr = &(s_op->ds_attr);

@@ -96,7 +96,7 @@ do {                                                             \
         gossip_ladebug("PINT Dist: " #_dist " = (%p)\n", (_dist)); \
         if (_dist != NULL)                                       \
         {                                                        \
-            PVFS_debug_afield(pattr->dist_name, pointer);         \
+            PVFS_debug_afield(pattr->dist_name, string);         \
             PVFS_debug_afield(pattr->name_size, uint32_t);       \
             PVFS_debug_afield(pattr->param_size, uint32_t);      \
             PVFS_debug_afield(pattr->params, pointer);           \

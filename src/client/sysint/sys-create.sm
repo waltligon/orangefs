@@ -1336,7 +1336,7 @@ static PINT_sm_action create_create_setup_msgpair(struct PINT_smcb *smcb,
                    PVFS_SID_str(&(sm_p->u.create.metadata_sid_array[i])));
         }
 
-        gossip_lsadebug("DATAFILE OIDs:\n");
+        gossip_lsadebug("DATAFILEs:\n");
 
         metacnt = sm_p->u.create.file_attr.meta_sid_count;
         for (i = 0; i < sm_p->u.create.file_attr.u.meta.dfile_count; i++)

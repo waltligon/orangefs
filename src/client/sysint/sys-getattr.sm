@@ -359,6 +359,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     PINT_client_sm *psm_p = PINT_sm_frame(parent_smcb, PINT_MSGPAIR_PARENT_SM);
 
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
+                   "%d   ----- OBJECT GETATTR COMP_FN\n", resp_p->op);
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG,
                    "(%p) ----- OBJECT GETATTR COMP_FN\n", psm_p);
 
     assert(resp_p->op == PVFS_SERV_GETATTR);

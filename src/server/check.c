@@ -361,7 +361,7 @@ static int check_mode(enum access_type access,
         !(attr->mask & PVFS_ATTR_COMMON_PERM))
     {
         gossip_err("%s: invalid mask\n", __func__);
-        /* PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attr->mask); */
+        PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attr->mask);
         return -PVFS_EINVAL;
     }
 

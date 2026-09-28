@@ -123,6 +123,7 @@ machine pvfs2_lookup_sm
         default => setup_resp;
     }
 
+    /* do a local getattr */
     state initiate_read_object_metadata
     {
         /* jump pvfs2_get_attr_work_sm; */
@@ -130,6 +131,7 @@ machine pvfs2_lookup_sm
         default => verify_object_metadata;
     }
 
+    /* do a remote getattr */
     state setup_remote_metadata_request
     {
         run remote_metadata_request;
@@ -157,7 +159,7 @@ machine pvfs2_lookup_sm
         default => setup_resp;
     }
 
-    /* processing file (metafile object) at the end of the path */
+    /* processing file (local metafile object) at the end of the path */
 
     state setup_getattr_request
     {
@@ -1066,7 +1068,8 @@ static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
                               s_op->req->u.lookup_path.credential,
                               s_op->req->u.lookup_path.fs_id,
                               s_op->resp.u.lookup_path.handle_array[s_op->u.lookup.array_index],
-                              PVFS_ATTR_FASTEST | PVFS_ATTR_CAPABILITY, /* suppress dirent count */
+                              /* suppress dirent count vvv */
+                              PVFS_ATTR_FASTEST | PVFS_ATTR_CAPABILITY | PVFS_ATTR_META_DIST,
                               NULL);
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -1088,10 +1091,10 @@ static PINT_sm_action remote_metadata_request(struct PINT_smcb *smcb,
     }
 
     PVFS_debug_servreq_getattr(GOSSIP_LOOKUP_DEBUG, &getattr_op->msgpair.req);
-    PVFS_debug_msgpair_state(GOSSIP_LOOKUP_DEBUG, msg_p);
+    //PVFS_debug_msgpair_state(GOSSIP_LOOKUP_DEBUG, msg_p);
 
     PINT_sm_push_frame(smcb, 0, getattr_op, M_OP); /* this is a mop */
-    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
+    //PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
 
     return SM_ACTION_COMPLETE;
 
@@ -1247,21 +1250,23 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
     struct PINT_sm_msgarray_op *getattr_op;
     PVFS_object_attr *a_p = NULL; /* convenience for debug */
 
-    PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
+    //PVFS_debug_frame_stack(GOSSIP_LOOKUP_DEBUG, smcb);
 
+    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "Remote object lookup completed\n");
     /* remove getattr frame - already removed */
     /* getattr_op = PINT_sm_pop_frame(smcb, &task_id, &js_p->error_code, &remaining, NULL); */
     /* getattr_op = &s_op->msgarray_op; - didn't save mop */
 
     /* OK, we get to this state in one of two ways: a remote getattr
      * or a local getattr.  For the first a mop is on the stack, but
-     * should have been removed iin a previous state, and for a local
+     * should have been removed in a previous state, and for a local
      * there is an s_op on the stack we want to get off.  We have a
      * frame variable to tell which it is.
      */
 
     if (s_op->u.lookup.locrmt == LOCAL_SEGMENT)
     {
+        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "local segment popping frame\n");
         PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
     }
 
@@ -1329,23 +1334,34 @@ static PINT_sm_action lookup_verify_object_metadata(struct PINT_smcb *smcb,
             (a_p->objtype == PVFS_TYPE_METAFILE)  ||
             (a_p->objtype == PVFS_TYPE_SYMLINK)));
 
-    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
-                   "attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
-                   a_p->owner, a_p->group, a_p->perms, a_p->objtype);
-
     /* if we hit a metafile in local dspace db,
      * then we know additional attributes are in the
      * local keyval db.  So, lets return what we can.
+     *
+     * BUT if it was a remote, all of the keyvals
+     * are already present.
      */
     if (a_p->objtype == PVFS_TYPE_METAFILE)
     {
-        gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "object is a metafile; "
-                       "gathering keyval attributes from local server.....\n");
+        if ( s_op->u.lookup.locrmt == LOCAL_SEGMENT)
+        {
+            gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "object is a local metafile\n");
+            gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                           "gathering keyval attributes from local server.....\n");
+    
+            /* sends SM to get attr for the file and end */
+            js_p->error_code = LOOKUP_LOCAL_METAFILE_KEYVALS;
+            goto errorout;
 
-        js_p->error_code = LOOKUP_LOCAL_METAFILE_KEYVALS;
-        goto errorout;
-
-        /* sends SM to get attr for the file and end */
+        }
+        else /* REMOTE SEGMENT */
+        {
+            gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "object is a remote metafile\n");
+            gossip_lsdebug(GOSSIP_LOOKUP_DEBUG,
+                           "keyval attributes already present.....\n");
+            js_p->error_code = LOOKUP_CHECK_PERMS;
+            goto errorout;
+        }
     }
 
     /*
@@ -1439,6 +1455,7 @@ static PINT_sm_action lookup_setup_getattr_request(
     getattr_op = calloc(1, sizeof(*getattr_op));
     if ( !getattr_op )
     {
+        gossip_lerr("Failed to calloc memory for getattr_op\n");
         js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
@@ -1446,7 +1463,7 @@ static PINT_sm_action lookup_setup_getattr_request(
     getattr_op->attr = s_op->resp.u.lookup_path.attr_array[
                                                s_op->u.lookup.array_index];
 
-    getattr_op->req = s_op->req; /* This forces and error below */
+    getattr_op->req = s_op->req; /* This forces an error below */
 
     getattr_op->u.getattr.fs_id      = s_op->req->u.lookup_path.fs_id;
     getattr_op->u.getattr.handle     = s_op->resp.u.lookup_path.handle_array[
@@ -1478,7 +1495,8 @@ static PINT_sm_action lookup_setup_getattr_request(
         return SM_ACTION_COMPLETE;
     }
 
-    gossip_lsdebug(GOSSIP_LOOKUP_DEBUG, "6\n");
+    PVFS_debug_servreq_getattr(GOSSIP_LOOKUP_DEBUG, getattr_op->req);
+
     return SM_ACTION_COMPLETE;
 
     /* jumps to a getattr */
