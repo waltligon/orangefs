@@ -107,7 +107,7 @@ nested machine pvfs2_get_attr_work_sm
     state read_file_size
     {
         jump pvfs2_tree_get_file_size_work_sm;
-        default => clear_dup_fram_size;
+        default => clear_dup_frame_size;
     }
 
     state clear_dup_frame_size
@@ -1271,34 +1271,40 @@ static PINT_sm_action getattr_clear_dup_frame_size(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *p_op = PINT_sm_frame(smcb, PINT_FRAME_PARENT);
-    int i;
+    struct PINT_server_op *t_op = PINT_sm_frame(smcb, +1);
+    //int i;
 
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "S_OP\n");
+    PVFS_debug_servresp_getattr(GOSSIP_SERVER_DEBUG, &(s_op->resp));
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "T_OP\n");
+    PVFS_debug_servresp_getattr(GOSSIP_SERVER_DEBUG, &(t_op->resp));
     /* we are back to getattr so we need to pop the tree frame
      * but not before we make sure the results of the tree op
      * are recorded
      */
 
+#if 0
     /* copy from s_op (currently tree size) to p_op (should be getattr) */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "copy tree size result\n");
     p_op->resp.u.getattr.attr.u.meta.size = 0;
-    for (i = 0; i < p_op->resp.u.tree_get_size.handle_count; i++)
+    for (i = 0; i < p_op->resp.u.tree_get_file_size.handle_count; i++)
     {
         p_op->resp.u.getattr.attr.u.meta.size +=
-                s_op->resp.u.tree_get_size.size[i];
+                s_op->resp.u.tree_get_file_size.size[i];
     }
+#endif
+    s_op->resp.u.getattr.attr.u.meta.size +=
+            t_op->resp.u.tree_get_file_size.size[0];
 
     /*
      * This frame was pushed in call_msgpairarray
      */
-     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "popping frame\n");
+     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "popping dup frame\n");
      PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
-
-     struct PINT_server_op *t_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-     PVFS_debug_servresp_getattr(GOSSIP_SERVER_DEBUG, &(t_op->resp));
 
      return SM_ACTION_COMPLETE;
 }    
+
 #if 0
 static PINT_sm_action getattr_read_metafile_distribution(
         struct PINT_smcb *smcb,
@@ -2152,18 +2158,35 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+/* At this point we have already added up the dent_cnt into getattr
+ * This is done in the tree cleanup code.
+ */
 static PINT_sm_action getattr_clear_dup_frame_dent(struct PINT_smcb *smcb,
                                                    job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    struct PINT_server_op *p_op = PINT_sm_frame(smcb, PINT_FRAME_PARENT);
-    int i;
+    struct PINT_server_op *t_op = PINT_sm_frame(smcb, +1);
+    //int i;
 
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "S_OP\n");
+    PVFS_debug_servresp_getattr(GOSSIP_SERVER_DEBUG, &(s_op->resp));
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "T_OP\n");
+    PVFS_debug_servresp_tree_get_dirent_count(GOSSIP_SERVER_DEBUG, &(t_op->resp));
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "t_op (%p)\n", t_op);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p)\n", s_op);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "t_op->op %d\n", t_op->op);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op->op %d\n", s_op->op);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "t_op->resp.u.tree_get_dirent_count.handle_count %u\n",
+                                         t_op->resp.u.tree_get_dirent_count.handle_count);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op->resp.u.getattr.attr.u.dir.dirent_count %ld\n",
+                                         s_op->resp.u.getattr.attr.u.dir.dirent_count);
     /* we are back to getattr so we need to pop the tree frame
      * but not before we make sure the results of the tree op
      * are recorded
      */
 
+#if 0
     /* copy from s_op (currently tree dirent) to p_op (should be getattr) */
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "copy tree result\n");
     p_op->resp.u.getattr.attr.u.dir.dirent_count = 0;
@@ -2172,15 +2195,15 @@ static PINT_sm_action getattr_clear_dup_frame_dent(struct PINT_smcb *smcb,
         p_op->resp.u.getattr.attr.u.dir.dirent_count +=
                 s_op->resp.u.tree_get_dirent_count.dentcnt[i];
     }
+#endif
+    s_op->resp.u.getattr.attr.u.dir.dirent_count +=
+            t_op->resp.u.tree_get_dirent_count.dentcnt[0];
 
     /*
      * This frame was a dup pushed in getattr_dirent_count
      */
      gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "popping frame\n");
      PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
-
-     struct PINT_server_op *t_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-     PVFS_debug_servresp_getattr(GOSSIP_SERVER_DEBUG, &(t_op->resp));
 
      return SM_ACTION_COMPLETE;
 }    
@@ -2634,6 +2657,9 @@ static PINT_sm_action getattr_setup_resp(struct PINT_smcb *smcb,
         /* Returning here can cause errors later. */
         return SM_ACTION_COMPLETE;
     }
+
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p)\n", s_op);
+    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op->resp.op %d\n", s_op->resp.op);
 
     PVFS_debug_servresp_getattr(GOSSIP_GETATTR_DEBUG, &(s_op->resp));
 

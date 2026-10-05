@@ -248,7 +248,7 @@ const __keyword_mask_t s_keyword_mask_map[] =
     /* Debugging for code common to client and server */
     { "common", {GOSSIP_COMMON_DEBUG_INIT} },
     /* Debugging for state machine internals */
-    { "sm_int", {GOSSIP_SM_TEST_DEBUG_INIT} },
+    { "sm_int", {GOSSIP_SM_INT_DEBUG_INIT} },
     /* Prints debug for test calls */
     { "verbose", { __DEBUG_ALL_INIT } },
     /* No debug output */
