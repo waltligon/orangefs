@@ -603,7 +603,7 @@ static int server_get_remote_config(
     PVFS_BMI_addr_t bmi_addr;
     struct PVFS_sys_mntent *mntent = NULL;
     PVFS_credential *credential = NULL;
-    struct SID_type_s cfg_server = {SID_SERVER_CONFIG, 0};
+    struct SID_type_s cfg_server = {.fsid = 0, .server_type = SID_SERVER_CONFIG};
 
     /* Initialize the bmi and job interfaces */
     *server_status_flag |= SERVER_CLIENT_INIT;

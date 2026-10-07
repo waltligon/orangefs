@@ -94,7 +94,7 @@ PVFS_error PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t *addr_array = NULL;
     int real_count = 0;
-    struct SID_type_s stype = {SID_SERVER_ALL, fs_id};
+    struct SID_type_s stype = {.fsid = fs_id, .server_type = SID_SERVER_ALL};
 
 /* V3 cleanup */
 #if 0
@@ -175,7 +175,7 @@ PVFS_error PVFS_mgmt_setparam_all(PVFS_fs_id fs_id,
     int count = 0;
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t *addr_array = NULL;
-    struct SID_type_s stype = {SID_SERVER_ALL, fs_id};
+    struct SID_type_s stype = {.fsid = fs_id, .server_type = SID_SERVER_ALL};
 
 /* V3 replace with SIDcache call */
 #if 0

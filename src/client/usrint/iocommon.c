@@ -383,7 +383,7 @@ int iocommon_parse_serverlist(char *serverlist,
     char *tok, *save_ptr;
     int i;
     int ret;
-    struct SID_type_s stype = {SID_SERVER_DATA, fsid};
+    struct SID_type_s stype = {.fsid = fsid, .server_type = SID_SERVER_DATA};
 
     /* expects slist->servers to be NULL */
     if (!slist || slist->servers)
