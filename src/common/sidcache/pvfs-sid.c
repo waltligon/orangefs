@@ -202,13 +202,132 @@ static int sid_seen(const PVFS_SID *sid, const PVFS_SID *list, int n)
     return 0;
 }
 
-/* These functions count servers of a given type
+/* A record with fsid 0 applies to every file system. Count each SID
+ * once when it has both that record and one for the requested fsid.
+ * SID_SERVER_ALL matches every server type. Replication decides how
+ * many of these servers an object uses. It does not make a second SID
+ * for the same server.
  */
-static int PVFS_SID_count_server(int *count, struct SID_type_s stype)
+static int remember_sid(PVFS_SID **seen, int *seen_n, const PVFS_SID *sid)
 {
-    sid_cursor *cursorp = NULL;
+    PVFS_SID *grown;
+
+    if (sid_seen(sid, *seen, *seen_n))
+    {
+        return 0;
+    }
+    grown = (PVFS_SID *)realloc(*seen,
+                                (size_t)(*seen_n + 1) * sizeof(PVFS_SID));
+    if (!grown)
+    {
+        return -PVFS_ENOMEM;
+    }
+    *seen = grown;
+    memcpy(&(*seen)[*seen_n], sid, sizeof(PVFS_SID));
+    (*seen_n)++;
+    return 0;
+}
+
+static int collect_exact(sid_cursor *cursorp,
+                         struct SID_type_s stype,
+                         PVFS_SID **seen,
+                         int *seen_n)
+{
     struct sid_data key;
     struct sid_data val;
+    int rc;
+    int op;
+
+    op = SID_DB_CURSOR_SET;
+    while (1)
+    {
+        SID_zero_dbt(&key, &val, NULL);
+        key.data = &stype;
+        key.len = sizeof(stype);
+        rc = sid_db_cursor_get(cursorp, &key, &val, op);
+        if (rc == -PVFS_ENOENT)
+        {
+            return 0;
+        }
+        if (rc)
+        {
+            return rc;
+        }
+        if (val.len == sizeof(PVFS_SID) && val.data)
+        {
+            rc = remember_sid(seen, seen_n, (const PVFS_SID *)val.data);
+        }
+        else
+        {
+            rc = 0;
+        }
+        free(val.data);
+        if (rc)
+        {
+            return rc;
+        }
+        op = SID_DB_CURSOR_NEXT_DUP;
+    }
+}
+
+static int collect_fs(sid_cursor *cursorp,
+                      PVFS_fs_id fs_id,
+                      PVFS_SID **seen,
+                      int *seen_n)
+{
+    struct sid_data key;
+    struct sid_data val;
+    int rc;
+    int op;
+
+    op = SID_DB_CURSOR_FIRST;
+    while (1)
+    {
+        SID_zero_dbt(&key, &val, NULL);
+        rc = sid_db_cursor_get(cursorp, &key, &val, op);
+        if (rc == -PVFS_ENOENT)
+        {
+            return 0;
+        }
+        if (rc)
+        {
+            free(key.data);
+            free(val.data);
+            return rc;
+        }
+        rc = 0;
+        if (key.len == sizeof(struct SID_type_s) &&
+            val.len == sizeof(PVFS_SID) &&
+            key.data && val.data)
+        {
+            struct SID_type_s type;
+
+            memcpy(&type, key.data, sizeof(type));
+            if (type.fsid == fs_id || (fs_id != 0 && type.fsid == 0))
+            {
+                rc = remember_sid(seen, seen_n, (const PVFS_SID *)val.data);
+            }
+        }
+        free(key.data);
+        free(val.data);
+        if (rc)
+        {
+            return rc;
+        }
+        op = SID_DB_CURSOR_NEXT;
+    }
+}
+
+/* These functions count servers of a given type
+ */
+static int PVFS_SID_count_server(int *count,
+                                 PVFS_fs_id fs_id,
+                                 uint32_t server_type)
+{
+    sid_cursor *cursorp = NULL;
+    PVFS_SID *seen = NULL;
+    int seen_n = 0;
+    struct SID_type_s stype;
     int rc;
 
     if (!count)
@@ -217,7 +336,7 @@ static int PVFS_SID_count_server(int *count, struct SID_type_s stype)
     }
     *count = 0;
     gossip_debug(GOSSIP_SIDCACHE_DEBUG,
-                 "Counting servers of type %o\n", stype.server_type);
+                 "Counting servers of type %o\n", server_type);
     if (!SID_type_db)
     {
         return -PVFS_EINVAL;
@@ -227,136 +346,41 @@ static int PVFS_SID_count_server(int *count, struct SID_type_s stype)
     {
         return rc;
     }
-    if (stype.server_type == SID_SERVER_ALL)
+    if (server_type == SID_SERVER_ALL)
     {
-        PVFS_SID *seen = NULL;
-        int seen_n = 0;
-
-        SID_zero_dbt(&key, &val, NULL);
-        rc = sid_db_cursor_get(cursorp, &key, &val, SID_DB_CURSOR_FIRST);
-        while (rc == 0)
-        {
-            if (key.len == sizeof(struct SID_type_s) &&
-                val.len == sizeof(PVFS_SID))
-            {
-                struct SID_type_s type;
-
-                memcpy(&type, key.data, sizeof(type));
-                if (type.fsid == stype.fsid &&
-                    !sid_seen((PVFS_SID *)val.data, seen, seen_n))
-                {
-                    PVFS_SID *grown;
-
-                    grown = (PVFS_SID *)realloc(
-                        seen, (size_t)(seen_n + 1) * sizeof(PVFS_SID));
-                    if (!grown)
-                    {
-                        free(seen);
-                        free(key.data);
-                        free(val.data);
-                        sid_db_cursor_close(cursorp);
-                        return -PVFS_ENOMEM;
-                    }
-                    seen = grown;
-                    memcpy(&seen[seen_n], val.data, sizeof(PVFS_SID));
-                    seen_n++;
-                }
-            }
-            free(key.data);
-            free(val.data);
-            SID_zero_dbt(&key, &val, NULL);
-            rc = sid_db_cursor_get(cursorp, &key, &val, SID_DB_CURSOR_NEXT);
-        }
-        free(seen);
-        sid_db_cursor_close(cursorp);
-        if (rc != -PVFS_ENOENT && rc != 0)
-        {
-            return rc;
-        }
-        *count = seen_n;
-        return 0;
+        rc = collect_fs(cursorp, fs_id, &seen, &seen_n);
     }
-    SID_zero_dbt(&key, &val, NULL);
-    key.data = &stype;
-    key.len = sizeof(stype);
-    rc = sid_db_cursor_get(cursorp, &key, &val, SID_DB_CURSOR_SET);
-    if (rc == 0)
+    else
     {
-        size_t n = 0;
-
-        free(val.data);
-        rc = sid_db_cursor_count(cursorp, &n);
-        sid_db_cursor_close(cursorp);
-        if (rc)
+        stype.fsid = fs_id;
+        stype.server_type = server_type;
+        rc = collect_exact(cursorp, stype, &seen, &seen_n);
+        if (!rc && fs_id != 0)
         {
-            return rc;
+            stype.fsid = 0;
+            rc = collect_exact(cursorp, stype, &seen, &seen_n);
         }
-        *count = (int)n;
-        return 0;
     }
     sid_db_cursor_close(cursorp);
-    if (rc == -PVFS_ENOENT)
+    free(seen);
+    if (rc)
     {
-        return 0;
+        return rc;
     }
-    return rc;
+    *count = seen_n;
+    return 0;
 }
 
 int PVFS_SID_count_type(PVFS_fs_id fs_id, int type, int *count)
 {
-    struct SID_type_s stype;
-    int mine = 0;
-    int global = 0;
-    int ret;
-
-    if (!count)
-    {
-        return -PVFS_EINVAL;
-    }
-    stype.fsid = fs_id;
-    stype.server_type = (uint32_t)type;
-    ret = PVFS_SID_count_server(&mine, stype);
-    /* Type records with fsid 0 apply to every file system. */
-    if (ret || fs_id == 0 || (uint32_t)type == SID_SERVER_ALL)
-    {
-        *count = mine;
-        return ret;
-    }
-    stype.fsid = 0;
-    ret = PVFS_SID_count_server(&global, stype);
-    if (ret)
-    {
-        return ret;
-    }
-    *count = mine + global;
-    return 0;
+    return PVFS_SID_count_server(count, fs_id, (uint32_t)type);
 }
 
 /* This defines a bunch of easy to use counting functions */
 #define DEFUN_COUNT( __NAME__ , __TYPE__ )           \
 int __NAME__ (PVFS_fs_id fs_id, int *count)          \
 {                                                    \
-    int ret = 0;                                     \
-    int mycount = 0;                                 \
-    int global = 0;                                  \
-    struct SID_type_s stype = {.fsid = fs_id, .server_type = __TYPE__ }; \
-    if (!count)                                      \
-    {                                                \
-        return -PVFS_EINVAL;                         \
-    }                                                \
-    ret = PVFS_SID_count_server(&mycount, stype);    \
-    if (ret)                                         \
-    {                                                \
-        return ret;                                  \
-    }                                                \
-    stype.fsid = 0;                                  \
-    ret = PVFS_SID_count_server(&global, stype);     \
-    if (ret)                                         \
-    {                                                \
-        return ret;                                  \
-    }                                                \
-    *count = mycount + global;                       \
-    return 0;                                        \
+    return PVFS_SID_count_server(count, fs_id, __TYPE__); \
 }
 
 DEFUN_COUNT(PVFS_SID_count_all, SID_SERVER_ALL)
