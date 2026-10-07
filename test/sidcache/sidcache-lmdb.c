@@ -38,6 +38,10 @@ static void fill_attrs(int *attrs, int meta, int tier, int space)
     attrs[SID_attr_meta] = meta;
     attrs[SID_attr_tier] = tier;
     attrs[SID_attr_space] = space;
+    /* The metadata policy spreads on rack. A positive rack lets
+     * SID_select mark the server so a wrapped join does not add it twice.
+     */
+    attrs[SID_attr_rack] = 1;
 }
 
 static int list_has(SID_server_list_t *list, const PVFS_SID *sid, int *n)
@@ -70,8 +74,7 @@ int main(void)
     int n = 0;
     int rc;
     SID_server_list_t selected;
-    PVFS_SID *attr_sids = NULL;
-    int nattr = 0;
+    SID_server_list_t again;
     struct SID_type_s typ;
     const char *good_url = "tcp://good:3334";
     const char *bad_url = "tcp://bad:3334";
@@ -124,7 +127,7 @@ int main(void)
     expect("SID_delete", rc == 0);
     {
         SID_cacheval_t *gone = NULL;
-        rc = SID_cache_get(&good, &gone);
+        rc = SID_cache_get(SID_db, &good, &gone);
         expect("deleted sid is gone", rc == -PVFS_ENOENT && gone == NULL);
         SID_cacheval_free(&gone);
     }
@@ -132,12 +135,15 @@ int main(void)
     expect("meta count after delete", rc == 0 && count == 0);
     rc = PVFS_SID_count_io(fsid, &count);
     expect("data count after delete", rc == 0 && count == 1);
-    rc = SID_attr_list(SID_attr_meta, SID_attr_meta_Y, &attr_sids, &nattr);
-    expect("meta=Y index after delete", rc == 0 && nattr == 0);
-    free(attr_sids);
 
     rc = SID_add(&good, 1001, good_url, good_attr);
     expect("SID_add after delete", rc == 0);
+    INIT_QLIST_HEAD(&again.link);
+    copies = -1;
+    rc = SID_select_servers(&SID_policies[0], 1, &copies, &again);
+    expect("select after re-add", rc == 0);
+    expect("re-add still matches the policy",
+           list_has(&again, &good, &n) == 1 && copies == 1);
 
     rc = SID_finalize();
     expect("SID_finalize", rc == 0);

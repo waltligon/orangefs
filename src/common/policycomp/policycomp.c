@@ -231,7 +231,7 @@ static void parse_args(int argc, char **argv)
     fprintf(header, "#ifndef %s\n", header_base);
     fprintf(header, "#define %s 1\n", header_base);
     fprintf(header, "#include <stdint.h>\n");
-    fprintf(header, "struct SID_cacheval_s;\n");
+    fprintf(header, "#include \"sidcache-db.h\"\n");
     fprintf(header, "\n");
 }
 

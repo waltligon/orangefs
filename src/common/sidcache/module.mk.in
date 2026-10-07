@@ -3,6 +3,7 @@ DIR := src/common/sidcache
 CSRC := \
         $(DIR)/policyeval.c \
         $(DIR)/sidcache.c \
+        $(DIR)/sidcache-db-lmdb.c \
         $(DIR)/pvfs-sid.c 
 
 CLIENT_PYCGEN := \

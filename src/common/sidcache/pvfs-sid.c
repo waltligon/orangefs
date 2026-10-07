@@ -150,7 +150,7 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
     }
     /* with SID we can look up BMI_addr if it is there */
     /* and the id_string URI if not - then lookup with BMI */
-    ret = SID_cache_get(sid, &temp_cacheval);
+    ret = SID_cache_get(SID_db, sid, &temp_cacheval);
     if (ret != 0)
     {
         return ret;
@@ -165,7 +165,7 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
         {
             /* write back the bmi_addr we just looked up to sidcache */
             /* NULL enables overwrite of the record just looked up */
-            ret = SID_cache_put(sid, temp_cacheval, NULL);
+            ret = SID_cache_put(SID_db, sid, temp_cacheval, NULL);
         }
     }
     if (ret == 0)
@@ -176,17 +176,130 @@ int PVFS_SID_get_addr(PVFS_BMI_addr_t *bmi_addr, const PVFS_SID *sid)
     return ret;
 }
 
+/* Position of the last type-database read. A cursor cannot stay open
+ * between calls, so the next read resumes from this key and SID.
+ */
+static int scan_valid = 0;
+static struct SID_type_s scan_key;
+static PVFS_SID scan_sid;
+
+static int type_equal(const struct SID_type_s *a, const struct SID_type_s *b)
+{
+    return a->fsid == b->fsid && a->server_type == b->server_type;
+}
+
+static int sid_seen(const PVFS_SID *sid, const PVFS_SID *list, int n)
+{
+    int i;
+
+    for (i = 0; i < n; i++)
+    {
+        if (memcmp(&list[i], sid, sizeof(*sid)) == 0)
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* These functions count servers of a given type
  */
 static int PVFS_SID_count_server(int *count, struct SID_type_s stype)
 {
+    sid_cursor *cursorp = NULL;
+    struct sid_data key;
+    struct sid_data val;
+    int rc;
+
     if (!count)
     {
         return -PVFS_EINVAL;
     }
+    *count = 0;
     gossip_debug(GOSSIP_SIDCACHE_DEBUG,
                  "Counting servers of type %o\n", stype.server_type);
-    return SID_type_count(&stype, count);
+    if (!SID_type_db)
+    {
+        return -PVFS_EINVAL;
+    }
+    rc = sid_db_cursor(SID_type_db, &cursorp, 1);
+    if (rc)
+    {
+        return rc;
+    }
+    if (stype.server_type == SID_SERVER_ALL)
+    {
+        PVFS_SID *seen = NULL;
+        int seen_n = 0;
+
+        SID_zero_dbt(&key, &val, NULL);
+        rc = sid_db_cursor_get(cursorp, &key, &val, SID_DB_CURSOR_FIRST);
+        while (rc == 0)
+        {
+            if (key.len == sizeof(struct SID_type_s) &&
+                val.len == sizeof(PVFS_SID))
+            {
+                struct SID_type_s type;
+
+                memcpy(&type, key.data, sizeof(type));
+                if (type.fsid == stype.fsid &&
+                    !sid_seen((PVFS_SID *)val.data, seen, seen_n))
+                {
+                    PVFS_SID *grown;
+
+                    grown = (PVFS_SID *)realloc(
+                        seen, (size_t)(seen_n + 1) * sizeof(PVFS_SID));
+                    if (!grown)
+                    {
+                        free(seen);
+                        free(key.data);
+                        free(val.data);
+                        sid_db_cursor_close(cursorp);
+                        return -PVFS_ENOMEM;
+                    }
+                    seen = grown;
+                    memcpy(&seen[seen_n], val.data, sizeof(PVFS_SID));
+                    seen_n++;
+                }
+            }
+            free(key.data);
+            free(val.data);
+            SID_zero_dbt(&key, &val, NULL);
+            rc = sid_db_cursor_get(cursorp, &key, &val, SID_DB_CURSOR_NEXT);
+        }
+        free(seen);
+        sid_db_cursor_close(cursorp);
+        if (rc != -PVFS_ENOENT && rc != 0)
+        {
+            return rc;
+        }
+        *count = seen_n;
+        return 0;
+    }
+    SID_zero_dbt(&key, &val, NULL);
+    key.data = &stype;
+    key.len = sizeof(stype);
+    rc = sid_db_cursor_get(cursorp, &key, &val, SID_DB_CURSOR_SET);
+    if (rc == 0)
+    {
+        size_t n = 0;
+
+        free(val.data);
+        rc = sid_db_cursor_count(cursorp, &n);
+        sid_db_cursor_close(cursorp);
+        if (rc)
+        {
+            return rc;
+        }
+        *count = (int)n;
+        return 0;
+    }
+    sid_db_cursor_close(cursorp);
+    if (rc == -PVFS_ENOENT)
+    {
+        return 0;
+    }
+    return rc;
 }
 
 int PVFS_SID_count_type(PVFS_fs_id fs_id, int type, int *count)
@@ -231,13 +344,13 @@ int __NAME__ (PVFS_fs_id fs_id, int *count)          \
     {                                                \
         return -PVFS_EINVAL;                         \
     }                                                \
-    ret = SID_type_count(&stype, &mycount);          \
+    ret = PVFS_SID_count_server(&mycount, stype);    \
     if (ret)                                         \
     {                                                \
         return ret;                                  \
     }                                                \
     stype.fsid = 0;                                  \
-    ret = SID_type_count(&stype, &global);           \
+    ret = PVFS_SID_count_server(&global, stype);     \
     if (ret)                                         \
     {                                                \
         return ret;                                  \
@@ -264,23 +377,66 @@ static int PVFS_SID_get_server(PVFS_BMI_addr_t *bmi_addr,
                                struct SID_type_s stype,
                                int first)
 {
+    sid_cursor *cursorp = NULL;
+    struct sid_data key;
+    struct sid_data val;
     int ret = 0;
+    int copied = 0;
     PVFS_SID sidval;
 
     gossip_debug(GOSSIP_SIDCACHE_DEBUG,
                  "Searching for servers of type %o\n", stype.server_type);
-
-    ret = SID_type_step(&stype, first, &sidval);
+    if (!SID_type_db)
+    {
+        return -PVFS_EINVAL;
+    }
+    ret = sid_db_cursor(SID_type_db, &cursorp, 1);
     if (ret)
     {
+        return ret;
+    }
+    SID_zero_dbt(&key, &val, NULL);
+    key.data = &stype;
+    key.len = sizeof(stype);
+    if (first || !scan_valid || !type_equal(&scan_key, &stype))
+    {
+        ret = sid_db_cursor_get(cursorp, &key, &val, SID_DB_CURSOR_SET);
+        copied = (ret == 0);
+    }
+    else
+    {
+        val.data = &scan_sid;
+        val.len = sizeof(scan_sid);
+        ret = sid_db_cursor_get(cursorp, &key, &val, SID_DB_CURSOR_GET_BOTH);
+        if (ret == 0)
+        {
+            val.data = NULL;
+            val.len = 0;
+            ret = sid_db_cursor_get(cursorp, &key, &val,
+                                    SID_DB_CURSOR_NEXT_DUP);
+            copied = (ret == 0);
+        }
+    }
+    sid_db_cursor_close(cursorp);
+    if (ret || !copied || val.len != sizeof(PVFS_SID) || !val.data)
+    {
+        if (copied)
+        {
+            free(val.data);
+        }
         if (ret != -PVFS_ENOENT)
         {
             gossip_debug(GOSSIP_SIDCACHE_DEBUG,
                          "Error getting type from type cache while searching:"
                          " %d\n", ret);
         }
-        return ret;
+        return ret ? ret : -PVFS_ENOENT;
     }
+    memcpy(&sidval, val.data, sizeof(sidval));
+    free(val.data);
+    scan_key = stype;
+    scan_sid = sidval;
+    scan_valid = 1;
 
     /* no point in the cacheval unless we are going for the bmi_addr
      * so only bother with this get if we are

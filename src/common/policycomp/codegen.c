@@ -42,8 +42,9 @@ void gen_attrib_table()
     list_item_t *attr;
 
     /* produce SID_extract_key and SID_attr_e */
-    fprintf(code, "int (* SID_extract_key[])(const struct SID_cacheval_s *cval, "
-            "int32_t *key) =\n{\n");
+    fprintf(code, "int (* SID_extract_key[])(sid_db *pri, "
+            "const struct sid_data *pkey, const struct sid_data *pdata, "
+            "struct sid_data *skey) =\n{\n");
     fprintf(header, "typedef enum SID_attr_e\n{\n");
     qlist_for_each_entry(attr, &attr_list, link)
     {
@@ -64,7 +65,8 @@ void gen_attrib_table()
     fprintf(header, "\n} SID_attr_t;\n\n");
     fprintf(header, "extern char *SID_attr_map[];\n\n");
     fprintf(header, "extern int (*SID_extract_key[])"
-            "(const struct SID_cacheval_s *cval, int32_t *key);\n\n");
+            "(sid_db *pri, const struct sid_data *pkey, "
+            "const struct sid_data *pdata, struct sid_data *skey);\n\n");
     /* produce SID_NUM_ATTR */
     fprintf(header, "#define SID_NUM_ATTR %d\n\n", i);
     fprintf(header, "#define MAX_ATTR_STR %d\n\n", maxlen);
@@ -122,13 +124,14 @@ void gen_save_attr_name(char *name)
     /* stash attr name in attr list */
     qlist_add_tail(&new->link, &attr_list);
     /* generate extractor function */
-    fprintf(code, "int SID_get_%s (const struct SID_cacheval_s *cval, "
-            "int32_t *key)\n{\n    "
-            "return SID_get_attr (cval, key, SID_attr_%s);\n}\n\n",
+    fprintf(code, "int SID_get_%s (sid_db *pri, const struct sid_data *pkey, "
+            "const struct sid_data *pdata, struct sid_data *skey)\n{\n    "
+            "return SID_get_attr (pri, pkey, pdata, skey, SID_attr_%s);\n}\n\n",
             name, name);
     /* generate prototype for extractor function */
-    fprintf(header, "int SID_get_%s (const struct SID_cacheval_s *cval, "
-            "int32_t *key);\n",
+    fprintf(header, "int SID_get_%s (sid_db *pri, "
+            "const struct sid_data *pkey, const struct sid_data *pdata, "
+            "struct sid_data *skey);\n",
             name);
 }
 
@@ -219,9 +222,9 @@ void gen_start_scfunc()
 {
     static int funcno = 0;
     int newfunc = funcno++;
-    fprintf(code2, "int SID_scfunc%d(const struct SID_cacheval_s *DBval){\n\treturn\n", newfunc);
+    fprintf(code2, "int SID_scfunc%d(struct sid_data *DBval){\n\treturn\n", newfunc);
     fprintf(code, "    .scfunc = SID_scfunc%d\n", newfunc);
-    fprintf(header, "int SID_scfunc%d(const struct SID_cacheval_s *DBval);\n\n", newfunc);
+    fprintf(header, "int SID_scfunc%d(struct sid_data *DBval);\n\n", newfunc);
 }
 
 void gen_end_scfunc()

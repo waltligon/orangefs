@@ -8,6 +8,7 @@
 #define SIDCACHEVAL_H 1
 
 #include "policy.h"
+#include "sidcache-db.h"
 
 typedef int64_t BMI_addr; /* equivalent to PVFS_BMI_adddr_t */
 
@@ -59,6 +60,14 @@ enum {
          SID_SERVER_SECURITY | SID_SERVER_LOCAL | SID_SERVER_ME)
 
 #define SID_SERVER_ALL SID_SERVER_VALID_TYPES
+
+/* these are defined in sidcache.c
+ * they depend on SID_NUM_ATTR and thus they are here
+ */
+
+extern sid_db *SID_attr_index[SID_NUM_ATTR];
+
+extern sid_cursor *SID_attr_cursor[SID_NUM_ATTR];
 
 #endif
 /*

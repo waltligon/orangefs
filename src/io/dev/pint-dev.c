@@ -2,7 +2,7 @@
  * (C) 2001 Clemson University and The University of Chicago
  *
  * Changes by Acxiom Corporation to add protocol version to kernel
- * communication, Copyright ï¿½ Acxiom Corporation, 2005.
+ * communication, Copyright © Acxiom Corporation, 2005.
  *
  * See COPYING in top-level directory.
  */
