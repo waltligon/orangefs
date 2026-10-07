@@ -643,6 +643,7 @@ endif
 LIBRARIES_STATIC := lib/libpvfs2.a
 ifdef TARGET_OS_DARWIN
 LIBRARIES_LIBTOOL := lib/liborangefs.la
+CFLAGS += -I$(srcdir)/src/common/misc/darwin
 else
 LIBRARIES_SHARED := lib/libpvfs2.so
 LIBRARIES_THREADED_STATIC := lib/libpvfs2-threaded.a

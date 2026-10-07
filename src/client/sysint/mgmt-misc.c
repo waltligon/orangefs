@@ -24,6 +24,30 @@
 #include "server-config.h"
 #include "client-state-machine.h"
 #include "sid.h"
+#include "sidcacheval.h"
+
+/* PVFS_MGMT_IO_SERVER is 1 and PVFS_MGMT_META_SERVER is 2.
+ * Those values are SID_SERVER_ROOT and SID_SERVER_PRIME.
+ * Config "Type DATA META" is stored as SID_SERVER_DATA / SID_SERVER_META.
+ */
+static uint32_t mgmt_server_type_to_sid(int server_type)
+{
+    uint32_t sid_type = 0;
+
+    if (server_type & PVFS_MGMT_IO_SERVER)
+    {
+        sid_type |= SID_SERVER_DATA;
+    }
+    if (server_type & PVFS_MGMT_META_SERVER)
+    {
+        sid_type |= SID_SERVER_META;
+    }
+    if (sid_type == 0)
+    {
+        sid_type = (uint32_t)server_type;
+    }
+    return sid_type;
+}
 
 /* V3 cleanup - use BMI_rev_lookup instread */
 #if 0
@@ -244,15 +268,10 @@ PVFS_error PVFS_mgmt_get_server_array(PVFS_fs_id fs_id,
                                       int *inout_count_p)
 {
     PVFS_error ret = -PVFS_EINVAL;
-    struct SID_type_s stype = {server_type, fs_id};
+    struct SID_type_s stype;
 
-/* V3 cleanup */
-#if 0
-    ret = PINT_cached_config_get_server_array(fs_id,
-                                              server_type,
-                                              addr_array,
-                                              inout_count_p);
-#endif
+    stype.fsid = fs_id;
+    stype.server_type = mgmt_server_type_to_sid(server_type);
     ret = PVFS_SID_get_server_first_n(addr_array, NULL, inout_count_p, stype);
     return ret;
 }
@@ -268,10 +287,40 @@ PVFS_error PVFS_mgmt_count_servers(PVFS_fs_id fs_id,
                                    int server_type,
                                    int *count)
 {
-    PVFS_error ret = -PVFS_EINVAL;
+    uint32_t sid_type = mgmt_server_type_to_sid(server_type);
+    uint32_t bit;
+    int total = 0;
+    PVFS_error ret;
 
-    ret = PVFS_SID_count_type(fs_id, server_type, count);
-    return ret;
+    if (!count)
+    {
+        return -PVFS_EINVAL;
+    }
+    /* A single role is an exact type key. A mask is the sum of
+     * those roles. One server that is both meta and data is
+     * counted once per role.
+     */
+    if (sid_type == 0 || (sid_type & (sid_type - 1)) == 0)
+    {
+        return PVFS_SID_count_type(fs_id, (int)sid_type, count);
+    }
+    for (bit = 1; bit != 0; bit <<= 1)
+    {
+        int part = 0;
+
+        if (!(sid_type & bit))
+        {
+            continue;
+        }
+        ret = PVFS_SID_count_type(fs_id, (int)bit, &part);
+        if (ret < 0)
+        {
+            return ret;
+        }
+        total += part;
+    }
+    *count = total;
+    return 0;
 }
 
 /*

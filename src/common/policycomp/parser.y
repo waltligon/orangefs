@@ -49,6 +49,9 @@ extern int yylex(void);
     char *c;
 };
 
+/* Berkeley DB 18 publishes a global enumerator named SELECT. */
+%define api.token.prefix {PC_}
+
 %token <i> ATTRIBUTE
 %token <i> POLICY
 %token <i> FOR

@@ -2,6 +2,9 @@ DIR := src/apps/kernel/linux
 
 PVFS2_SEGV_BACKTRACE = @PVFS2_SEGV_BACKTRACE@
 
+# The kernel helper speaks to a Linux kernel module and still treats
+# PVFS_handle as an inode number. Skip it on Darwin.
+ifndef TARGET_OS_DARWIN
 KERNAPPSRC += \
 	$(DIR)/pvfs2-client.c 
 
@@ -14,6 +17,7 @@ endif
 
 ifneq (,$(LINUX24_KERNEL_SRC))
 KERNAPPSRC += $(DIR)/mount.pvfs2.c
+endif
 endif
 
 # get kernel interface defines, and sysint client.h

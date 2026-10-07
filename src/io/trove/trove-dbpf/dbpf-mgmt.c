@@ -737,6 +737,46 @@ int dbpf_finalize(void)
     return 1;
 }
 
+/* Berkeley DB stores a database as one file. LMDB stores it as a
+ * directory of the same name containing data.mdb and lock.mdb.
+ */
+static int dbpf_remove_db(const char *path)
+{
+    struct stat sb;
+    char child[PATH_MAX];
+    int n;
+
+    if (stat(path, &sb) != 0)
+    {
+        return -1;
+    }
+    if (!S_ISDIR(sb.st_mode))
+    {
+        return unlink(path);
+    }
+    n = snprintf(child, sizeof(child), "%s/data.mdb", path);
+    if (n < 0 || n >= (int)sizeof(child))
+    {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    if (unlink(child) != 0 && errno != ENOENT)
+    {
+        return -1;
+    }
+    n = snprintf(child, sizeof(child), "%s/lock.mdb", path);
+    if (n < 0 || n >= (int)sizeof(child))
+    {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
+    if (unlink(child) != 0 && errno != ENOENT)
+    {
+        return -1;
+    }
+    return rmdir(path);
+}
+
 /* Creates and initializes the databases needed for a dbpf storage
  * space.  This includes:
  * - creating the path to the storage directory
@@ -789,7 +829,7 @@ int dbpf_storage_create(char *data_path,
     if (ret != 0)
     {
         gossip_lerr("dbpf_storage_create: removing storage attribute database after failed create attempt");
-        unlink(sto_attrib_dbname);
+        dbpf_remove_db(sto_attrib_dbname);
         return ret;
     }
 
@@ -818,7 +858,7 @@ int dbpf_storage_remove(char *data_path,
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, meta_path);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
 
-    if (unlink(path_name) != 0)
+    if (dbpf_remove_db(path_name) != 0)
     {
         ret = -trove_errno_to_trove_error(errno);
         goto storage_remove_failure;
@@ -827,46 +867,39 @@ int dbpf_storage_remove(char *data_path,
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, meta_path);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
 
-    if (unlink(path_name) != 0)
+    if (dbpf_remove_db(path_name) != 0)
     {
         ret = -trove_errno_to_trove_error(errno);
         goto storage_remove_failure;
     }
 
+    /* data, meta, and config are often the same directory. The
+     * first rmdir removes it. ENOENT on the later ones means it
+     * is already gone.
+     */
+    ret = 1;
     DBPF_GET_CONFIG_DIRNAME(path_name, PATH_MAX, config_path);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
-    if (rmdir(path_name) != 0)
+    if (rmdir(path_name) != 0 && errno != ENOENT)
     {
         perror("failure removing config directory");
         ret = -trove_errno_to_trove_error(errno);
-#if 0
-        ret = -trove_errno_to_trove_error(errno);
-        goto storage_remove_failure;
-#endif
     }
 
     DBPF_GET_META_DIRNAME(path_name, PATH_MAX, meta_path);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
-    if (rmdir(path_name) != 0)
+    if (rmdir(path_name) != 0 && errno != ENOENT)
     {
         perror("failure removing metadata directory");
         ret = -trove_errno_to_trove_error(errno);
-#if 0
-        ret = -trove_errno_to_trove_error(errno);
-        goto storage_remove_failure;
-#endif
     }
 
     DBPF_GET_DATA_DIRNAME(path_name, PATH_MAX, data_path);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
-    if (rmdir(path_name) != 0)
+    if (rmdir(path_name) != 0 && errno != ENOENT)
     {
         perror("failure removing data directory");
         ret = -trove_errno_to_trove_error(errno);
-#if 0
-        ret = -trove_errno_to_trove_error(errno);
-        goto storage_remove_failure;
-#endif
     }
 
     if (ret < 0)
@@ -1256,7 +1289,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
                               sto_p->meta_path, db_data.coll_id);
-    if (unlink(path_name) != 0)
+    if (dbpf_remove_db(path_name) != 0)
     {
         gossip_err("failure removing dataspace attrib db\n");
         ret = -trove_errno_to_trove_error(errno);
@@ -1264,7 +1297,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
                            sto_p->meta_path, db_data.coll_id);
-    if(unlink(path_name) != 0)
+    if(dbpf_remove_db(path_name) != 0)
     {
         gossip_err("failure removing keyval db\n");
         ret = -trove_errno_to_trove_error(errno);
@@ -1272,7 +1305,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->meta_path, db_data.coll_id);
-    if (unlink(path_name) != 0)
+    if (dbpf_remove_db(path_name) != 0)
     {
         gossip_err("failure removing collection attrib db\n");
         ret = -trove_errno_to_trove_error(errno);
@@ -1317,7 +1350,7 @@ int dbpf_collection_remove(char *collname,
                     goto collection_remove_failure;
                 }
                 assert(S_ISREG(file_info.st_mode));
-                if (unlink(tmp_path) != 0)
+                if (dbpf_remove_db(tmp_path) != 0)
                 {
                     gossip_err("failure removing bstream entry\n");
                     ret = -trove_errno_to_trove_error(errno);
@@ -1366,7 +1399,7 @@ int dbpf_collection_remove(char *collname,
                 goto collection_remove_failure;
             }
             assert(S_ISREG(file_info.st_mode));
-            if(unlink(tmp_path) != 0)
+            if(dbpf_remove_db(tmp_path) != 0)
             {
                 gossip_err("failure removing bstream entry\n");
                 ret = -trove_errno_to_trove_error(errno);
@@ -1387,7 +1420,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
 			  sto_p->meta_path, db_data.coll_id);
-    if (rmdir(path_name) != 0)
+    if (rmdir(path_name) != 0 && errno != ENOENT)
     {
 	gossip_err("failure removing metadata collection directory\n");
 	ret = -trove_errno_to_trove_error(errno);
@@ -1396,7 +1429,7 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
 			  sto_p->config_path, db_data.coll_id);
-    if (rmdir(path_name) != 0)
+    if (rmdir(path_name) != 0 && errno != ENOENT)
     {
 	gossip_err("failure removing configuration collection directory\n");
 	ret = -trove_errno_to_trove_error(errno);
@@ -1405,12 +1438,16 @@ int dbpf_collection_remove(char *collname,
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
                           sto_p->data_path, db_data.coll_id);
-    if (rmdir(path_name) != 0)
+    if (rmdir(path_name) != 0 && errno != ENOENT)
     {
         gossip_err("failure removing data collection directory\n");
         ret = -trove_errno_to_trove_error(errno);
     }
 collection_remove_failure:
+    if (ret == 0)
+    {
+        ret = 1;
+    }
     return ret;
 }
 

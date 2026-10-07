@@ -3339,8 +3339,11 @@ do {                                                        \
     (__req).u.mgmt_setparam.fs_id = (__fsid);               \
     (__req).u.mgmt_setparam.param = (__param);              \
     if(__value){                                            \
-        (__req).u.mgmt_setparam.value.type = (__value)->type;\
-        (__req).u.mgmt_setparam.value.u.value = (__value)->u.value;\
+        /* Copy the whole value. u.value is 8 bytes, and a \
+         * PVFS_handle is 16, so assigning u.value kept    \
+         * only the first half of a root-handle UUID.      \
+         */                                                 \
+        (__req).u.mgmt_setparam.value = *(__value);         \
     }                                                       \
 } while (0)
 

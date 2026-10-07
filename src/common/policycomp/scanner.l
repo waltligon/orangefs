@@ -91,29 +91,29 @@ in_file_name);
                  fprintf(code, "#endif\n");
                  BEGIN(0);}
 
-<CODE>"attribute"  {RETURNVAL(ATTRIBUTE);}
-<CODE>"policy"     {RETURNVAL(POLICY);}
-<CODE>"for"        {RETURNVAL(FOR);}
-<CODE>"sets"       {RETURNVAL(SETS);}
-<CODE>"spread"     {RETURNVAL(SPREAD);}
-<CODE>"others"     {RETURNVAL(OTHERS);}
-<CODE>"select"     {RETURNVAL(SELECT);}
-<CODE>"where"      {RETURNVAL(WHERE);}
-<CODE>"\{"         {RETURNVAL(LBRACE);}
-<CODE>"\}"         {RETURNVAL(RBRACE);}
-<CODE>"\("         {RETURNVAL(LPAREN);}
-<CODE>"\)"         {RETURNVAL(RPAREN);}
-<CODE>"\;"         {RETURNVAL(SEMICOLON);}
-<CODE>"\,"         {RETURNVAL(COMMA);}
-<CODE>"\-"         {RETURNVAL(DASH);}
-<CODE>"\&\&"       {RETURNVAL(AND);}
-<CODE>"\|\|"       {RETURNVAL(OR);}
-<CODE>"\=\="       {RETURNVAL(EQ);}
-<CODE>"\!\="       {RETURNVAL(NE);}
-<CODE>"\>"         {RETURNVAL(GT);}
-<CODE>"\>\="       {RETURNVAL(GE);}
-<CODE>"\<"         {RETURNVAL(LT);}
-<CODE>"\<\="       {RETURNVAL(LE);}
+<CODE>"attribute"  {RETURNVAL(PC_ATTRIBUTE);}
+<CODE>"policy"     {RETURNVAL(PC_POLICY);}
+<CODE>"for"        {RETURNVAL(PC_FOR);}
+<CODE>"sets"       {RETURNVAL(PC_SETS);}
+<CODE>"spread"     {RETURNVAL(PC_SPREAD);}
+<CODE>"others"     {RETURNVAL(PC_OTHERS);}
+<CODE>"select"     {RETURNVAL(PC_SELECT);}
+<CODE>"where"      {RETURNVAL(PC_WHERE);}
+<CODE>"\{"         {RETURNVAL(PC_LBRACE);}
+<CODE>"\}"         {RETURNVAL(PC_RBRACE);}
+<CODE>"\("         {RETURNVAL(PC_LPAREN);}
+<CODE>"\)"         {RETURNVAL(PC_RPAREN);}
+<CODE>"\;"         {RETURNVAL(PC_SEMICOLON);}
+<CODE>"\,"         {RETURNVAL(PC_COMMA);}
+<CODE>"\-"         {RETURNVAL(PC_DASH);}
+<CODE>"\&\&"       {RETURNVAL(PC_AND);}
+<CODE>"\|\|"       {RETURNVAL(PC_OR);}
+<CODE>"\=\="       {RETURNVAL(PC_EQ);}
+<CODE>"\!\="       {RETURNVAL(PC_NE);}
+<CODE>"\>"         {RETURNVAL(PC_GT);}
+<CODE>"\>\="       {RETURNVAL(PC_GE);}
+<CODE>"\<"         {RETURNVAL(PC_LT);}
+<CODE>"\<\="       {RETURNVAL(PC_LE);}
 
 <CODE>"/*"              {comment_caller = CODE; BEGIN(COMMENT);}
 <COMMENT>[^*\n]*        /* eat anything that's not a '*' */
@@ -121,8 +121,8 @@ in_file_name);
 <COMMENT>\n             line++;
 <COMMENT>"*"+"/"        BEGIN(comment_caller);
 
-<CODE>{id}      {yylval.c = yytext; return(IDENTIFIER);}
-<CODE>{int}     {yylval.c = yytext; return(INTEGER);}
+<CODE>{id}      {yylval.c = yytext; return(PC_IDENTIFIER);}
+<CODE>{int}     {yylval.c = yytext; return(PC_INTEGER);}
 
 <CODE>"\n"      {line++;}
 <CODE>[ \t]+    /* eat white space */

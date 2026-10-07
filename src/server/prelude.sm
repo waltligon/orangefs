@@ -498,7 +498,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         case PVFS_SERV_RMDIRENT : /* assumes existing dirdata */
             gossip_lsdebug(GOSSIP_SERVER_DEBUG, "removing dirent from non-existent dirdata - skip\n");
             create_object = 0;
-            js_p->error_code = ENOENT;
+            js_p->error_code = -PVFS_ENOENT;
             goto complete;
             break;
         case PVFS_SERV_CHDIRENT : /* assumes existing dirdata */
@@ -539,7 +539,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             {
                 gossip_err("Prelude asked to create object of unknown type\n");
                 create_object = 0;
-                js_p->error_code = ENOENT;
+                js_p->error_code = -PVFS_ENOENT;
             }
             break;
         /* normal ops where the object is not expected to exist
@@ -558,7 +558,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                            "remove or rmdir of non-existing object\n");
             create_object = 0;
-            js_p->error_code = ENOENT;
+            js_p->error_code = -PVFS_ENOENT;
             goto complete;
             break;
         default:
@@ -568,7 +568,7 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
             }
             /* else don't create an object */
             create_object = 0;
-            js_p->error_code = ENOENT;
+            js_p->error_code = -PVFS_ENOENT;
             break;
         }
 
@@ -867,10 +867,25 @@ static PINT_sm_action prelude_validate(struct PINT_smcb *smcb,
         goto complete;
     }
 
-    /* anything else we treat as a real error */
+    /* anything else we treat as a real error.
+     * A raw positive errno must be encoded as -(errno|PVFS_ERROR_BIT).
+     * Negating first and then masking keeps the wrong low 7 bits
+     * (ENOENT 2 became 126, "Interrupted system call").
+     */
     if (js_p->error_code)
     {
-        js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
+        if (js_p->error_code > 0 && !IS_PVFS_ERROR(js_p->error_code))
+        {
+            js_p->error_code = -(js_p->error_code | PVFS_ERROR_BIT);
+        }
+        else if (js_p->error_code > 0)
+        {
+            js_p->error_code = -PVFS_ERROR_CODE(js_p->error_code);
+        }
+        else
+        {
+            js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
+        }
         return SM_ACTION_COMPLETE;
     }
 

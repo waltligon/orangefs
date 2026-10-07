@@ -60,13 +60,6 @@ enum {
 
 #define SID_SERVER_ALL SID_SERVER_VALID_TYPES
 
-/* these are defined in policyeval.c */
-/* they depend on SID_NUM_ATTR and thus they are here */
-
-extern DB *SID_attr_index[SID_NUM_ATTR];
-
-extern DBC *SID_attr_cursor[SID_NUM_ATTR];
-
 #endif
 /*
  * Local variables:

@@ -533,8 +533,25 @@ static PINT_sm_action readdir_msg_setup_msgpair(
         return SM_ACTION_COMPLETE;
     }          
 
-    /* print out the dirent_count distribution, for debugging purpose */
-    assert(sm_p->getattr.size_array);
+    /* v3 directory getattr keeps the total dirent count on the
+     * directory and does not fill per-dirdata counts. Without
+     * size_array, ask each bucket for up to the caller's limit.
+     */
+    if (!sm_p->getattr.size_array)
+    {
+        int nd = sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count;
+
+        PINT_SM_DATAFILE_SIZE_ARRAY_INIT(&sm_p->getattr.size_array, nd);
+        if (!sm_p->getattr.size_array)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return SM_ACTION_COMPLETE;
+        }
+        for (i = 0; i < nd; i++)
+        {
+            sm_p->getattr.size_array[i] = sm_p->readdir_state.dirent_limit;
+        }
+    }
     gossip_debug(GOSSIP_READDIR_DEBUG, "readdir getattr: "
             "dirent_count of all dirdata handles\n");
     for(i = 0; i < sm_p->getattr.attr.u.dir.dist_dir_attr.dirdata_count; i++)

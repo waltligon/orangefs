@@ -2,7 +2,7 @@
  * (C) 2001 Clemson University and The University of Chicago
  *
  * Changes by Acxiom Corporation to add protocol version to kernel
- * communication, Copyright © Acxiom Corporation, 2005.
+ * communication, Copyright ï¿½ Acxiom Corporation, 2005.
  *
  * See COPYING in top-level directory.
  */
@@ -11,14 +11,18 @@
 #ifndef WIN32
 #include <unistd.h>
 #endif
+#ifdef __linux__
 #include <sys/sysmacros.h>
+#endif
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 #ifndef WIN32
+#ifdef __linux__
 #include <sys/sysmacros.h>
+#endif
 #include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>

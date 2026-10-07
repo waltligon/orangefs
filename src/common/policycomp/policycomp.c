@@ -177,7 +177,7 @@ static void parse_args(int argc, char **argv)
     fprintf(code, " * Changes made here will certainly "
             "be overwritten.\n");
     fprintf(code, " */\n\n");
-    fprintf(code, "#include <db.h>\n");
+    fprintf(code, "#include <stdint.h>\n");
     fprintf(code, "#include <%s>\n", header_base);
     fprintf(code, "#include <policyeval.h>\n");
     fprintf(code, "#include <sidcacheval.h>\n");
@@ -230,7 +230,8 @@ static void parse_args(int argc, char **argv)
     fprintf(header, " */\n\n");
     fprintf(header, "#ifndef %s\n", header_base);
     fprintf(header, "#define %s 1\n", header_base);
-    fprintf(header, "#include <db.h>\n");
+    fprintf(header, "#include <stdint.h>\n");
+    fprintf(header, "struct SID_cacheval_s;\n");
     fprintf(header, "\n");
 }
 

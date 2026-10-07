@@ -349,6 +349,11 @@ int main(int argc, char **argv)
             gossip_log("PVFS2 Server: storage space created.\n");
         }
         gossip_debug(GOSSIP_SERVER_DEBUG, "Exiting.\n");
+        /* trove_storage_remove returns 1 on success. This path is
+         * only reached when rmspace/mkspace did not fail, so do not
+         * let that 1 become EXIT_FAILURE in server_shutdown.
+         */
+        ret = 0;
         goto server_shutdown;
     }
 

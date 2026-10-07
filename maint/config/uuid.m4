@@ -83,6 +83,26 @@ AC_DEFUN([AX_UUID],
     else
     dnl This section sesarches standard paths
 
+        case "$host_os" in
+        *darwin*)
+            dnl macOS provides uuid_generate and friends in libSystem.
+            dnl There is no libuuid.so, and -luuid does not resolve.
+            AC_LINK_IFELSE(
+                [AC_LANG_PROGRAM(
+                    [[#include <uuid/uuid.h>]],
+                    [[uuid_t oid;
+                      uuid_is_null(oid);]]
+                )],
+                [   UUIDDOTH="libSystem"
+                    LIBUUID="libSystem"
+                    UUID_LIB=""
+                    UUID_CFLAGS=""
+                    UUID_LDFLAGS=""],
+                [   AC_MSG_FAILURE([macOS uuid functions not found in libSystem.])]
+            )
+            ;;
+        *)
+
         dnl first search for include file 
         for lidir in /usr/include /usr/local/include
         do
@@ -148,6 +168,8 @@ AC_DEFUN([AX_UUID],
         if test "x$LIBUUID" = "xnotfound" ; then
             AC_MSG_FAILURE(No working libuuid.so found.)
         fi
+            ;;
+        esac
     fi
 
     dnl check for mismatched libs and includes

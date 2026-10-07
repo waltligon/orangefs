@@ -269,6 +269,7 @@ if test "${withval}" = "bdb"
 then
     DATABASE_BACKEND=bdb
     NEED_BERKELEY_DB=yes
+    NEED_LMDB=yes
 elif test "${withval}" = "lmdb"
 then
     DATABASE_BACKEND=lmdb
@@ -279,8 +280,8 @@ fi
 AC_SUBST(DATABASE_BACKEND)
 AC_SUBST(NEED_BERKELEY_DB)
 AC_SUBST(NEED_LMDB),
-DATABASE_BACKEND=bdb
-NEED_BERKELEY_DB=yes
+DATABASE_BACKEND=lmdb
+NEED_LMDB=yes
 AC_SUBST(DATABASE_BACKEND)
 AC_SUBST(NEED_BERKELEY_DB)
 AC_SUBST(NEED_LMDB))
@@ -1503,8 +1504,7 @@ dnl end of WITH_UUID section
 
 if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     dnl
-    dnl make sure that required db development package is installed
-    dnl and valid; path can be specified at configure time
+    dnl Trove follows --with-db-backend. The SID cache uses in-tree LMDB.
     dnl
     AC_ARG_WITH(db,
            [  --with-db=<dir>         Location of installed DB package (default=/usr)],

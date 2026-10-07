@@ -48,6 +48,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/* Hidden when _XOPEN_SOURCE is set before the first system header. */
+#ifndef EREMOTE
+#ifdef __APPLE__
+#define EREMOTE 71
+#else
+#define EREMOTE 66
+#endif
+#endif
+#ifndef EHOSTDOWN
+#ifdef __APPLE__
+#define EHOSTDOWN 64
+#else
+#define EHOSTDOWN 112
+#endif
+#endif
+
 #include "pvfs2-internal.h"
 #include "pvfs2-util.h"
 #include "gossip.h"

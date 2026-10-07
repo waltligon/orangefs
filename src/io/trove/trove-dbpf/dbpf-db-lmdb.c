@@ -16,7 +16,7 @@
 
 #include "server-config.h"
 
-extern filesystem_configuration_s *cfg_fs;
+extern struct filesystem_configuration_s *cfg_fs;
 
 struct dbpf_db {
     MDB_env *env;

@@ -659,6 +659,12 @@ void dbpf_collection_deregister(struct dbpf_collection *entry);
 /* function for mapping db errors to trove errors */
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 
+/* macOS has fsync and no fdatasync. The in-tree LMDB copy does the same. */
+#if defined(__APPLE__) && !defined(fdatasync)
+#include <unistd.h>
+#define fdatasync(fd) fsync(fd)
+#endif
+
 #define DBPF_AIO_SYNC_IF_NECESSARY(dbpf_op_ptr, fd, ret)  \
 do {                                                      \
     int tmp_ret, tmp_errno;                               \

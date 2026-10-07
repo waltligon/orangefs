@@ -49,7 +49,9 @@
 #endif
 #define _FORTIFY_SOURCE 0
 
+#ifndef __APPLE__
 #include <features.h>
+#endif
 
 #ifdef __USE_FORTIFY_LEVEL
 #undef __USE_FORTIFY_LEVEL
@@ -65,7 +67,16 @@
 #include <sys/stat.h>
 #include <sys/statvfs.h>
 #include <sys/time.h>
+#ifdef __APPLE__
+#include <sys/mount.h>
+typedef off_t off64_t;
+#define stat64 stat
+#define statfs64 statfs
+#define dirent64 dirent
+typedef char *security_context_t;
+#else
 #include <sys/vfs.h>
+#endif
 #include <sys/uio.h>
 
 /* define open flags unique to PVFS here */

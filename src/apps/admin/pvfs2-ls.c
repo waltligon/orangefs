@@ -1219,7 +1219,17 @@ int main(int argc, char **argv)
         PINT_string_rm_extra_slashes_rts(user_opts->start[i], 1);
 
         fprintf(stderr, "calling do_list\n");
-        do_list(user_opts->start[i], pvfs_path[i], fs_id_array[i], user_opts, entry_buffer);
+        {
+            int list_ret = do_list(user_opts->start[i],
+                                   pvfs_path[i],
+                                   fs_id_array[i],
+                                   user_opts,
+                                   entry_buffer);
+            if (list_ret < 0)
+            {
+                ret = list_ret;
+            }
+        }
 
         if (user_opts->num_starts > 1)
         {

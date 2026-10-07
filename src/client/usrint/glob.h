@@ -21,6 +21,11 @@
 
 #include <sys/cdefs.h>
 
+/* glibc annotates prototypes with __THROW. Apple's sys/cdefs.h does not. */
+#ifndef __THROW
+#define __THROW
+#endif
+
 __BEGIN_DECLS
 
 /* We need `size_t' for the following definitions.  */

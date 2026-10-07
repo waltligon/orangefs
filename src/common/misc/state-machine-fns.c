@@ -905,15 +905,16 @@ void PINT_smcb_free(struct PINT_smcb *smcb)
             frame_entry->frame_info->frame /*&& frame_entry->task_id != 0*/)
         {
             /* This combines with the lsdebug below */
-            sprintf(freeframe, "Freeing / "),
-            //gossip_lsdebug(GOSSIP_STATE_MACHINE_DEBUG, "Freeing frame\n");
-            /* V3 - are we assured this frame has had any referenced
-             * memory freed.  Shouldn't we call a specific free routine
-             * on it to make sure and free anything remaining, rather
-             * than the generic free?
+            sprintf(freeframe, "Freeing / ");
+            /* Frames can be a slice of a parent state, not a
+             * PINT_malloc block. PINT_sm_pop_top_frames already
+             * skips those. free() here is PINT_free, which logs
+             * a magic-number failure and leaks the block.
              */
-            /* only free if task_id is 0 */
-            free(frame_entry->frame_info->frame);
+            if (PINT_check_malloc(frame_entry->frame_info->frame))
+            {
+                free(frame_entry->frame_info->frame);
+            }
             free(frame_entry->frame_info);
         } 
         gossip_lsdebug(GOSSIP_SM_INT_DEBUG, "%s Unlinking Frame\n", freeframe);
@@ -1726,7 +1727,10 @@ PINT_sm_action PINT_sm_pop_old_pjmp_frames(struct PINT_smcb *smcb, int numpframe
         {
             gossip_lsdebug(GOSSIP_SM_INT_DEBUG,
                            "Freeing PJMP Frame\n");
-            free(frame_entry->frame_info->frame);
+            if (PINT_check_malloc(frame_entry->frame_info->frame))
+            {
+                free(frame_entry->frame_info->frame);
+            }
             free(frame_entry->frame_info);
             smcb->frame_count--;
         }

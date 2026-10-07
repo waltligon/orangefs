@@ -6,179 +6,13 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <db.h>
 
+#include "pvfs2-internal.h"
 #include "policy.h"
 #include "sidcache.h"
 #include "policyeval.h"
 #include "sidcacheval.h"
 #include "quicklist.h"
-
-static int first_cursor_end = 0;
-
-/*
-DB *SID_attr_index[SID_NUM_ATTR];
-
-DBC *SID_attr_cursor[SID_NUM_ATTR];
-*/
-
-int SID_get_attr (DB *pri,
-                  const DBT *pkey,
-                  const DBT *pdata,
-                  DBT *skey,
-                  int attr_ix)
-{
-    memset(skey, 0, sizeof(DBT));
-    skey->data = &((SID_cacheval_t *)(pdata->data))->attr[attr_ix];
-    skey->size = sizeof(int);
-    return (0);
-}
-
-int SID_do_join(SID_policy_t *policy, DBC **join_curs)
-{
-    DBT DBkey; /* key for EBD get */
-    DBT DBval; /* return value from DB get */
-    int val;   /* data buffer for attribute index key */
-    int i;     /* general loop index */
-    int ret;   /* return value from DB calls */
-
-    if (*join_curs)
-    {
-        (*join_curs)->close(*join_curs);
-    }
-
-    /* position secondary cursors and add them to join cursor array */
-    for (i = 0; i < policy->join_count; i++)
-    {
-        /* each used attr for this policy is listed here */
-        val = policy->jc[i].value;
-        DBkey.data = &val;
-        DBkey.size = sizeof(int);
-        if ((ret = policy->carray[i]->get(policy->carray[i],
-                                          &DBkey, &DBval, DB_SET)) != 0)
-            goto err;
-    }
-
-    /* use a DB cursor if we don't need a join */
-    if (policy->join_count <= 0)
-    {
-        if ((ret = SID_db->cursor(SID_db, SID_txn, join_curs, 0)) != 0)
-        {
-            goto err;
-        }
-    }
-    else
-    {
-        if ((ret = SID_db->join(SID_db, policy->carray, join_curs, 0)) != 0)
-        {
-            goto err;
-        }
-    }
-    return 0;
-
-err:
-    return -1;
-}
-
-int SID_join_count(DBC *join_curs, int *count)
-{
-    DBT DBkey; /* key for EBD get */
-    DBT DBval; /* return value from DB get */
-    int ret;   /* return value from DB calls */
-
-    *count = 0;
-    while ((ret = join_curs->get(join_curs, &DBkey, &DBval, 0)) == 0)
-    {
-        (*count)++;
-    }
-    if (ret < 0)
-    {
-        return -1;
-    }
-    else
-    {
-        return 0;
-    }
-}
-
-int SID_first_record(SID_policy_t *policy,
-                     DBC **join_curs,
-                     DBT *key,
-                     DBT *value)
-{
-    int i;     /* general loop index */
-    int ret;   /* return value from DB calls */
-    int first = 0;
-    int num_rec;
-
-    /* random select the first one */
-    if ((ret = SID_join_count(*join_curs, &num_rec)) != 0)
-    {
-        goto err;
-    }
-    first = rand() % num_rec;
-    /* must reset the join after a count */
-    SID_do_join(policy, join_curs);
-    for (i = 0; i < first; i++)
-    {
-        if ((ret = (*join_curs)->get(*join_curs, key, value, 0)) != 0)
-        {
-            goto err;
-        }
-    }
-    first_cursor_end = 0;
-    return 0;
-
-err:
-    return -1;
-}
-
-/*
- * A policy defines a set of viable SIDs for a given purpose, then we
- * select from those SIDs using a layout much as we did in V2
- */
-
-int SID_next_record(SID_policy_t *policy,
-                    DBC **join_curs,
-                    DBT *key,
-                    DBT *value)
-{
-    int ret;
-    switch (policy->layout)
-    {
-    case PVFS_LAYOUT_ROUND_ROBIN :
-            /* go to the next record */
-            if ((ret = (*join_curs)->get(*join_curs, key, value, 0)) != 0)
-            {
-                if (ret == DB_NOTFOUND)
-                {
-                    /* if end of records, return to start */
-                    /* but only once */
-                   if (!first_cursor_end)
-                   {
-                       first_cursor_end = 1;
-                       SID_do_join(policy, join_curs);
-                   }
-                   else
-                   {
-                       return -1; /* cannot complete policy */
-                   }
-                }
-                else
-                {
-                    goto err;
-                }
-            }
-        break;
-    case PVFS_LAYOUT_RANDOM :
-        /* randomly pick a record */
-        break;
-    }
-    return 0;
-
-err:
-    return -1;
-}
 
 /*
  * Map is a bit mask used to keep up with which SIDs have been selected by
@@ -262,9 +96,19 @@ int SID_cmp(SID_cmpop_t cmpop, int v1, int v2)
     }
 }
 
-int SID_add_query_list(SID_server_list_t *sid_list,
-                       DBT *key,
-                       DBT *value)
+int SID_get_attr(const struct SID_cacheval_s *cval, int32_t *key, int attr_ix)
+{
+    if (!cval || !key || attr_ix < 0 || attr_ix >= SID_NUM_ATTR)
+    {
+        return -1;
+    }
+    *key = cval->attr[attr_ix];
+    return 0;
+}
+
+static int sid_append(SID_server_list_t *sid_list,
+                      const PVFS_SID *sid,
+                      const SID_cacheval_t *cval)
 {
     SID_server_list_t *new;
     int url_len;
@@ -272,63 +116,41 @@ int SID_add_query_list(SID_server_list_t *sid_list,
     new = (SID_server_list_t *)malloc(sizeof(SID_server_list_t));
     if (!new)
     {
-        return -1; /* ENOMEM should be set */
+        return -PVFS_ENOMEM;
     }
     INIT_QLIST_HEAD(&new->link);
-    qlist_add_tail(&new->link, (struct qlist_head *)sid_list);
-
-    memcpy(&new->server_sid, key->data, sizeof(PVFS_SID));
-    /* do we need this? we have nowhere to put it at the moment */
-    new->server_addr = ((SID_cacheval_t *)value->data)->bmi_addr;
-    url_len = strlen(((SID_cacheval_t *)value->data)->url) + 1;
-    new->server_url = (char *)malloc(url_len);
-    if (!new->server_url)
+    qlist_add_tail(&new->link, &sid_list->link);
+    new->server_sid = *sid;
+    new->server_addr = cval->bmi_addr;
+    new->server_url = NULL;
+    if (cval->url)
     {
-        qlist_del(&new->link);
-        free(new);
-        return -1; /* ENOMEM should be set */
+        url_len = (int)strlen(cval->url) + 1;
+        new->server_url = (char *)malloc(url_len);
+        if (!new->server_url)
+        {
+            qlist_del(&new->link);
+            free(new);
+            return -PVFS_ENOMEM;
+        }
+        memcpy(new->server_url, cval->url, url_len);
     }
-    memcpy(new->server_url, ((SID_cacheval_t *)value->data)->url, url_len);
-    /* end of do we need this? */
     return 0;
 }
 
 int SID_add_server_list(SID_server_list_t *sid_list, const PVFS_SID *sid)
 {
     int ret;
-    SID_server_list_t *new;
-    SID_cacheval_t *temp_cacheval;
-    int url_len;
+    SID_cacheval_t *temp_cacheval = NULL;
 
-    ret = SID_cache_get(SID_db, sid, &temp_cacheval);
+    ret = SID_cache_get(sid, &temp_cacheval);
     if (ret != 0)
     {
         return ret;
     }
-
-    new = (SID_server_list_t *)malloc(sizeof(SID_server_list_t));
-    if (!new)
-    {
-        return -1; /* ENOMEM should be set */
-    }
-    INIT_QLIST_HEAD(&new->link);
-    qlist_add_tail(&new->link, &sid_list->link);
-
-    new->server_sid = *sid;
-    /* do we need this? we have nowhere to put it at the moment */
-    new->server_addr = temp_cacheval->bmi_addr;
-    url_len = strlen(temp_cacheval->url) + 1;
-    new->server_url = (char *)malloc(url_len);
-    if (!new->server_url)
-    {
-        qlist_del(&new->link);
-        free(new);
-        return -1; /* ENOMEM should be set */
-    }
-    memcpy(new->server_url, temp_cacheval->url, url_len);
-    /* end of do we need this? */
-    free(temp_cacheval);
-    return 0;
+    ret = sid_append(sid_list, sid, temp_cacheval);
+    SID_cacheval_free(&temp_cacheval);
+    return ret;
 }
 
 int SID_pop_query_list(SID_server_list_t *sid_list,
@@ -353,100 +175,297 @@ int SID_pop_query_list(SID_server_list_t *sid_list,
     {
         *addr = server->server_addr;
     }
-    if (url)
+    if (url && url_size > 0)
     {
-        strncpy(url, server->server_url, url_size);
-        url[url_size] = 0;
+        if (server->server_url)
+        {
+            strncpy(url, server->server_url, url_size - 1);
+        }
+        else
+        {
+            url[0] = 0;
+        }
+        url[url_size - 1] = 0;
     }
+    free(server->server_url);
     free(server);
     return 0;
 }
 
+static int sid_cmp_q(const void *a, const void *b)
+{
+    return memcmp(a, b, sizeof(PVFS_SID));
+}
+
+static int sid_intersect(PVFS_SID *a, int na, PVFS_SID *b, int nb,
+                         PVFS_SID **out, int *nout)
+{
+    int i = 0;
+    int j = 0;
+    int n = 0;
+    PVFS_SID *hit = NULL;
+
+    *out = NULL;
+    *nout = 0;
+    if (na > 1)
+    {
+        qsort(a, na, sizeof(PVFS_SID), sid_cmp_q);
+    }
+    if (nb > 1)
+    {
+        qsort(b, nb, sizeof(PVFS_SID), sid_cmp_q);
+    }
+    if (na == 0 || nb == 0)
+    {
+        return 0;
+    }
+    hit = (PVFS_SID *)malloc((size_t)(na < nb ? na : nb) * sizeof(PVFS_SID));
+    if (!hit)
+    {
+        return -PVFS_ENOMEM;
+    }
+    while (i < na && j < nb)
+    {
+        int cmp = memcmp(&a[i], &b[j], sizeof(PVFS_SID));
+        if (cmp == 0)
+        {
+            if (n == 0 || memcmp(&hit[n - 1], &a[i], sizeof(PVFS_SID)) != 0)
+            {
+                hit[n++] = a[i];
+            }
+            i++;
+            j++;
+        }
+        else if (cmp < 0)
+        {
+            i++;
+        }
+        else
+        {
+            j++;
+        }
+    }
+    *out = hit;
+    *nout = n;
+    return 0;
+}
+
+static int sid_policy_sids(SID_policy_t *policy, PVFS_SID **sids, int *n)
+{
+    int i;
+    int rc;
+    PVFS_SID *cur = NULL;
+    int ncur = 0;
+
+    *sids = NULL;
+    *n = 0;
+    if (policy->join_count <= 0)
+    {
+        return SID_list_all(sids, n);
+    }
+    if (!policy->jc)
+    {
+        return -PVFS_EINVAL;
+    }
+    rc = SID_attr_list(policy->jc[0].attr, policy->jc[0].value, &cur, &ncur);
+    if (rc)
+    {
+        return rc;
+    }
+    for (i = 1; i < policy->join_count; i++)
+    {
+        PVFS_SID *next = NULL;
+        PVFS_SID *hit = NULL;
+        int nnext = 0;
+        int nhit = 0;
+
+        rc = SID_attr_list(policy->jc[i].attr, policy->jc[i].value,
+                           &next, &nnext);
+        if (rc)
+        {
+            free(cur);
+            return rc;
+        }
+        rc = sid_intersect(cur, ncur, next, nnext, &hit, &nhit);
+        free(cur);
+        free(next);
+        if (rc)
+        {
+            return rc;
+        }
+        cur = hit;
+        ncur = nhit;
+    }
+    *sids = cur;
+    *n = ncur;
+    return 0;
+}
+
+struct sid_match
+{
+    PVFS_SID sid;
+    SID_cacheval_t *cval;
+};
+
+static void sid_free_matches(struct sid_match *matches, int n)
+{
+    int i;
+
+    if (!matches)
+    {
+        return;
+    }
+    for (i = 0; i < n; i++)
+    {
+        SID_cacheval_free(&matches[i].cval);
+    }
+    free(matches);
+}
+
+/*
+ * A policy defines a set of viable SIDs for a given purpose, then we
+ * select from those SIDs using a layout much as we did in V2.
+ *
+ * LMDB has no DB->join. The attribute duplicate lists are intersected
+ * in memory. One pass over that set stops when fewer servers match
+ * than the requested copy count, and *copies is the number stored.
+ */
 int SID_select_servers(SID_policy_t *policy,
                        int num_servers,
                        int *copies,
                        SID_server_list_t *sid_list)
 {
-    int i;
     int set;
-    DBC *join_curs;
-    DBT DBkey_s, DBval_s;
-    DBT *DBkey = &DBkey_s;
-    DBT *DBval = &DBval_s; /* more convenient to have pointers */
+    int i;
+    int rc;
+    int target = 2;
+    int nsrc = 0;
+    int nmatches = 0;
+    PVFS_SID *src = NULL;
+    struct sid_match *matches = NULL;
 
-    *copies = 2; /* FIXME */
-
-    policy->layout = PVFS_LAYOUT_ROUND_ROBIN;
-
-    policy->carray = (DBC **)malloc(sizeof(DBC *) * policy->join_count);
-
-    /* each attr used by this policy is copied to carray */
-    for (i = 0; i < policy->join_count; i++)
+    if (!policy || !copies || !sid_list || num_servers < 0)
     {
-        policy->carray[i] = SID_attr_cursor[policy->jc[i].attr];
+        return -PVFS_EINVAL;
     }
-    /* do the join */
-    SID_do_join(policy, &join_curs);
+    *copies = target;
+    policy->layout = PVFS_SYS_LAYOUT_ROUND_ROBIN;
 
-    /* loop over sets to be created - could be var via arg */
+    rc = sid_policy_sids(policy, &src, &nsrc);
+    if (rc)
+    {
+        return rc;
+    }
+    matches = (struct sid_match *)calloc(nsrc > 0 ? (size_t)nsrc : 1,
+                                         sizeof(*matches));
+    if (!matches)
+    {
+        free(src);
+        return -PVFS_ENOMEM;
+    }
+    for (i = 0; i < nsrc; i++)
+    {
+        SID_cacheval_t *cval = NULL;
+        rc = SID_cache_get(&src[i], &cval);
+        if (rc == -PVFS_ENOENT)
+        {
+            continue;
+        }
+        if (rc)
+        {
+            free(src);
+            sid_free_matches(matches, nmatches);
+            return rc;
+        }
+        matches[nmatches].sid = src[i];
+        matches[nmatches].cval = cval;
+        nmatches++;
+    }
+    free(src);
+    if (nmatches == 0)
+    {
+        sid_free_matches(matches, 0);
+        *copies = 0;
+        return -PVFS_ENOENT;
+    }
+
     for (set = 0; set < num_servers; set++)
     {
-        int i;
-        int set_size_remaining = *copies;
-        /* initialize counter for each rule */
+        int added = 0;
+        int idle = 0;
+        int pos = 0;
+        unsigned char *used;
+
+        if (policy->layout == PVFS_SYS_LAYOUT_RANDOM)
+        {
+            pos = rand() % nmatches;
+        }
         for (i = 0; i < policy->rule_count; i++)
         {
             policy->sc[i].count = 0;
         }
-
-        /* position the cursor to the first record we plan to use */
-        SID_first_record(policy, &join_curs, DBkey, DBval);
         SID_clear_selected(255);
-
-        /* select servers */
-        while (set_size_remaining)
+        used = (unsigned char *)calloc((size_t)nmatches, 1);
+        if (!used)
         {
-            if (SID_is_selected(SID_ATTR(policy->spread_attr)))
+            sid_free_matches(matches, nmatches);
+            return -PVFS_ENOMEM;
+        }
+        while (added < target && idle < nmatches)
+        {
+            const struct SID_cacheval_s *DBval = matches[pos].cval;
+            int picked = 0;
+
+            if (used[pos] || SID_is_selected(SID_ATTR(policy->spread_attr)))
             {
-                /* do not select again */
-                SID_next_record(policy, &join_curs, DBkey, DBval);
+                pos = (pos + 1) % nmatches;
+                idle++;
                 continue;
             }
+            used[pos] = 1;
             for (i = 0; i < policy->rule_count; i++)
             {
                 if (policy->sc[i].count_max == SID_OTHERS ||
                     policy->sc[i].count < policy->sc[i].count_max)
                 {
-                    /* if ( SID_cmp(policy->sc[i].cmpop,
-                                SID_ATTR(policy->sc[i].attr),
-                                policy->sc.value) ) */
-                    if ( (*policy->sc[i].scfunc)(DBval) )
+                    if (policy->sc[i].scfunc &&
+                        (*policy->sc[i].scfunc)(DBval))
                     {
-                        /* add to output list */
-                        SID_add_query_list(sid_list, DBkey, DBval);
+                        rc = sid_append(sid_list, &matches[pos].sid, DBval);
+                        if (rc)
+                        {
+                            free(used);
+                            sid_free_matches(matches, nmatches);
+                            return rc;
+                        }
                         policy->sc[i].count++;
-                        SID_next_record(policy, &join_curs, DBkey, DBval);
-                        set_size_remaining--;
                         SID_select(SID_ATTR(policy->spread_attr));
-                        continue;
+                        added++;
+                        picked = 1;
+                        break;
                     }
-                    /* otherwise fall through */
                 }
             }
-            if (i >= policy->rule_count)
+            pos = (pos + 1) % nmatches;
+            if (!picked)
             {
-                /* not selected by any rule so skip */
-                SID_next_record(policy, &join_curs, DBkey, DBval);
+                idle++;
             }
         }
+        free(used);
+        if (set == 0)
+        {
+            *copies = added;
+        }
+        if (added == 0)
+        {
+            sid_free_matches(matches, nmatches);
+            return -PVFS_ENOENT;
+        }
     }
-    if (join_curs)
-    {
-        join_curs->close(join_curs);
-    }
+    sid_free_matches(matches, nmatches);
     return 0;
 }
-
 
 /*
  * Local variables:
