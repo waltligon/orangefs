@@ -11,7 +11,10 @@
 #include <pvfs3-handle.h>
 #include <quicklist.h>
 #include <sidcache-db.h>
-#include <sidcacheval.h>
+/* Do not include sidcacheval.h here. It includes policy.h, which is the
+ * generated example2.h. policycomp includes this header, and policycomp
+ * is what writes example2.h.
+ */
 
 #define SID_OTHERS -1
 
