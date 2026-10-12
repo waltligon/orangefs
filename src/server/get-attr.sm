@@ -1185,11 +1185,12 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
                                             job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    struct PINT_server_op *new_op = NULL;
     struct PINT_server_getattr_op *getattr_p = &(s_op->u.getattr);
     int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr_p = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
+    PVFS_capability capability;
     
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p) Request\n", s_op);
     PVFS_debug_servreq_getattr(GOSSIP_GETATTR_DEBUG, s_op->req);
@@ -1200,7 +1201,22 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
 #endif
     gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "s_op (%p)\n", s_op);
 
-    PVFS_capability capability;
+    PINT_sm_push_dup_frame(smcb, sizeof(PINT_server_op));
+
+    new_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT + 1); /* get new frame */
+
+    new_op->op = PVFS_SERV_TREE_GET_FILE_SIZE; /* tree op we are about to jump to */
+
+    new_op->msgarray_op.msgarray = &(new_op->msgarray_op.msgpair);
+    new_op->req = &(new_op->msgarray_op.msgpair.req);  /* don't malloc if we don't have to */
+    /* new_op->req = (struct PVFS_server_req *)malloc(sizeof(struct PVFS_server_req)); */
+
+    memcpy(new_op->req, s_op->req, sizeof(struct PVFS_server_req));
+    memcpy(&new_op->resp, &s_op->resp, sizeof(struct PVFS_server_resp));
+    new_op->resp.op = PVFS_SERV_TREE_GET_DIRENT_COUNT;
+    new_op->msgarray_op.msgarray = NULL;
+    new_op->key_a = NULL;
+    new_op->val_a = NULL;
 
     js_p->error_code = 0;
 
@@ -1210,8 +1226,9 @@ static PINT_sm_action getattr_get_file_size(struct PINT_smcb *smcb,
     /* Note: permission not required for tree_get_file_size op */
     PINT_null_capability(&capability);
 
-    PINT_msgpair_init(&(s_op->msgarray_op));
-    msg_p = &(s_op->msgarray_op.msgpair);
+    //PINT_msgpair_init(&(s_op->msgarray_op));
+    PINT_msgpair_init(&(new_op->msgarray_op));
+    msg_p = &(new_op->msgarray_op.msgpair);
 
     /*initialize the size_array, which will hold the size of each datahandle*/
     getattr_p->size_array =
@@ -2075,15 +2092,19 @@ static PINT_sm_action getattr_get_dirent_count(struct PINT_smcb *smcb,
 
     js_p->error_code = 0;
 
-    /*attr = &s_op->attr; */
+    //attr_p = &s_op->attr;
     attr_p = &new_op->resp.u.getattr.attr;
+    //gossip_debug(GOSSIP_GETATTR_DEBUG, "NEWOP RESP ATTR\n");
+    //PVFS_debug_PVFS_attr(GOSSIP_GETATTR_DEBUG, attr_p);
+    //gossip_debug(GOSSIP_GETATTR_DEBUG, "SOP ATTR\n");
+    //PVFS_debug_PVFS_attr(GOSSIP_GETATTR_DEBUG, &(s_op->attr));
 
     /* Note: permission not required for tree_get_dirent_count op */
     PINT_null_capability(&capability);
 
-    PINT_msgpair_init(&s_op->msgarray_op);
-    PINT_msgpair_init(&new_op->msgarray_op);
-    msg_p = &new_op->msgarray_op.msgpair;
+    PINT_msgpair_init(&s_op->msgarray_op); /* do we need this or is it leftover? */
+    PINT_msgpair_init(&(new_op->msgarray_op));
+    msg_p = &(new_op->msgarray_op.msgpair);
 
     /* initialize the dirent_array, which will hold
      * the dirent count of each dirdata

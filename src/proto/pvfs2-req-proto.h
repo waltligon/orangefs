@@ -1824,7 +1824,10 @@ do {                                                        \
             PVFS_debug_afield(&tresp->handle_array[i], PVFS_handle);\
         }                                                   \
         PVFS_debug_afield(tresp->sid_count, int32_t);       \
-        PVFS_debug_afield(tresp->sid_array, PVFS_SID);      \
+        for (i = 0; i < tresp->sid_count; i++)              \
+        {                                                   \
+            PVFS_debug_afield(&tresp->sid_array[i], PVFS_SID);\
+        }                                                   \
         if (tresp->attr_count > 0)                          \
         {                                                   \
             PVFS_debug_PVFS_attr(_mask, tresp->attr_array); \

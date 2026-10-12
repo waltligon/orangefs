@@ -1814,6 +1814,8 @@ static PINT_sm_action lookup_setup_resp(struct PINT_smcb *smcb,
     {
         /* preserve error code in this case and fall through */
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "lookup error in previous step\n");
+        /* if there is an error there may be frames left on the stack */
+        PINT_sm_pop_top_frames(smcb);
     }
     else
     {

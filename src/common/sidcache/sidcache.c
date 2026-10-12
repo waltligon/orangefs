@@ -973,7 +973,7 @@ int SID_cache_get(DB *dbp,
     }
     else
     {
-        gossip_err("SID_cache_get returns a null data pointere\n");
+        gossip_err("SID_cache_get returns a null data pointer\n");
         return -1;
     }
     gossip_debug(GOSSIP_SIDCACHE_DEBUG, "Sidcache returns %s\n",

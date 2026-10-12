@@ -314,10 +314,10 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
      * all of the dirdata are created (not sure how) so for now I'm
      * leaving this here.
      *
-     * The logic behind this is we don't need to ready the DB
+     * The logic behind this is we don't need to read the DB
      * because we have the data - but we can't leave the
      * struct without these things in place or later code will
-     * crash, so I'm trying to link the keyval items to the
+     * crash, so I'm linking the keyval items to the
      * dspace attrs.
      */
 
@@ -345,9 +345,10 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
             PVFS_OID_str(&s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
                           s_op->req->u.crdirent.dd_server_index]));
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Getting attributes <==================");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Getting attributes <==================\n");
     PVFS_debug_PVFS_dirdata_attr(GOSSIP_SERVER_DEBUG, attr_p);
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Allocating memory for bitmap and dd handles\n");
     /* allocate space for bitmap and dirdata handles */
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "bitmap_size %d\n",
                    attr_p->u.dirdata.dist_dir_attr.bitmap_size);
@@ -367,6 +368,7 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Setting pointer for dd sids\n");
     /* set pointer for dirdata_sids */
     attr_p->u.dirdata.dirdata_sids =
                (PVFS_SID *)(attr_p->u.dirdata.dirdata_handles +
@@ -379,6 +381,7 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     attr_p->mask |= PVFS_ATTR_DISTDIR_ATTR;
 
     /* total 2 keyvals, DIST_DIRDATA_BITMAP, DIST_DIRDATA_HANDLES */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "freeing keyval data structures\n");
 
     if (s_op->free_val)
     {
@@ -413,6 +416,8 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
     s_op->free_val = 0;
 
    /* allocate space for keys and values */
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "allocating keyval data structures\n");
+
    s_op->keyval_count = 2;
    s_op->key_a = s_op->val_a = NULL;
    s_op->error_a = NULL;
@@ -427,6 +432,8 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
         return SM_ACTION_COMPLETE;
     }
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "setting up keys\n");
+    
     s_op->key_a[0].buffer_sz = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].size;
     s_op->key_a[0].buffer = Trove_Common_Keys[DIST_DIRDATA_BITMAP_KEY].key;
 
@@ -442,6 +449,7 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
                          attr_p->u.dirdata.dist_dir_attr.sid_count);
     s_op->val_a[1].buffer = attr_p->u.dirdata.dirdata_handles;
 
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "calling trove\n");
     js_p->error_code = 0;
     ret = job_trove_keyval_read_list(s_op->req->u.crdirent.parent_ref.fs_id,
                                      s_op->req->u.crdirent.parent_attr.u.dir.dirdata_handles[
@@ -509,8 +517,11 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     for(i = 0; i < attr_p->u.dirdata.dist_dir_attr.dirdata_count; i++)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG,
-                     "\t\tdirdata server %d: %s.\n",
-                     i, PVFS_OID_str(&attr_p->u.dirdata.dirdata_handles[i]));
+                     "\t\tdirdata %d: OID %s.\n", i,
+                      PVFS_OID_str(&attr_p->u.dirdata.dirdata_handles[i]));
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+                     "\t\tdirdata %d: SID %s.\n", i,
+                      PVFS_OID_str(&attr_p->u.dirdata.dirdata_sids[i]));
     }           
  
     /* verify name and handle are not NULL */
@@ -525,7 +536,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                  "dirent: %s (with handle %s) in %s\n",
                  s_op->req->u.crdirent.name,
-                 PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle),
+                 PVFS_OID_str(&s_op->req->u.crdirent.new_ref.handle), /* these are the same! */
                  PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
 
     /* check for invalid characters (ie "/") in name */
