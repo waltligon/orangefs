@@ -199,7 +199,7 @@ static PINT_sm_action crdirent_debug(struct PINT_smcb *smcb,
                                     job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Start of crdirent request <==================");
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Start of crdirent request <==================\n");
     PVFS_debug_servreq_crdirent(GOSSIP_SERVER_DEBUG, s_op->req);
     return SM_ACTION_COMPLETE;
 }
@@ -521,7 +521,7 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
                       PVFS_OID_str(&attr_p->u.dirdata.dirdata_handles[i]));
         gossip_debug(GOSSIP_SERVER_DEBUG,
                      "\t\tdirdata %d: SID %s.\n", i,
-                      PVFS_OID_str(&attr_p->u.dirdata.dirdata_sids[i]));
+                      PVFS_SID_str(&attr_p->u.dirdata.dirdata_sids[i]));
     }           
  
     /* verify name and handle are not NULL */

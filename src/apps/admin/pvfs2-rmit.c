@@ -121,6 +121,7 @@ int main(int argc, char **argv)
         }
         /*fprintf(stderr, "Testing before lookup\n");*/
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+        fprintf(stderr, "SYS_LOOKUP\n");
         rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
                              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW, NULL);
         if (rc)
@@ -150,7 +151,7 @@ int main(int argc, char **argv)
             }
 
             layout.server_list.servers = 
-                malloc(layout.server_list.count*sizeof(PVFS_BMI_addr_t));
+                malloc(layout.server_list.count * sizeof(PVFS_BMI_addr_t));
             if(!(layout.server_list.servers))
             {
                 perror("malloc");
@@ -171,6 +172,7 @@ int main(int argc, char **argv)
                  * state machine.  This program should only have to send in
                  * a list of server aliases from the config file.
                  */
+                fprintf(stderr, "BMI_ADDR_LOOKUP\n");
                 rc = BMI_addr_lookup(&layout.server_list.servers[tmp_server_index],
                                      tmp_server,
                                      NULL);
@@ -189,6 +191,7 @@ int main(int argc, char **argv)
             }
         }
 
+        fprintf(stderr, "SYS_REMOVE\n");
         rc = PVFS_sys_remove(filename,
                              parent_ref,
                              &credentials,

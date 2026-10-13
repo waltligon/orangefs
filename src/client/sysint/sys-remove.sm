@@ -91,8 +91,14 @@ machine pvfs2_client_remove_sm
     state rmdirent_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => do_remove;
+        success => rmdirent_cleanup;
         default => rmdirent_retry_or_fail;
+    }
+
+    state rmdirent_cleanup
+    {
+        run remove_rmdirent_cleanup;
+        default => do_remove;
     }
 
     state rmdirent_retry_or_fail
@@ -321,7 +327,15 @@ static int remove_rmdirent_comp_fn(void *v_p,
         memcpy(sm_p->object_ref.sid_array,
                resp_p->u.rmdirent.sid_array,
                resp_p->u.rmdirent.sid_count * sizeof(PVFS_SID));
-
+        gossip_lsdebug(GOSSIP_REMOVE_DEBUG, "sm_p (%p)\n", sm_p);
+        gossip_lsdebug(GOSSIP_REMOVE_DEBUG, "handle %s\n",
+                                            PVFS_OID_str(&sm_p->object_ref.handle));
+        gossip_lsdebug(GOSSIP_REMOVE_DEBUG, "fsid %d\n",
+                                            sm_p->object_ref.fs_id);
+        gossip_lsdebug(GOSSIP_REMOVE_DEBUG, "sid_count %d\n",
+                                            sm_p->object_ref.sid_count);
+        gossip_lsdebug(GOSSIP_REMOVE_DEBUG, "sid_array %s\n",
+                                            PVFS_SID_str(sm_p->object_ref.sid_array));
         gossip_ldebug(GOSSIP_CLIENT_DEBUG,
                      "metafile handle = %s\n",
                      PVFS_OID_str(&sm_p->object_ref.handle));
@@ -462,13 +476,22 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     return SM_ACTION_COMPLETE;
 }
 
+static PINT_sm_action remove_rmdirent_cleanup(struct PINT_smcb *smcb,
+                                              job_status_s *js_p)
+{
+    /* pop the mop on top - it should not be freed 
+     * because it wasn't malloc'd
+     */
+    PINT_sm_pop_frame(smcb, NULL, NULL, NULL, NULL);
+    return SM_ACTION_COMPLETE;
+}
+
 static PINT_sm_action remove_getattr_setup(struct PINT_smcb *smcb,
                                            job_status_s *js_p)
 {
     struct PINT_client_sm *sm_p = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     
-    gossip_lsdebug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: getattr_setup\n");
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "remove getattr_setup frame (%p)\n", sm_p);
     
     sm_p->u.remove.stored_error_code = js_p->error_code;
     js_p->error_code = 0;
