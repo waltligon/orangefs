@@ -434,9 +434,17 @@ do { \
 #define PVFS_to_string_PVFS_size(_size, _string, _print) \
         PVFS_to_string_int64_t(_size, _string, _print)
 
+#define PVFS_to_string_PVFS_object_attrmask(_mask, _string, _print) \
+        PVFS_to_string_xint64_t(_mask, _string, _print)
+
 #define PVFS_to_string_uint64_t(_longuint, _string, _print) \
 do { \
     sprintf(_string, "%lu", (_longuint)); \
+} while (0)
+
+#define PVFS_to_string_xint64_t(_longuint, _string, _print) \
+do { \
+    sprintf(_string, "%lx", (_longuint)); \
 } while (0)
 
 #define PVFS_to_string_int32_t(_integer, _string, _print) \
@@ -522,9 +530,6 @@ do {                                     \
     }                                    \
 } while (0)
 #endif
-
-#define PVFS_to_string_PVFS_object_attrmask(_mask, _string, _print) \
-        PVFS_to_string_uint64_t(_mask, _string, _print)
 
 #define PVFS_to_string_job_status_s(_stat_p, _string, _print) \
 do { \

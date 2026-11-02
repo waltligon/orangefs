@@ -28,6 +28,12 @@ enum
 
 machine pvfs2_rmdirent_sm
 {
+    state debug
+    {
+        run rmdirent_debug;
+        default => prelude;
+    }
+
     state prelude
     {
         jump pvfs2_prelude_sm;
@@ -42,6 +48,7 @@ machine pvfs2_rmdirent_sm
         default => setup_resp;
     }
 
+    /* removes dirent here */
     state remove_directory_entry
     {
         run rmdirent_remove_directory_entry;
@@ -55,25 +62,37 @@ machine pvfs2_rmdirent_sm
         default => setup_resp;
     }
 
+    /* writes dirdata with decremented dirent_count here */
     state update_dirdata_attr
     {
         run rmdirent_update_dirdata_attr;
+        default => check_directory_location;
+    }
+
+    state check_directory_location
+    {
+        run rmdirent_check_directory_location;
         REMOTE => update_remote_parent_dir;
         default => read_local_parent_dir;
     }
 
+    /* does local dspace read of dir */
     state read_local_parent_dir
     {
         run rmdirent_read_local_parent_dir;
         default => update_local_parent_dir;
     }
 
+    /* does local dspace write of dir */
     state update_local_parent_dir
     {
         run rmdirent_update_local_parent_dir;
         default => setup_resp;
     }
 
+    /* sets up remove server setattr request to update
+     * parent with decremented dirent_count and CTIME update
+     */
     state update_remote_parent_dir
     {
         run rmdirent_update_remote_parent_dir;
@@ -106,6 +125,14 @@ machine pvfs2_rmdirent_sm
 }
 
 %%
+
+static PINT_sm_action rmdirent_debug(struct PINT_smcb *smcb,
+                                     job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    PVFS_debug_servreq_rmdirent(GOSSIP_SERVER_DEBUG, (s_op->req));
+    return SM_ACTION_COMPLETE;
+}
 
 #if 0
 /* We should not need this function, because prelude should have
@@ -467,13 +494,43 @@ static PINT_sm_action rmdirent_update_dirdata_attr(struct PINT_smcb *smcb,
         return ret;
     }
     /* decide if parent is local or not */
+#if 0
     if(!PINT_cached_config_server_local(&s_op->req->u.rmdirent.parent.sid_array[0]))
     {
         gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Remote DIR entry\n");
         js_p->error_code = REMOTE;
     }
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "local DIR entry\n");
+    else
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "local DIR entry\n");
+    }
+#endif
     return ret;
+}
+
+static PINT_sm_action rmdirent_check_directory_location(struct PINT_smcb *smcb,
+                                                        job_status_s *js_p)
+{
+    struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
+    /* see if the trove op completed correctly */
+    if (js_p->error_code < 0)
+    {
+        char msg[200];
+        PVFS_strerror_r(js_p->error_code, msg, 200);
+        gossip_lerr("trove op failed code %d (%s)\n", js_p->error_code, msg);
+        return SM_ACTION_COMPLETE;
+    }
+    /* check dir location */
+    if(!PINT_cached_config_server_local(&s_op->req->u.rmdirent.parent.sid_array[0]))
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Remote DIR entry\n");
+        js_p->error_code = REMOTE;
+    }
+    else
+    {
+        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "local DIR entry\n");
+    }
+    return SM_ACTION_COMPLETE;
 }
 
 /* Before we can update the dir we need to read the attributes for the dir which
@@ -552,16 +609,18 @@ static PINT_sm_action rmdirent_update_local_parent_dir(struct PINT_smcb *smcb,
     return ret;
 }
 
-/* set up a remote request for MPA
+/* set up a remote request for MPA to update the parent directory
  */
 static PINT_sm_action rmdirent_update_remote_parent_dir(struct PINT_smcb *smcb,
                                                         job_status_s *js_p)
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     PINT_sm_msgpair_state *msg_p = &s_op->msgarray_op.msgpair;
-    PVFS_object_attr tmp_attr;
     PVFS_handle *capability_handles = NULL;
     int ret;
+
+    /* clear the REMOTE code */
+    js_p->error_code = 0;
 
     PINT_msgpair_init(&s_op->msgarray_op);
     msg_p = &s_op->msgarray_op.msgpair;
@@ -593,10 +652,6 @@ static PINT_sm_action rmdirent_update_remote_parent_dir(struct PINT_smcb *smcb,
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Write attrs to remote parent via setattr\n");
 
-    /* update dirent_count on DIR which sums all dirdata for this dir */
-    tmp_attr.mask = PVFS_ATTR_COMMON_CTIME; /* set time to remote server time */
-    tmp_attr.mask |= PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_DIRENT_COUNT_DECR;
-
     /* Capability was initialized earlier. */
     PINT_SERVREQ_SETATTR_FILL(msg_p->req,
                               PVFS_REQ_NONE,  /* logically target must exist */
@@ -606,7 +661,7 @@ static PINT_sm_action rmdirent_update_remote_parent_dir(struct PINT_smcb *smcb,
                               s_op->req->u.rmdirent.parent.handle,
                               s_op->req->u.rmdirent.parent.sid_count,
                               s_op->req->u.rmdirent.parent.sid_array,
-                              tmp_attr,
+                              s_op->attr, // WRONG ATTR
                               s_op->req->hints);
 
     msg_p->msgclass = PVFS_IO_METADATA;
@@ -618,6 +673,13 @@ static PINT_sm_action rmdirent_update_remote_parent_dir(struct PINT_smcb *smcb,
     msg_p->sid_array = s_op->req->u.rmdirent.parent.sid_array;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = NULL;
+
+    /* update dirent_count on DIR which sums all dirdata for this dir */
+    s_op->req->u.setattr.attr.mask = PVFS_ATTR_COMMON_CTIME; /* set time to remote server time */
+    s_op->req->u.setattr.attr.mask |= PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_DIRENT_COUNT_DECR;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "SETATTR REQUEST\n");
+    PVFS_debug_servreq_setattr(GOSSIP_SERVER_DEBUG, &msg_p->req);
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG,
                    "setting timestamps for directory handle %s SID %s\n",

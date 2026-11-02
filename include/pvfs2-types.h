@@ -1713,9 +1713,9 @@ do { \
     if (_cred) \
     { \
         gossip_ladebug("PVFS_debug_PVFS_credential: " #_cred " = (%p)\n", _cred); \
-        gossip_ladebug(" userid:       %d\n", (_cred)->userid); \
-        gossip_ladebug(" num_groups:   %d\n", (_cred)->num_groups);   \
-        gossip_ladebug(" group_array (%p):\n", (_cred)->group_array);  \
+        gossip_ladebug("    userid:       %d\n", (_cred)->userid); \
+        gossip_ladebug("    num_groups:   %d\n", (_cred)->num_groups);   \
+        gossip_ladebug("    group_array (%p):\n", (_cred)->group_array);  \
         if((_cred)->num_groups > 0 && (_cred)->group_array) \
         { \
             int g; \
@@ -1726,9 +1726,9 @@ do { \
         }  \
         if((_cred)->issuer) \
         { \
-            gossip_ladebug(" issuer:  %s\n", (_cred)->issuer); \
+            gossip_ladebug("    issuer:  %s\n", (_cred)->issuer); \
         } \
-        gossip_ladebug(" sig_size:     %d\n", (_cred)->sig_size);  \
+        gossip_ladebug("    sig_size:     %d\n", (_cred)->sig_size);  \
         gossip_ladebug("PVFS_debug_credential End\n"); \
     } \
     else \

@@ -110,6 +110,7 @@ nested machine pvfs2_set_attr_work_sm
         default => work_cleanup;
     }
 
+/* setattr dirdata */
     state dirdata_write_distr_dir_data_if_required
     {
         run setattr_dirdata_write_distr_dir_data_if_required;
@@ -117,6 +118,7 @@ nested machine pvfs2_set_attr_work_sm
         default => work_cleanup;
     }
 
+/* common */
     state setobj_attrib
     {
         run setattr_setobj_attribs;

@@ -392,8 +392,7 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
     /* NOTE: we remove the dirent first because this gets the object
      * out of the system fastest.
      */
-    gossip_lsdebug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: rmdirent_setup_msgpair\n");
+    gossip_lsdebug(GOSSIP_CLIENT_DEBUG, "starting sm_p (%p)\n", sm_p);
 
     js_p->error_code = 0;
 
@@ -425,6 +424,17 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
                  "\t\t\tdirent string name is %s\n",
                  dirdata_server_index, sm_p->u.remove.object_name);
 
+    gossip_lsdebug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
+          "under %s,%d from dirdata server %s\n",
+          sm_p->u.remove.object_name,
+          PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
+                                           dirdata_server_index]),
+          sm_p->parent_ref.fs_id,
+          PVFS_SID_str(&sm_p->getattr.attr.u.dir.dirdata_sids[
+                                           dirdata_server_index * metasidcnt])
+          );
+
+    /* set up remote server request */
     PINT_msgpair_init(&sm_p->msgarray_op);
     msg_p = &sm_p->msgarray_op.msgpair;
 
@@ -437,15 +447,6 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
                  &sm_p->getattr.attr.u.dir.dirdata_sids[dirdata_server_index * metasidcnt],
                  sm_p->u.remove.object_name, /* string name of dirent */
                  sm_p->hints);
-
-    gossip_lsdebug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
-          "under %s,%d from dirdata server %s\n",
-          sm_p->u.remove.object_name,
-          PVFS_OID_str(&sm_p->parent_ref.handle),
-          sm_p->parent_ref.fs_id,
-          PVFS_OID_str(&sm_p->getattr.attr.u.dir.dirdata_handles[
-                                           dirdata_server_index])
-          );
 
     msg_p->msgclass = PVFS_IO_METADATA;
     msg_p->msgdir = PVFS_IO_WRITE;
@@ -466,11 +467,6 @@ static PINT_sm_action remove_rmdirent_setup_msgpair(struct PINT_smcb *smcb,
         gossip_err("Failed to map directory server address\n");
         js_p->error_code = ret;
     }
-
-    gossip_lsdebug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
-                 "under %s,%d\n", sm_p->u.remove.object_name,
-                 PVFS_OID_str(&sm_p->parent_ref.handle),
-                 sm_p->parent_ref.fs_id);
 
     PINT_sm_push_frame(smcb, 0, &sm_p->msgarray_op, M_OP);
     return SM_ACTION_COMPLETE;

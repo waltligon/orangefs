@@ -1217,14 +1217,14 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
                                 msg_p->recv_status.actual_size,
                                 &resp_p);
 
-    gossip_lsdebug(GOSSIP_GETATTR_DEBUG, "resp_p->op %d ########################\n", resp_p->op);
     PVFS_debug_servresp(GOSSIP_SERVER_DEBUG, resp_p);
 
     gossip_if(GOSSIP_MSGPAIR_DEBUG)
     {
-        gossip_lsadebug("PINT_serv_decode_resp: return code: (%d)\n", ret);
-        gossip_lsadebug("PINT_serv_decode_resp: msg_p->op_status: (%d)\n", msg_p->op_status);
-        gossip_lsadebug("PINT_serv_decode_resp: resp_p->status: (%d)\n", resp_p->status);
+        gossip_lsadebug("PINT_serv_decode_resp: return code: %d\n", ret);
+        gossip_lsadebug("PINT_serv_decode_resp: msg_p->op_status: %d\n", msg_p->op_status);
+        gossip_lsadebug("PINT_serv_decode_resp: resp_p->status: %d\n", resp_p->status);
+        gossip_lsadebug("PINT_serv_decode_resp: resp_p->status: %x\n", -resp_p->status & 0x7f);
         gossip_lsadebug("mop (%p) resp_p->op %d\n", mop, resp_p->op);
     }
     gossip_end;
@@ -1257,6 +1257,7 @@ static PINT_sm_action msgpairarray_complete_msg(struct PINT_smcb *smcb,
          */
         js_p->error_code = msg_p->op_status = resp_p->status;
         gossip_lsadebug("js_p->error_code %d\n", js_p->error_code);
+        gossip_lsadebug("js_p->error_code %x\n", -js_p->error_code & 0x7f);
 
         /* compute sizes based on message class */
         switch (msg_p->msgclass)

@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    /* Create each specified file */
+    /* Remove each specified file/directory */
     for (i = 0; i < user_opts->num_files; ++i)
     {
         int rc;
@@ -198,7 +198,7 @@ int main(int argc, char **argv)
                              NULL);
         if (rc)
         {
-            PVFS_perror("pvfs2-touch: PVFS_sys_remove", rc);
+            PVFS_perror("pvfs2-rmit: PVFS_sys_remove", rc);
             ret = -1;
             break;
         }

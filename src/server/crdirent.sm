@@ -418,9 +418,9 @@ static PINT_sm_action crdirent_get_bitmap_and_dirdata_handles(
    /* allocate space for keys and values */
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "allocating keyval data structures\n");
 
-   s_op->keyval_count = 2;
-   s_op->key_a = s_op->val_a = NULL;
-   s_op->error_a = NULL;
+    s_op->keyval_count = 2;
+    s_op->key_a = s_op->val_a = NULL;
+    s_op->error_a = NULL;
 
     s_op->key_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
     s_op->val_a = calloc(s_op->keyval_count, sizeof(PVFS_ds_keyval));
@@ -498,8 +498,6 @@ static PINT_sm_action crdirent_validate(struct PINT_smcb *smcb,
     attr_p = &s_op->attr;
 
     /* gossip bitmap, since jump from get_bitmap_and_dirdata_handles */
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "bitmap:\n");
-
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "attr_p (%p)\n", attr_p);
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "bitmap (%p)\n", attr_p->u.dirdata.dist_dir_bitmap);
 
@@ -757,7 +755,7 @@ static PINT_sm_action crdirent_update_dirdata_attr(struct PINT_smcb *smcb,
 
     dirdata_attr->objtype = PVFS_TYPE_DIRDATA;
 
-    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "update timestamp, type is %d\n ", ds_attr->type);
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "update timestamp, type is %d\n", ds_attr->type);
     dirdata_attr->ctime = dirdata_attr->mtime = PINT_util_get_current_time();
 
     gossip_lsdebug(GOSSIP_SERVER_DEBUG, "Old dirdata dirent_count %d\n",
@@ -953,123 +951,121 @@ static PINT_sm_action crdirent_remote_dir_update(struct PINT_smcb *smcb,
 {
     struct PINT_server_op *s_op = PINT_sm_frame(smcb, PINT_FRAME_CURRENT);
     int ret = -1;
+    
+    /* remote */
+    /* Here update the parent directory.  We don't have its attribs,
+     * but we can update the two times and the dirent_count with a
+     * setenv request.  Still not clear about local values versus
+     * remote values, for now We are updating both.
+     */
+
+    /* clear navigation flags */
+    if (js_p->error_code > -1)
     {
-        /* remote */
-        /* Here update the parent directory.  We don't have its attribs,
-         * but we can update the two times and the dirent_count with a
-         * setenv request.  Still not clear about local values versus
-         * remote values, for now We are updating both.
-         */
+        js_p->error_code = 0;
+    }
 
-        /* clear navigation flags */
-        if (js_p->error_code > -1)
-        {
-            js_p->error_code = 0;
-        }
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to send setattr "
+                   "request for directory handle %s\n",
+                   PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
 
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "About to send setattr "
-                     "request for directory handle %s\n",
-                     PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
+    PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_handle *capability_handles = NULL;
+    PVFS_object_attr tmp_attr;
 
-        PINT_sm_msgpair_state *msg_p = NULL;
-        PVFS_handle *capability_handles = NULL;
-        PVFS_object_attr tmp_attr;
+    PINT_msgpair_init(&s_op->msgarray_op);
+    msg_p = &s_op->msgarray_op.msgpair;
+    PINT_serv_init_msgarray_params(s_op, s_op->req->u.crdirent.fs_id);
 
-        PINT_msgpair_init(&s_op->msgarray_op);
-        msg_p = &s_op->msgarray_op.msgpair;
-        PINT_serv_init_msgarray_params(s_op, s_op->req->u.crdirent.fs_id);
+    /* If we created a capability in crdirent_update_parent_dir_timestamp
+     * we need to clean it up first. */
+    PINT_cleanup_capability(&s_op->u.crdirent.capability);
 
-        /* If we created a capability in crdirent_update_parent_dir_timestamp
-         * we need to clean it up first. */
-        PINT_cleanup_capability(&s_op->u.crdirent.capability);
+    /* This memory will be freed in either crdirent_cleanup or
+     * crdirent_find_split_entries by PINT_cleanup_capability. */
+    capability_handles = malloc(sizeof(PVFS_handle));
 
-        /* This memory will be freed in either crdirent_cleanup or
-         * crdirent_find_split_entries by PINT_cleanup_capability. */
-        capability_handles = malloc(sizeof(PVFS_handle));
-
-        if (! capability_handles)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return SM_ACTION_COMPLETE;
-        }
-
-        capability_handles[0] = s_op->req->u.crdirent.parent_ref.handle;
-        ret = PINT_server_to_server_capability(&s_op->u.crdirent.capability,
-                                               s_op->req->u.crdirent.parent_ref.fs_id,
-                                               1,
-                                               capability_handles);
-        if (ret != 0)
-        {
-            js_p->error_code = ret;
-            return SM_ACTION_COMPLETE;
-        }
-        /* The only thing we need to change is CTIME, so all we have to
-         * do is set that flag in the representation of the attributes
-         * we want to change. we do update the dirent_count too
-         */
-        memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-        tmp_attr.mask = PVFS_ATTR_COMMON_CTIME; /* set time to remote server time */
-
-        /* update dirent_count on DIR which sums all dirdata for this dir */
-        /* does s_op->req->u.crdirent.parent_attr.u.dir.dirent_count exist?
-         * was this a crdirent req or some other req that called crdirent
-         */
-#if 0
-        tmp_attr.u.dir.dirent_count = 
-            s_op->req->u.crdirent.parent_attr.u.dir.dirent_count + 1;
-        tmp_attr.mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
-#endif
-
-        /* Capability was initialized earlier. */
-        /* Does an attr copy */
-        PINT_SERVREQ_SETATTR_FILL(msg_p->req,
-                                  PVFS_REQ_DIRDATA,
-                                  s_op->u.crdirent.capability,
-                                  s_op->req->u.crdirent.credential,
-                                  s_op->req->u.crdirent.parent_ref.fs_id,
-                                  s_op->req->u.crdirent.parent_ref.handle,
-                                  s_op->req->u.crdirent.parent_ref.sid_count,
-                                  s_op->req->u.crdirent.parent_ref.sid_array,
-                                  tmp_attr,
-                                  s_op->req->hints);
-
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "handle %s\n",
-                       PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
-
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG, "sid %s\n",
-                       PVFS_SID_str(&s_op->req->u.crdirent.parent_ref.sid_array[0]));
-
-        msg_p->msgclass = PVFS_IO_METADATA;
-        msg_p->msgdir = PVFS_IO_WRITE;
-        msg_p->fs_id = s_op->req->u.crdirent.parent_ref.fs_id;
-        msg_p->handle = s_op->req->u.crdirent.parent_ref.handle;
-        msg_p->sid_count = s_op->req->u.crdirent.parent_ref.sid_count;
-        msg_p->sid_index = 0;
-        msg_p->sid_array = s_op->req->u.crdirent.parent_ref.sid_array;
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-        msg_p->comp_fn = NULL;
-
-        gossip_lsdebug(GOSSIP_SERVER_DEBUG,
-                     "setting timestamps for directory handle %s SID %s\n",
-                     PVFS_OID_str(&msg_p->handle),
-                     PVFS_SID_str(&s_op->req->u.crdirent.parent_ref.sid_array[0])
-                     );
-
-        ret = PVFS_SID_get_addr(&msg_p->svr_addr,
-                                &s_op->req->u.crdirent.parent_ref.sid_array[0]);
-        if (ret)
-        {
-            gossip_err("Failed to map dirdata server address\n");
-            js_p->error_code = ret;
-            return SM_ACTION_COMPLETE;
-        }
-
-        /* ready to submit the requests */
-        PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
+    if (! capability_handles)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
         return SM_ACTION_COMPLETE;
     }
 
-   return ret;
+    capability_handles[0] = s_op->req->u.crdirent.parent_ref.handle;
+    ret = PINT_server_to_server_capability(&s_op->u.crdirent.capability,
+                                           s_op->req->u.crdirent.parent_ref.fs_id,
+                                           1,
+                                           capability_handles);
+    if (ret != 0)
+    {
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+    /* The only thing we need to change is CTIME, so all we have to
+     * do is set that flag in the representation of the attributes
+     * we want to change. we do update the dirent_count too
+     */
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+    tmp_attr.objtype = PVFS_TYPE_DIRDATA;
+    tmp_attr.mask = PVFS_ATTR_COMMON_CTIME; /* set time to remote server time */
+
+    /* update dirent_count on DIR which sums all dirdata for this dir */
+    /* does s_op->req->u.crdirent.parent_attr.u.dir.dirent_count exist?
+     * was this a crdirent req or some other req that called crdirent
+     */
+#if 0
+    tmp_attr.u.dir.dirent_count = 
+        s_op->req->u.crdirent.parent_attr.u.dir.dirent_count + 1;
+    tmp_attr.mask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+#endif
+
+    /* Capability was initialized earlier. */
+    /* Does an attr copy */
+    PINT_SERVREQ_SETATTR_FILL(msg_p->req,
+                              PVFS_REQ_DIRDATA,
+                              s_op->u.crdirent.capability,
+                              s_op->req->u.crdirent.credential,
+                              s_op->req->u.crdirent.parent_ref.fs_id,
+                              s_op->req->u.crdirent.parent_ref.handle,
+                              s_op->req->u.crdirent.parent_ref.sid_count,
+                              s_op->req->u.crdirent.parent_ref.sid_array,
+                              tmp_attr,
+                              s_op->req->hints);
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "handle %s\n",
+                   PVFS_OID_str(&s_op->req->u.crdirent.parent_ref.handle));
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG, "sid %s\n",
+                   PVFS_SID_str(&s_op->req->u.crdirent.parent_ref.sid_array[0]));
+
+    msg_p->msgclass = PVFS_IO_METADATA;
+    msg_p->msgdir = PVFS_IO_WRITE;
+    msg_p->fs_id = s_op->req->u.crdirent.parent_ref.fs_id;
+    msg_p->handle = s_op->req->u.crdirent.parent_ref.handle;
+    msg_p->sid_count = s_op->req->u.crdirent.parent_ref.sid_count;
+    msg_p->sid_index = 0;
+    msg_p->sid_array = s_op->req->u.crdirent.parent_ref.sid_array;
+    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
+    msg_p->comp_fn = NULL;
+
+    gossip_lsdebug(GOSSIP_SERVER_DEBUG,
+                 "setting timestamps for directory handle %s SID %s\n",
+                 PVFS_OID_str(&msg_p->handle),
+                 PVFS_SID_str(&s_op->req->u.crdirent.parent_ref.sid_array[0])
+                 );
+
+    ret = PVFS_SID_get_addr(&msg_p->svr_addr,
+                            &s_op->req->u.crdirent.parent_ref.sid_array[0]);
+    if (ret)
+    {
+        gossip_err("Failed to map dirdata server address\n");
+        js_p->error_code = ret;
+        return SM_ACTION_COMPLETE;
+    }
+
+    /* ready to submit the requests */
+    PINT_sm_push_frame(smcb, 0, &s_op->msgarray_op, M_OP);
+    return SM_ACTION_COMPLETE;
 }
 
 #if 0

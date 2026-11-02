@@ -1660,10 +1660,10 @@ do {                                                        \
     {                                                       \
         gossip_lsadebug("Setattr Request " #_req " = (%p)\n", (_req)); \
         PVFS_debug_afield(&treq->handle, PVFS_handle);      \
-        PVFS_debug_afield(&((treq)->credential), PVFS_credential);\
         PVFS_debug_afield(treq->fs_id, PVFS_fs_id);         \
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, PVFS_SID);       \
+        PVFS_debug_afield(&((treq)->credential), PVFS_credential);\
         PVFS_debug_PVFS_attr(_mask, &treq->attr);           \
         gossip_lsadebug("Setattr End:\n");                  \
     }                                                       \
@@ -2185,8 +2185,8 @@ do {                                                        \
         gossip_lsadebug("Rmdirent Request:\n");             \
         gossip_lsadebug("req = (%p)\n", (req));             \
         PVFS_debug_afield(treq->entry, char);               \
-        PVFS_debug_afield(&treq->handle, PVFS_handle);       \
-        PVFS_debug_afield(treq->parent, PVFS_object_ref);   \
+        PVFS_debug_afield(&(treq->handle), PVFS_handle);    \
+        PVFS_debug_afield(&(treq->parent), PVFS_object_ref);\
         PVFS_debug_afield(treq->sid_count, int32_t);        \
         PVFS_debug_afield(treq->sid_array, PVFS_SID);       \
         gossip_lsadebug("Rmdirent End:\n");                 \
